@@ -1,10 +1,11 @@
-define void @inst_add(){
+
+define i32 @inst_add(){
     %x = add i32 2,1
-    ret void
+    ret i32 %x
 }
 
 define i32 @main(){
-    call void @inst_add()
+    call i32 @inst_add()
     ret i32 0
 }
 

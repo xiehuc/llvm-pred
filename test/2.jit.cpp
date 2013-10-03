@@ -17,6 +17,9 @@
 using namespace llvm;
 using namespace std;
 
+void empty(){
+}
+
 int main()
 {
     InitializeNativeTarget();
@@ -29,11 +32,13 @@ int main()
     Function * func = m->getFunction("inst_add");
     void* fptr = ee->getPointerToFunction(func);
     void (*fp)() = (void (*)())(intptr_t)fptr;
-    struct timeval beg,end;
-    gettimeofday(&beg, 0);
-    int i;
-    for(i=0;i<1000;i++)
-        fp();
-    gettimeofday(&end, 0);
-    cout<<"us:"<<end.tv_usec-beg.tv_usec<<endl;
+    struct timespec beg,end;
+    clock_gettime(CLOCK_MONOTONIC, &beg);
+    empty();
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    cout<<"nano second:"<<end.tv_nsec-beg.tv_nsec<<endl;
+    clock_gettime(CLOCK_MONOTONIC, &beg);
+    fp();
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    cout<<"nano second:"<<end.tv_nsec-beg.tv_nsec<<endl;
 }
