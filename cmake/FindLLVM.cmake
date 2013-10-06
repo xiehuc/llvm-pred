@@ -13,10 +13,26 @@
 # LLVM_LD_FLAGS     - Additional flags to pass to the linker.
 # LLVM_LIBRARY_DIRS - A list of directories where the LLVM libraries are located.
 # LLVM_INCLUDE_DIRS - A list of directories where the LLVM headers are located.
-# LLVM_LIBRARIES    - A list of libraries which should be linked against.
+# LLVM_DEFINITIONS  - The definitions should be used
+# LLVM_DEPENT_LIBRARIES - A list of libraries which should be linked
 # 
 # Using Following macros to set library:
-# llvm_map_components_to_libraries
+# llvm_map_components_to_libraries(OUTPUT_VARIABLE ${llvm components})
+# 
+# example:
+# 
+# include_directories(${LLVM_INCLUDE_DIRS})
+# link_directories(${LLVM_LIBRARY_DIRS})
+# add_definitions(${LLVM_DEFINITIONS} --std=c++11)
+# 
+# 
+# llvm_map_components_to_libraries(LLVM_IRREADER_LIRARY irreader)
+# 
+# add_executable(irread 1.irread.cpp)
+# target_link_libraries(target
+#     ${LLVM_DEPEND_LIBRARIES}
+#     ${LLVM_IRREADER_LIRARY}
+#     )
 #
 if(NOT DEFINED ${LLVM_RECOMMAND_VERSION})
     SET(LLVM_RECOMMAND_VERSION 3.2)
@@ -29,6 +45,8 @@ if(NOT DEFINED ${LLVM_ROOT})
   if(NOT LLVM_CONFIG_EXE)
       set(LLVM_FOUND False)
       message(FATAL_ERROR "Not Found LLVM")
+  else()
+      set(LLVM_FOUND True)
   endif()
 
   # Get the directory of llvm by using llvm-config. also remove whitespaces.
@@ -55,12 +73,9 @@ _llvm_config(LLVM_CPP_FLAGS --cppflags)
 _llvm_config(LLVM_CXX_FLAGS --cxxflags)
 _llvm_config(LLVM_LD_FLAGS --ldflags)
 string(REGEX MATCH "-l.*" LLVM_DEPEND_LIBRARIES ${LLVM_LD_FLAGS})
-message(STATUS "${LLVM_DEPEND_LIBRARIES}")
-message(STATUS "${LLVM_LD_FLAGS}")
 
 macro(llvm_map_components_to_libraries _var_name)
     _llvm_config(${_var_name} --libs "${ARGN}")
-    #string(REPLACE "-l" "" ${_var_name} "${${_var_name}}")
 endmacro()
 
 message(STATUS "Found LLVM Version ${LLVM_VERSION} ")
