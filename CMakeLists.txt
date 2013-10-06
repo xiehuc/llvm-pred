@@ -6,6 +6,4 @@ set(CMAKE_MODULE_PATH
     ${CMAKE_SOURCE_DIR}/cmake
     )
 
-#find_package(LLVM)
-
-message(LLVM_LIBRARY)
+find_package(LLVM)
