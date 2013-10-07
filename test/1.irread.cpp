@@ -1,8 +1,11 @@
-#include <llvm/IR/Module.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/Support/SourceMgr.h>
-#include <llvm/IRReader/IRReader.h>
-#include <llvm/Support/InstIterator.h>
+//#include <llvm/IR/Module.h>
+//#include <llvm/IR/LLVMContext.h>
+//#include <llvm/Support/SourceMgr.h>
+//#include <llvm/IRReader/IRReader.h>
+//#include <llvm/Support/InstIterator.h>
+
+#include "head.h"
+
 #include <iostream>
 #include <map>
 

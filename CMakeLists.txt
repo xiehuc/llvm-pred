@@ -8,4 +8,7 @@ set(CMAKE_MODULE_PATH
 
 find_package(LLVM)
 
+configure_file(config.h.in config.h)
+configure_file(head.h head.h COPYONLY)
+
 add_subdirectory(test)
