@@ -34,13 +34,18 @@
 #     ${LLVM_IRREADER_LIRARY}
 #     )
 #
-if(NOT DEFINED ${LLVM_RECOMMAND_VERSION})
+if(NOT DEFINED LLVM_RECOMMAND_VERSION)
     SET(LLVM_RECOMMAND_VERSION 3.2)
 endif()
 
-if(NOT DEFINED ${LLVM_ROOT})
-  # find llvm-config. perfers to the one with version suffix, Ex:llvm-config-3.2
-  find_program(LLVM_CONFIG_EXE NAMES "llvm-config-${LLVM_RECOMMAND_VERSION}" "llvm-config")
+
+#if(NOT(DEFINED LLVM_ROOT) OR NOT("${LLVM_VERSION_LAST}" VERSION_EQUAL "${LLVM_RECOMMAND_VERSION}"))
+if(NOT(DEFINED LLVM_ROOT) )
+    if(NOT "${LLVM_VERSION}" EQUAL "{LLVM_RECOMMAND_VERSION}")
+        unset(LLVM_CONFIG_EXE CACHE)
+    endif()
+    # find llvm-config. perfers to the one with version suffix, Ex:llvm-config-3.2
+    find_program(LLVM_CONFIG_EXE NAMES "llvm-config-${LLVM_RECOMMAND_VERSION}" "llvm-config")
 
   if(NOT LLVM_CONFIG_EXE)
       set(LLVM_FOUND False)

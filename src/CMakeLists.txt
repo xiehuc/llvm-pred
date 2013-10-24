@@ -12,7 +12,6 @@ add_executable(llvm-pred
 
 target_link_libraries(llvm-pred
 	${LLVM_PRED_LIBRARY}
-	pthread
-	dl
+    ${LLVM_LIBRARIES}
 	)
 
