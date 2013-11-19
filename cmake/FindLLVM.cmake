@@ -14,7 +14,7 @@
 # LLVM_LIBRARY_DIRS - A list of directories where the LLVM libraries are located.
 # LLVM_INCLUDE_DIRS - A list of directories where the LLVM headers are located.
 # LLVM_DEFINITIONS  - The definitions should be used
-# LLVM_DEPENT_LIBRARIES - A list of libraries which should be linked
+# LLVM_LIBRARIES    - A list of libraries which should be linked
 # 
 # Using Following macros to set library:
 # llvm_map_components_to_libraries(OUTPUT_VARIABLE ${llvm components})
