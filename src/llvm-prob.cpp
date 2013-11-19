@@ -23,6 +23,29 @@ namespace {
               cl::Required);
 };
 
+namespace {
+    class FrequencyPrintPass:public FunctionPass 
+    {
+        static char ID;
+        public:
+        explicit FrequencyPrintPass(): FunctionPass(ID) {}
+        void getAnalysisUsage(AnalysisUsage &AU) const 
+        {
+            AU.setPreservesAll();
+            AU.addRequired<BlockFrequencyInfo>();
+        }
+        bool runOnFunction(Function& F)
+        {
+            BlockFrequencyInfo& BFI = getAnalysis<BlockFrequencyInfo>();
+            BFI.print(outs(), F.getParent());
+
+            return 0;
+        }
+    };
+};
+
+char FrequencyPrintPass::ID = 0;
+
 int main(int argc, char **argv) {
   // Print a stack trace if we signal out.
   sys::PrintStackTraceOnErrorSignal();
@@ -55,6 +78,7 @@ int main(int argc, char **argv) {
 
   FunctionPassManager f_pass_mgr(M);
   f_pass_mgr.add(new BlockFrequencyInfo());
+  f_pass_mgr.add(new FrequencyPrintPass());
 
   for( auto& func : *M ){
       f_pass_mgr.run(func);
