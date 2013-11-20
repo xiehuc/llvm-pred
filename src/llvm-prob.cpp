@@ -36,8 +36,10 @@ namespace {
         }
         bool runOnFunction(Function& F)
         {
+            outs()<<"Function:"<<F.getName();
             BlockFrequencyInfo& BFI = getAnalysis<BlockFrequencyInfo>();
             BFI.print(outs(), F.getParent());
+            outs()<<"----------------------\n";
 
             return 0;
         }
