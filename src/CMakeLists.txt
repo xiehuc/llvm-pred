@@ -23,3 +23,12 @@ target_link_libraries(llvm-prob
     ${LLVM_PRED_LIBRARY}
     ${LLVM_LIBRARIES}
     )
+
+add_executable(llvm-loop
+    llvm-loop.cpp
+    )
+
+target_link_libraries(llvm-loop
+    ${LLVM_PRED_LIBRARY}
+    ${LLVM_LIBRARIES}
+    )
