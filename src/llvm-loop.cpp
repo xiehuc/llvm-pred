@@ -13,7 +13,9 @@
 #include <llvm/Support/system_error.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include <llvm/IR/Instructions.h>
 #include <llvm/Analysis/LoopInfo.h>
+#include <llvm/Transforms/Utils/SimplifyIndVar.h>
 
 using namespace llvm;
 
@@ -39,6 +41,21 @@ namespace {
             outs()<<"Function:"<<F.getName()<<"\n";
             LoopInfo& LI = getAnalysis<LoopInfo>();
             LI.print(outs(), F.getParent());
+			for(auto ite = LI.begin(), end = LI.end();ite!=end;ite++){
+				Loop* L = *ite;
+				outs()<<"---phi node---\n";
+				PHINode* phi = L->getCanonicalInductionVariable();
+				phi->print(outs());
+				outs()<<"\n";
+				if(phi == NULL) continue;
+				Value* v1 = phi->getIncomingValue(0);
+				for(auto use = v1->use_begin(),end = v1->use_end();use!=end;use++){
+					use->print(outs());
+					outs()<<"\n";
+
+				}
+				outs()<<"\n";
+			}
             outs()<<"----------------------\n";
 
             return 0;
