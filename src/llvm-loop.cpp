@@ -43,16 +43,35 @@ namespace {
             LI.print(outs(), F.getParent());
 			for(auto ite = LI.begin(), end = LI.end();ite!=end;ite++){
 				Loop* L = *ite;
-				outs()<<"---phi node---\n";
+				outs()<<"phi node: ";
 				PHINode* phi = L->getCanonicalInductionVariable();
 				phi->print(outs());
 				outs()<<"\n";
 				if(phi == NULL) continue;
+				outs()<<"--- users ---"<<"\n";
 				Value* v1 = phi->getIncomingValue(0);
 				for(auto use = v1->use_begin(),end = v1->use_end();use!=end;use++){
-					use->print(outs());
-					outs()<<"\n";
-
+					if(isa<Instruction>(*use)){
+						Instruction* i = dyn_cast<Instruction>(*use);
+						// this is self node, so ignore it.
+						if ( i == phi ) continue;
+						i->print(outs());outs()<<"\n";
+						if(i->getNumOperands() != 2) continue;
+						assert((i->getNumOperands() == 2) && "if num operands isn't 2 , what it could be?");
+						int idx = -1;
+						idx = i->getOperand(0) == v1 ? 1:0;
+						Use& bnd = i->getOperandUse(idx);
+						//operand(idx) is another variable, which may be boundary condition;
+						if(!bnd->getName().startswith("bnd.")) continue;
+						outs()<<"boundary variable: "<<bnd->getName()<<"\n";
+						for( auto bu = bnd->use_begin();bu != bnd->use_end();bu++){
+							bu->print(outs());
+							outs()<<"\n";
+						}
+					}else if(isa<Constant>(*use)){
+					}else{
+						assert(1&&"this is not a instruction, so what is it?");
+					}
 				}
 				outs()<<"\n";
 			}
