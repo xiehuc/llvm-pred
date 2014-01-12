@@ -64,10 +64,14 @@ namespace {
 						//operand(idx) is another variable, which may be boundary condition;
 						if(!bnd->getName().startswith("bnd.")) continue;
 						outs()<<"boundary variable: "<<bnd->getName()<<"\n";
-						for( auto bu = bnd->use_begin();bu != bnd->use_end();bu++){
-							bu->print(outs());
-							outs()<<"\n";
-						}
+						//a value is a instruction; it's content is where assign it
+						bnd->print(outs());outs()<<"\n";
+						Instruction* bnd_i = dyn_cast<Instruction>(bnd);
+						if(!bnd_i) continue;
+						Value* vv1 = bnd_i->getOperand(0);
+						vv1->print(outs());outs()<<"\n";
+
+
 					}else if(isa<Constant>(*use)){
 					}else{
 						assert(1&&"this is not a instruction, so what is it?");
