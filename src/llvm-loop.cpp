@@ -16,6 +16,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/Analysis/LoopInfo.h>
 #include <llvm/Transforms/Utils/SimplifyIndVar.h>
+#include "loop.h"
 
 using namespace llvm;
 
@@ -36,6 +37,23 @@ namespace {
             AU.setPreservesAll();
             AU.addRequired<LoopInfo>();
         }
+		bool runOnFunction(Function& F)
+		{
+            outs()<<"Function:"<<F.getName()<<"\n";
+            LoopInfo& LI = getAnalysis<LoopInfo>();
+            LI.print(outs(), F.getParent());
+			for(auto ite = LI.begin(), end = LI.end();ite!=end;ite++){
+				Loop* L = *ite;
+				Value* endcond = ll::Loop::getCanonicalEndCondition(L);
+				outs()<<"end condition:";
+				endcond->print(outs());
+				outs()<<"\n";
+				if(endcond) ll::pretty_print(endcond);
+
+			}
+
+		}
+#if 0
         bool runOnFunction(Function& F)
         {
             outs()<<"Function:"<<F.getName()<<"\n";
@@ -83,6 +101,7 @@ namespace {
 
             return 0;
         }
+#endif
     };
 };
 
