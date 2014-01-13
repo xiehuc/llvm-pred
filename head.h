@@ -5,7 +5,7 @@
 #include <llvm/LLVMContext.h>
 #include <llvm/Module.h>
 #include <llvm/Support/IRReader.h>
-#elif LLVM_VERSION_MINOR == 3
+#elif LLVM_VERSION_MINOR >= 3
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IRReader/IRReader.h>
