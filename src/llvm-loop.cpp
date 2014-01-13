@@ -48,7 +48,7 @@ namespace {
 				outs()<<"end condition:";
 				endcond->print(outs());
 				outs()<<"\n";
-				if(endcond) ll::pretty_print(endcond);
+				if(endcond){ ll::pretty_print(endcond);outs()<<"\n";}
 
 			}
 

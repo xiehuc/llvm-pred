@@ -31,6 +31,7 @@ target_link_libraries(llvm-prob
 
 add_executable(llvm-loop
     llvm-loop.cpp
+	loop.cpp
     )
 
 target_link_libraries(llvm-loop
