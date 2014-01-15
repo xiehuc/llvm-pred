@@ -32,6 +32,7 @@ namespace ll {
 				}
 	};
 
-	void pretty_print(BinaryOperator* bin);
 	void pretty_print(Value* v);
+	/** unfinished yet **/
+	void latex_print(Value* v);
 }
