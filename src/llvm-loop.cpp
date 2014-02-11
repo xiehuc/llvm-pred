@@ -21,9 +21,9 @@
 using namespace llvm;
 
 namespace {
-  cl::opt<std::string>
-  BitcodeFile(cl::Positional, cl::desc("<program bitcode file>"),
-              cl::Required);
+	cl::opt<std::string>
+		BitcodeFile(cl::Positional, cl::desc("<program bitcode file>"),
+				cl::Required);
 };
 
 namespace {
@@ -37,114 +37,72 @@ namespace {
             AU.setPreservesAll();
             AU.addRequired<LoopInfo>();
         }
+		void runOnLoop(Loop* L)
+		{
+			Value* endcond = ll::Loop::getCanonicalEndCondition(L);
+			outs()<<"end condition at depth"<<L->getLoopDepth()<<":";
+			endcond->print(outs());
+			outs()<<"\n";
+			if(endcond){ ll::latex_print(endcond);outs()<<"\n";}
+
+			if(!L->getSubLoops().empty()){
+				for(auto I = L->getSubLoops().begin(),E = L->getSubLoops().end();I!=E;I++)
+					runOnLoop(*I);
+			}
+		}
 		bool runOnFunction(Function& F)
 		{
-            outs()<<"Function:"<<F.getName()<<"\n";
-            LoopInfo& LI = getAnalysis<LoopInfo>();
-            LI.print(outs(), F.getParent());
+			StringRef func_name = F.getName();
+			outs()<<"Function:"<<func_name<<"\n";
+			LoopInfo& LI = getAnalysis<LoopInfo>();
+			LI.print(outs(), F.getParent());
 			for(auto ite = LI.begin(), end = LI.end();ite!=end;ite++){
-				Loop* L = *ite;
-				Value* endcond = ll::Loop::getCanonicalEndCondition(L);
-				outs()<<"end condition:";
-				endcond->print(outs());
-				outs()<<"\n";
-				if(endcond){ ll::pretty_print(endcond);outs()<<"\n";}
-
+				runOnLoop(*ite);
 			}
-
 		}
-#if 0
-        bool runOnFunction(Function& F)
-        {
-            outs()<<"Function:"<<F.getName()<<"\n";
-            LoopInfo& LI = getAnalysis<LoopInfo>();
-            LI.print(outs(), F.getParent());
-			for(auto ite = LI.begin(), end = LI.end();ite!=end;ite++){
-				Loop* L = *ite;
-				outs()<<"phi node: ";
-				PHINode* phi = L->getCanonicalInductionVariable();
-				phi->print(outs());
-				outs()<<"\n";
-				if(phi == NULL) continue;
-				outs()<<"--- users ---"<<"\n";
-				Value* v1 = phi->getIncomingValue(0);
-				for(auto use = v1->use_begin(),end = v1->use_end();use!=end;use++){
-					if(isa<Instruction>(*use)){
-						Instruction* i = dyn_cast<Instruction>(*use);
-						// this is self node, so ignore it.
-						if ( i == phi ) continue;
-						i->print(outs());outs()<<"\n";
-						if(i->getNumOperands() != 2) continue;
-						assert((i->getNumOperands() == 2) && "if num operands isn't 2 , what it could be?");
-						int idx = -1;
-						idx = i->getOperand(0) == v1 ? 1:0;
-						Use& bnd = i->getOperandUse(idx);
-						//operand(idx) is another variable, which may be boundary condition;
-						if(!bnd->getName().startswith("bnd.")) continue;
-						outs()<<"boundary variable: "<<bnd->getName()<<"\n";
-						//a value is a instruction; it's content is where assign it
-						bnd->print(outs());outs()<<"\n";
-						Instruction* bnd_i = dyn_cast<Instruction>(bnd);
-						if(!bnd_i) continue;
-						Value* vv1 = bnd_i->getOperand(0);
-						vv1->print(outs());outs()<<"\n";
-
-
-					}else if(isa<Constant>(*use)){
-					}else{
-						assert(1&&"this is not a instruction, so what is it?");
-					}
-				}
-				outs()<<"\n";
-			}
-            outs()<<"----------------------\n";
-
-            return 0;
-        }
-#endif
     };
 };
 
 char LoopPrintPass::ID = 0;
 
 int main(int argc, char **argv) {
-  // Print a stack trace if we signal out.
-  sys::PrintStackTraceOnErrorSignal();
-  PrettyStackTraceProgram X(argc, argv);
+	// Print a stack trace if we signal out.
+	sys::PrintStackTraceOnErrorSignal();
+	PrettyStackTraceProgram X(argc, argv);
 
-  LLVMContext &Context = getGlobalContext();
-  llvm_shutdown_obj Y;  // Call llvm_shutdown() on exit.
-  
-  cl::ParseCommandLineOptions(argc, argv, "llvm profile dump decoder\n");
+	LLVMContext &Context = getGlobalContext();
+	llvm_shutdown_obj Y;  // Call llvm_shutdown() on exit.
 
-  // Read in the bitcode file...
-  std::string ErrorMessage;
-  OwningPtr<MemoryBuffer> Buffer;
-  error_code ec;
-  Module *M = 0;
-  if (!(ec = MemoryBuffer::getFileOrSTDIN(BitcodeFile, Buffer))) {
-    M = ParseBitcodeFile(Buffer.get(), Context, &ErrorMessage);
-  } else
-    ErrorMessage = ec.message();
-  if (M == 0) {
-    errs() << argv[0] << ": " << BitcodeFile << ": "
-      << ErrorMessage << "\n";
-    return 1;
-  }
+	cl::ParseCommandLineOptions(argc, argv, "llvm profile dump decoder\n");
 
-  // Read the profiling information. This is redundant since we load it again
-  // using the standard profile info provider pass, but for now this gives us
-  // access to additional information not exposed via the ProfileInfo
-  // interface.
+	// Read in the bitcode file...
+	std::string ErrorMessage;
+	OwningPtr<MemoryBuffer> Buffer;
+	error_code ec;
+	Module *M = 0;
+	if (!(ec = MemoryBuffer::getFileOrSTDIN(BitcodeFile, Buffer))) {
+		M = ParseBitcodeFile(Buffer.get(), Context, &ErrorMessage);
+	} else
+		ErrorMessage = ec.message();
+	if (M == 0) {
+		errs() << argv[0] << ": " << BitcodeFile << ": "
+			<< ErrorMessage << "\n";
+		return 1;
+	}
 
-  FunctionPassManager f_pass_mgr(M);
-  f_pass_mgr.add(new LoopInfo());
-  f_pass_mgr.add(new LoopPrintPass());
+	// Read the profiling information. This is redundant since we load it again
+	// using the standard profile info provider pass, but for now this gives us
+	// access to additional information not exposed via the ProfileInfo
+	// interface.
 
-  for( auto& func : *M ){
-      f_pass_mgr.run(func);
-  }
+	FunctionPassManager f_pass_mgr(M);
+	f_pass_mgr.add(new LoopInfo());
+	f_pass_mgr.add(new LoopPrintPass());
+
+	for( auto& func : *M ){
+		f_pass_mgr.run(func);
+	}
 
 
-  return 0;
+	return 0;
 }
