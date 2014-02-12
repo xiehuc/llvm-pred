@@ -4,17 +4,15 @@
 #include <iostream>
 #include <llvm/Support/raw_ostream.h>
 
-namespace ll 
+namespace lle
 {
+	class Loop:public llvm::Loop{
+		public:
+			llvm::Value* getInductionStartValue();
+			llvm::Value* getCanonicalEndCondition();
+	};
 
-	using namespace llvm;
-
-	namespace Loop{
-		Value* getInductionStartValue(llvm::Loop* loop);
-		Value* getCanonicalEndCondition(llvm::Loop* loop);
-	}
-
-	void pretty_print(Value* v);
+	void pretty_print(llvm::Value* v);
 	/** unfinished yet **/
-	void latex_print(Value* v);
+	void latex_print(llvm::Value* v);
 }

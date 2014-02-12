@@ -4,66 +4,62 @@
 
 #include <map>
 
-namespace ll 
+namespace lle
 {
-
 	using namespace llvm;
 
-	namespace Loop 
+	//may not be constant
+	Value* Loop::getInductionStartValue()
 	{
-		//may not be constant
-		Value* getInductionStartValue(llvm::Loop* loop)
-		{
-			// inspired from Loop::getCanonicalInductionVariable
-			BasicBlock *H = loop->getHeader();
+		// inspired from Loop::getCanonicalInductionVariable
+		BasicBlock *H = getHeader();
 
-			BasicBlock *Incoming = 0, *Backedge = 0;
-			pred_iterator PI = pred_begin(H);
-			assert(PI != pred_end(H) &&
-					"Loop must have at least one backedge!");
-			Backedge = *PI++;
-			if (PI == pred_end(H)) return 0;  // dead loop
-			Incoming = *PI++;
-			if (PI != pred_end(H)) return 0;  // multiple backedges?
+		BasicBlock *Incoming = 0, *Backedge = 0;
+		pred_iterator PI = pred_begin(H);
+		assert(PI != pred_end(H) &&
+				"Loop must have at least one backedge!");
+		Backedge = *PI++;
+		if (PI == pred_end(H)) return 0;  // dead loop
+		Incoming = *PI++;
+		if (PI != pred_end(H)) return 0;  // multiple backedges?
 
-			if (loop->contains(Incoming)) {
-				if (loop->contains(Backedge))
-					return 0;
-				std::swap(Incoming, Backedge);
-			} else if (!contains(Backedge))
+		if (contains(Incoming)) {
+			if (contains(Backedge))
 				return 0;
+			std::swap(Incoming, Backedge);
+		} else if (!contains(Backedge))
+			return 0;
 
-			Value* candidate = NULL;
-			for(auto I = H->begin();isa<PHINode>(I);++I){
-				PHINode* P = cast<PHINode>(I);
-				if(candidate) assert("there are more than one induction,Why???")
+		Value* candidate = NULL;
+		for(auto I = H->begin();isa<PHINode>(I);++I){
+			PHINode* P = cast<PHINode>(I);
+			if(candidate) assert("there are more than one induction,Why???");
 				candidate = P->getIncomingValueForBlock(Incoming);
+		}
+		return candidate;
+	}
+	Value* Loop::getCanonicalEndCondition()
+	{
+		//i
+		PHINode* ind = getCanonicalInductionVariable();
+		ind->print(outs());
+		if(ind == NULL) return NULL;
+		//i++
+		Value* indpp = ind->getIncomingValueForBlock(getLoopLatch());
+		for(auto ii = indpp->use_begin(), ee = indpp->use_end();ii!=ee;++ii){
+			Instruction* inst = dyn_cast<Instruction>(*ii);
+			if(!inst) continue;
+			if(inst->getOpcode() == Instruction::ICmp){
+				Value* v1 = inst->getOperand(0);
+				Value* v2 = inst->getOperand(1);
+				if(v1 == indpp && isLoopInvariant(v2)) return v2;
+				if(v2 == indpp && isLoopInvariant(v1)) return v1;
 			}
-			return candidate;
 		}
-		Value* getCanonicalEndCondition(llvm::Loop* loop)
-		{
-			//i
-			PHINode* ind = loop->getCanonicalInductionVariable();
-			ind->print(outs());
-			if(ind == NULL) return NULL;
-			//i++
-			Value* indpp = ind->getIncomingValueForBlock(loop->getLoopLatch());
-			for(auto ii = indpp->use_begin(), ee = indpp->use_end();ii!=ee;++ii){
-				Instruction* inst = dyn_cast<Instruction>(*ii);
-				if(!inst) continue;
-				if(inst->getOpcode() == Instruction::ICmp){
-					Value* v1 = inst->getOperand(0);
-					Value* v2 = inst->getOperand(1);
-					if(v1 == indpp && loop->isLoopInvariant(v2)) return v2;
-					if(v2 == indpp && loop->isLoopInvariant(v1)) return v1;
-				}
-			}
-			return NULL;
-		}
-		PHINode* getInductionVariable(llvm::Loop* loop)
-		{
-		}
+		return NULL;
+	}
+	PHINode* getInductionVariable(llvm::Loop* loop)
+	{
 	}
 
 	static

@@ -37,13 +37,14 @@ namespace {
             AU.setPreservesAll();
             AU.addRequired<LoopInfo>();
         }
-		void runOnLoop(Loop* L)
+		void runOnLoop(Loop* l)
 		{
-			Value* endcond = ll::Loop::getCanonicalEndCondition(L);
+			lle::Loop* L = static_cast<lle::Loop*>(l);
+			Value* endcond = L->getCanonicalEndCondition();
 			outs()<<"end condition at depth"<<L->getLoopDepth()<<":";
 			endcond->print(outs());
 			outs()<<"\n";
-			if(endcond){ ll::latex_print(endcond);outs()<<"\n";}
+			if(endcond){ lle::latex_print(endcond);outs()<<"\n";}
 
 			if(!L->getSubLoops().empty()){
 				for(auto I = L->getSubLoops().begin(),E = L->getSubLoops().end();I!=E;I++)
