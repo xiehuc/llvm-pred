@@ -10,6 +10,7 @@ namespace lle
 		public:
 			llvm::Value* getInductionStartValue();
 			llvm::Value* getCanonicalEndCondition();
+			llvm::Instruction* getLoopCycle();
 	};
 
 	void pretty_print(llvm::Value* v);

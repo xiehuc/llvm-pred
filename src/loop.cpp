@@ -1,4 +1,5 @@
 #include "loop.h"
+#include "debug.h"
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Constants.h>
 
@@ -7,6 +8,68 @@
 namespace lle
 {
 	using namespace llvm;
+
+	Instruction* Loop::getLoopCycle()
+	{
+		// inspired from Loop::getCanonicalInductionVariable
+		BasicBlock *H = getHeader();
+
+		BasicBlock *Incoming = 0, *Backedge = 0;
+		pred_iterator PI = pred_begin(H);
+		assert(PI != pred_end(H) &&
+				"Loop must have at least one backedge!");
+		Backedge = *PI++;
+		if (PI == pred_end(H)) return 0;  // dead loop
+		Incoming = *PI++;
+		if (PI != pred_end(H)) return 0;  // multiple backedges?
+
+		if (contains(Incoming)) {
+			if (contains(Backedge))
+				return 0;
+			std::swap(Incoming, Backedge);
+		} else if (!contains(Backedge))
+			return 0;
+
+		Value* start = NULL;
+		PHINode* ind = NULL;
+		Instruction* next  = NULL;
+		for(auto I = H->begin();isa<PHINode>(I);++I){
+			PHINode* P = cast<PHINode>(I);
+			if(start) assert("there are more than one induction,Why???");
+			start = P->getIncomingValueForBlock(Incoming);
+			next = dyn_cast<Instruction>(P->getIncomingValueForBlock(Backedge));
+			ind = P;
+		}
+
+		DEBUG(if(!start) H->print(outs()));
+		assert(start && "couldn't find a start value");
+		//process complex loops later
+		DEBUG(if(this->getLoopDepth()>1 || !this->getSubLoops().empty()) return NULL);
+		DEBUG(outs()<<"loop  depth:"<<this->getLoopDepth()<<"\n");
+		DEBUG(outs()<<"start value:"<<*start<<"\n");
+		DEBUG(outs()<<"ind   value:"<<*ind<<"\n");
+
+		int count = 0;
+		for( auto I = ind->use_begin(),E = ind->use_end();I!=E;++I){
+			outs()<<**I<<"\n";
+			++count;
+		}
+		outs()<<count<<"\n";
+		DEBUG(outs()<<"next   value:"<<*next<<"\n");
+		//process non add later
+		DEBUG(if(next->getOpcode() != Instruction::Add) return NULL);
+		assert(next->getOpcode() == Instruction::Add && "why induction increment is not Add");
+		DEBUG(if(next->getOperand(0) != ind) return NULL);
+		assert(next->getOperand(0) == ind && "why induction increment is not add it self");
+		assert(dyn_cast<ConstantInt>(next->getOperand(1))->equalsInt(1) && "why induction increment number is not 1");
+
+		for( auto I = getBlocks().begin(),E = getBlocks().end();I!=E;++I){
+			if(!isLoopExiting(*I)) continue;
+			Instruction* Exit = dyn_cast<Instruction>((*I)->getTerminator());
+			DEBUG(outs()<<"Exit:"<<*Exit<<"\n");
+			assert(Exit->getOpcode() == Instruction::Br);
+		}
+	}
 
 	//may not be constant
 	Value* Loop::getInductionStartValue()

@@ -40,11 +40,13 @@ namespace {
 		void runOnLoop(Loop* l)
 		{
 			lle::Loop* L = static_cast<lle::Loop*>(l);
+			L->getLoopCycle();
 			Value* endcond = L->getCanonicalEndCondition();
-			outs()<<"end condition at depth"<<L->getLoopDepth()<<":";
+			/*outs()<<"end condition at depth"<<L->getLoopDepth()<<":";
 			endcond->print(outs());
 			outs()<<"\n";
 			if(endcond){ lle::latex_print(endcond);outs()<<"\n";}
+			*/
 
 			if(!L->getSubLoops().empty()){
 				for(auto I = L->getSubLoops().begin(),E = L->getSubLoops().end();I!=E;I++)
