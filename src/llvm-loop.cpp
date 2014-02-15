@@ -48,8 +48,10 @@ namespace {
 		{
 			lle::Loop* L = static_cast<lle::Loop*>(l);
 			L->getLoopCycle();
+			errs()<<*L->getHeader()<<"\n";
+			/*
 			Value* endcond = L->getCanonicalEndCondition();
-			/*outs()<<"end condition at depth"<<L->getLoopDepth()<<":";
+			outs()<<"end condition at depth"<<L->getLoopDepth()<<":";
 			endcond->print(outs());
 			outs()<<"\n";
 			if(endcond){ lle::latex_print(endcond);outs()<<"\n";}

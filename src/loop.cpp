@@ -81,14 +81,20 @@ namespace lle
 			}
 			ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
 			assert(EC->getUnsignedPredicate() == EC->ICMP_EQ);
+			Value* END = EC->getOperand(1);
 
-			IRBuilder<> Builder(H->getContext());
-			Value* RES = Builder.CreateFSub(EC->getOperand(1), start);
-			outs()<<*RES<<"\n";
-			bool changed;
-			makeLoopInvariant(RES, changed);
+			IRBuilder<> Builder(H->getFirstInsertionPt());
+			Value* RES = NULL;
+			if(start->getType()->isIntegerTy() && END->getType()->isIntegerTy())
+				RES = Builder.CreateSub(EC->getOperand(1), start,"subtemp");
+			else{
+				Value* LHS = Builder.CreateUIToFP(END, Type::getFloatTy(H->getContext()));
+				Value* RHS = Builder.CreateUIToFP(start, Type::getFloatTy(H->getContext()));
+				RES = Builder.CreateFSub(LHS, RHS);
+			}
+			//insert the result to last second instruction
+			new BitCastInst(RES,RES->getType(),"loop",const_cast<BranchInst*>(EBR));
 		}
-
 	}
 
 	//may not be constant
