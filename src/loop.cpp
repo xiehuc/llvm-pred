@@ -2,6 +2,7 @@
 #include "debug.h"
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/IRBuilder.h>
 
 #include <map>
 
@@ -63,12 +64,31 @@ namespace lle
 		assert(next->getOperand(0) == ind && "why induction increment is not add it self");
 		assert(dyn_cast<ConstantInt>(next->getOperand(1))->equalsInt(1) && "why induction increment number is not 1");
 
-		for( auto I = getBlocks().begin(),E = getBlocks().end();I!=E;++I){
-			if(!isLoopExiting(*I)) continue;
-			Instruction* Exit = dyn_cast<Instruction>((*I)->getTerminator());
-			DEBUG(outs()<<"Exit:"<<*Exit<<"\n");
-			assert(Exit->getOpcode() == Instruction::Br);
+		SmallVector<llvm::Loop::Edge,8> exit_edges;
+		getExitEdges(exit_edges);
+		for(auto e : exit_edges){
+			DEBUG(if(e.first->getTerminator()->getOpcode() != Instruction::Br) continue;)
+			assert(e.first->getTerminator()->getOpcode() == Instruction::Br);
+			const BranchInst* EBR = cast<BranchInst>(e.first->getTerminator());
+			assert(EBR->isConditional());
+			if(EBR->getSuccessor(0)==e.second){
+				//true exit
+				outs()<<*EBR->getCondition()<<"\n";
+			}else{
+				//false exit
+				outs()<<*EBR->getCondition()<<"\n";
+				continue;
+			}
+			ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
+			assert(EC->getUnsignedPredicate() == EC->ICMP_EQ);
+
+			IRBuilder<> Builder(H->getContext());
+			Value* RES = Builder.CreateFSub(EC->getOperand(1), start);
+			outs()<<*RES<<"\n";
+			bool changed;
+			makeLoopInvariant(RES, changed);
 		}
+
 	}
 
 	//may not be constant

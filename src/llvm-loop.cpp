@@ -16,6 +16,10 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/Analysis/LoopInfo.h>
 #include <llvm/Transforms/Utils/SimplifyIndVar.h>
+
+#include <fcntl.h>
+#include <sys/stat.h>
+
 #include "loop.h"
 
 using namespace llvm;
@@ -24,6 +28,9 @@ namespace {
 	cl::opt<std::string>
 		BitcodeFile(cl::Positional, cl::desc("<program bitcode file>"),
 				cl::Required);
+	cl::opt<std::string>
+		WriteFile(cl::Positional,cl::desc("<write bitcode file>"),
+				cl::Optional);
 };
 
 namespace {
@@ -106,6 +113,8 @@ int main(int argc, char **argv) {
 		f_pass_mgr.run(func);
 	}
 
-
+	std::string error;
+	raw_fd_ostream output(WriteFile.c_str(),error);
+	WriteBitcodeToFile(M, output);
 	return 0;
 }

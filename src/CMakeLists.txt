@@ -29,6 +29,8 @@ target_link_libraries(llvm-prob
     ${LLVM_LIBRARIES}
     )
 
+llvm_map_components_to_libraries(LLVM_LOOP_LIBRARY bitreader analysis bitwriter)
+
 add_executable(llvm-loop
     llvm-loop.cpp
 	loop.cpp
@@ -36,6 +38,6 @@ add_executable(llvm-loop
     )
 
 target_link_libraries(llvm-loop
-    ${LLVM_PRED_LIBRARY}
+	${LLVM_LOOP_LIBRARY}
     ${LLVM_LIBRARIES}
     )
