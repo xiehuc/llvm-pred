@@ -19,23 +19,29 @@ namespace lle
 		BasicBlock *H = getHeader();
 
 		outs()<<"loop simplify:"<<this->isLoopSimplifyForm()<<"\n";
-		DEBUG(if(!isLoopSimplifyForm()) return NULL);
-		assert(isLoopSimplifyForm() && "why is not simplify form");
+		//DEBUG(if(!isLoopSimplifyForm()) return NULL);
+		//assert(isLoopSimplifyForm() && "why is not simplify form");
+		DEBUG(if(!getLoopLatch() || !getLoopPreheader()) return NULL);
+		assert(getLoopLatch() && getLoopPreheader() && "need loop simplify form" );
 
-		SmallVector<Edge,8> Exits;
+		SmallVector<Edge,4> Exits;
 		getExitEdges(Exits);
 
+		BasicBlock* TE = NULL;//True Exit
 		for(auto Exit : Exits){
 			//this is a true exit
-			if(getLoopLatch() == Exit.first)
+			if(getLoopLatch() == Exit.first){
+				TE = const_cast<BasicBlock*>(Exit.first);
 				break;
+			}
 		}
 		//process true exit
+		DEBUG(if(!TE) return NULL);
+		assert(TE && "need have a true exit");
 
 		Value* start = NULL;
 		PHINode* ind = NULL;
 		Instruction* next = NULL;
-		BasicBlock* TE = getLoopLatch();//True Exit
 		for(auto I = H->begin();isa<PHINode>(I);++I){
 			PHINode* P = cast<PHINode>(I);
 			if(start) assert("there are more than one induction,Why???");
@@ -44,7 +50,7 @@ namespace lle
 			ind = P;
 		}
 
-		DEBUG(if(!start) H->print(outs()));
+		DEBUG(if(!start) return NULL);
 		assert(start && "couldn't find a start value");
 		//process complex loops later
 		DEBUG(if(this->getLoopDepth()>1 || !this->getSubLoops().empty()) return NULL);
@@ -65,15 +71,19 @@ namespace lle
 		assert(next->getOpcode() == Instruction::Add && "why induction increment is not Add");
 		DEBUG(if(next->getOperand(0) != ind) return NULL);
 		assert(next->getOperand(0) == ind && "why induction increment is not add it self");
-		assert(dyn_cast<ConstantInt>(next->getOperand(1))->equalsInt(1) && "why induction increment number is not 1");
-
+		ConstantInt* PLUS = dyn_cast<ConstantInt>(next->getOperand(1));
+		DEBUG(if(!PLUS) return NULL);
+		assert(PLUS);
+		DEBUG(if(!PLUS->equalsInt(1))return NULL);
+		assert(VERBOSE(PLUS->equalsInt(1),PLUS) && "why induction increment number is not 1");
 
 		DEBUG(if(TE->getTerminator()->getOpcode() != Instruction::Br) return NULL);
 		assert(TE->getTerminator()->getOpcode() == Instruction::Br);
 		const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
 		assert(EBR->isConditional());
 		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
-		assert(EC->getUnsignedPredicate() == EC->ICMP_EQ);
+		DEBUG(if(EC->getUnsignedPredicate() != EC->ICMP_EQ) return NULL);
+		assert(VERBOSE(EC->getUnsignedPredicate() == EC->ICMP_EQ,EC) && "why end condition is not ==");
 		Value* END = EC->getOperand(1);
 
 		IRBuilder<> Builder(H->getFirstInsertionPt());
