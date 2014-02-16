@@ -10,7 +10,10 @@ namespace lle
 {
 	using namespace llvm;
 
-	Instruction* Loop::getLoopCycle()
+	DenseMap<llvm::Loop*, Loop::Storage> Loop::stores;
+
+
+	Value* Loop::insertLoopCycle()
 	{
 		// inspired from Loop::getCanonicalInductionVariable
 		BasicBlock *H = getHeader();
@@ -94,7 +97,9 @@ namespace lle
 			}
 			//insert the result to last second instruction
 			new BitCastInst(RES,RES->getType(),"loop",const_cast<BranchInst*>(EBR));
+			return stores[this].cycle = RES;
 		}
+		return NULL;
 	}
 
 	//may not be constant

@@ -47,8 +47,8 @@ namespace {
 		void runOnLoop(Loop* l)
 		{
 			lle::Loop* L = static_cast<lle::Loop*>(l);
-			L->getLoopCycle();
-			errs()<<*L->getHeader()<<"\n";
+			Value* CC = L->getLoopCycle();
+			if(CC) outs()<<"cycles:"<<*CC<<"\n";
 			/*
 			Value* endcond = L->getCanonicalEndCondition();
 			outs()<<"end condition at depth"<<L->getLoopDepth()<<":";
@@ -115,8 +115,10 @@ int main(int argc, char **argv) {
 		f_pass_mgr.run(func);
 	}
 
-	std::string error;
-	raw_fd_ostream output(WriteFile.c_str(),error);
-	WriteBitcodeToFile(M, output);
+	if(!WriteFile.empty()){
+		std::string error;
+		raw_fd_ostream output(WriteFile.c_str(),error);
+		WriteBitcodeToFile(M, output);
+	}
 	return 0;
 }
