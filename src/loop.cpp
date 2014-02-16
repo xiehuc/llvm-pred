@@ -18,30 +18,29 @@ namespace lle
 		// inspired from Loop::getCanonicalInductionVariable
 		BasicBlock *H = getHeader();
 
-		BasicBlock *Incoming = 0, *Backedge = 0;
-		pred_iterator PI = pred_begin(H);
-		assert(PI != pred_end(H) &&
-				"Loop must have at least one backedge!");
-		Backedge = *PI++;
-		if (PI == pred_end(H)) return 0;  // dead loop
-		Incoming = *PI++;
-		if (PI != pred_end(H)) return 0;  // multiple backedges?
+		outs()<<"loop simplify:"<<this->isLoopSimplifyForm()<<"\n";
+		DEBUG(if(!isLoopSimplifyForm()) return NULL);
+		assert(isLoopSimplifyForm() && "why is not simplify form");
 
-		if (contains(Incoming)) {
-			if (contains(Backedge))
-				return 0;
-			std::swap(Incoming, Backedge);
-		} else if (!contains(Backedge))
-			return 0;
+		SmallVector<Edge,8> Exits;
+		getExitEdges(Exits);
+
+		for(auto Exit : Exits){
+			//this is a true exit
+			if(getLoopLatch() == Exit.first)
+				break;
+		}
+		//process true exit
 
 		Value* start = NULL;
 		PHINode* ind = NULL;
-		Instruction* next  = NULL;
+		Instruction* next = NULL;
+		BasicBlock* TE = getLoopLatch();//True Exit
 		for(auto I = H->begin();isa<PHINode>(I);++I){
 			PHINode* P = cast<PHINode>(I);
 			if(start) assert("there are more than one induction,Why???");
-			start = P->getIncomingValueForBlock(Incoming);
-			next = dyn_cast<Instruction>(P->getIncomingValueForBlock(Backedge));
+			start = P->getIncomingValueForBlock(getLoopPreheader());
+			next = dyn_cast<Instruction>(P->getIncomingValueForBlock(getLoopLatch()));
 			ind = P;
 		}
 
@@ -52,6 +51,7 @@ namespace lle
 		DEBUG(outs()<<"loop  depth:"<<this->getLoopDepth()<<"\n");
 		DEBUG(outs()<<"start value:"<<*start<<"\n");
 		DEBUG(outs()<<"ind   value:"<<*ind<<"\n");
+		DEBUG(outs()<<"next  value:"<<*next<<"\n");
 
 		int count = 0;
 		for( auto I = ind->use_begin(),E = ind->use_end();I!=E;++I){
@@ -59,7 +59,7 @@ namespace lle
 			++count;
 		}
 		outs()<<count<<"\n";
-		DEBUG(outs()<<"next   value:"<<*next<<"\n");
+
 		//process non add later
 		DEBUG(if(next->getOpcode() != Instruction::Add) return NULL);
 		assert(next->getOpcode() == Instruction::Add && "why induction increment is not Add");
@@ -67,39 +67,27 @@ namespace lle
 		assert(next->getOperand(0) == ind && "why induction increment is not add it self");
 		assert(dyn_cast<ConstantInt>(next->getOperand(1))->equalsInt(1) && "why induction increment number is not 1");
 
-		SmallVector<llvm::Loop::Edge,8> exit_edges;
-		getExitEdges(exit_edges);
-		for(auto e : exit_edges){
-			DEBUG(if(e.first->getTerminator()->getOpcode() != Instruction::Br) continue;)
-			assert(e.first->getTerminator()->getOpcode() == Instruction::Br);
-			const BranchInst* EBR = cast<BranchInst>(e.first->getTerminator());
-			assert(EBR->isConditional());
-			if(EBR->getSuccessor(0)==e.second){
-				//true exit
-				outs()<<*EBR->getCondition()<<"\n";
-			}else{
-				//false exit
-				outs()<<*EBR->getCondition()<<"\n";
-				continue;
-			}
-			ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
-			assert(EC->getUnsignedPredicate() == EC->ICMP_EQ);
-			Value* END = EC->getOperand(1);
 
-			IRBuilder<> Builder(H->getFirstInsertionPt());
-			Value* RES = NULL;
-			if(start->getType()->isIntegerTy() && END->getType()->isIntegerTy())
-				RES = Builder.CreateSub(EC->getOperand(1), start,"subtemp");
-			else{
-				Value* LHS = Builder.CreateUIToFP(END, Type::getFloatTy(H->getContext()));
-				Value* RHS = Builder.CreateUIToFP(start, Type::getFloatTy(H->getContext()));
-				RES = Builder.CreateFSub(LHS, RHS);
-			}
-			//insert the result to last second instruction
-			new BitCastInst(RES,RES->getType(),"loop",const_cast<BranchInst*>(EBR));
-			return stores[this].cycle = RES;
-		}
-		return NULL;
+		DEBUG(if(TE->getTerminator()->getOpcode() != Instruction::Br) return NULL);
+		assert(TE->getTerminator()->getOpcode() == Instruction::Br);
+		const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
+		assert(EBR->isConditional());
+		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
+		assert(EC->getUnsignedPredicate() == EC->ICMP_EQ);
+		Value* END = EC->getOperand(1);
+
+		IRBuilder<> Builder(H->getFirstInsertionPt());
+		Value* RES = NULL;
+		assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() && " why increment is not integer type");
+		RES = Builder.CreateSub(EC->getOperand(1), start);
+		/*
+		   Value* LHS = Builder.CreateUIToFP(END, Type::getFloatTy(H->getContext()));
+		   Value* RHS = Builder.CreateUIToFP(start, Type::getFloatTy(H->getContext()));
+		   RES = Builder.CreateFSub(LHS, RHS);
+		   */
+		//insert the result to last second instruction
+		new BitCastInst(RES,RES->getType(),"loop",const_cast<BranchInst*>(EBR));
+		return stores[this].cycle = RES;
 	}
 
 	//may not be constant
