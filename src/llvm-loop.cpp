@@ -48,7 +48,10 @@ namespace {
 		{
 			lle::Loop L(l);
 			Value* CC = L.getLoopCycle();
-			if(CC) outs()<<"cycles:"<<*CC<<"\n";
+			if(CC)
+				outs()<<"cycles:"<<*CC<<"\n";
+			else
+				outs()<<"cycles:unknow\n";
 			/*
 			Value* endcond = L->getCanonicalEndCondition();
 			outs()<<"end condition at depth"<<L->getLoopDepth()<<":";

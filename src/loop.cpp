@@ -10,6 +10,17 @@ namespace lle
 {
 	using namespace llvm;
 
+	//remove cast instruction for a value
+	//because cast means the original value and the returned value is
+	//semanticly equal
+	static Value* castoff(Value* v)
+	{
+		if(CastInst* CI = dyn_cast<CastInst>(v)){
+			return castoff(CI->getOperand(0));
+		}else
+			return v;
+	}
+
 	Value* Loop::insertLoopCycle()
 	{
 		// inspired from Loop::getCanonicalInductionVariable
@@ -45,7 +56,7 @@ namespace lle
 		assert(VERBOSE(EC->getUnsignedPredicate() == EC->ICMP_EQ,EC) && "why end condition is not ==");
 
 		Value* start = NULL;
-		PHINode* ind = dyn_cast<PHINode>(EC->getOperand(0));
+		PHINode* ind = dyn_cast<PHINode>(castoff(EC->getOperand(0)));
 		Instruction* next = NULL;
 		for(auto I = H->begin();isa<PHINode>(I);++I){
 			PHINode* P = cast<PHINode>(I);
