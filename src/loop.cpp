@@ -18,7 +18,7 @@ namespace lle
 		outs()<<"loop simplify:"<<self->isLoopSimplifyForm()<<"\n";
 		//DEBUG(if(!isLoopSimplifyForm()) return NULL);
 		//assert(isLoopSimplifyForm() && "why is not simplify form");
-		DEBUG(if(!self->getLoopLatch() || !self->getLoopPreheader()) return NULL);
+		RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPreheader());
 		assert(self->getLoopLatch() && self->getLoopPreheader() && "need loop simplify form" );
 
 		SmallVector<llvm::Loop::Edge,4> Exits;
@@ -33,24 +33,32 @@ namespace lle
 			}
 		}
 		//process true exit
-		DEBUG(if(!TE) return NULL);
+		RET_ON_FAIL(TE);
 		assert(TE && "need have a true exit");
 
+		DEBUG(if(TE->getTerminator()->getOpcode() != Instruction::Br) return NULL);
+		assert(TE->getTerminator()->getOpcode() == Instruction::Br);
+		const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
+		assert(EBR->isConditional());
+		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
+		DEBUG(if(EC->getUnsignedPredicate() != EC->ICMP_EQ) return NULL);
+		assert(VERBOSE(EC->getUnsignedPredicate() == EC->ICMP_EQ,EC) && "why end condition is not ==");
+
 		Value* start = NULL;
-		PHINode* ind = NULL;
+		PHINode* ind = dyn_cast<PHINode>(EC->getOperand(0));
 		Instruction* next = NULL;
 		for(auto I = H->begin();isa<PHINode>(I);++I){
 			PHINode* P = cast<PHINode>(I);
-			if(start) assert("there are more than one induction,Why???");
-			start = P->getIncomingValueForBlock(self->getLoopPreheader());
-			next = dyn_cast<Instruction>(P->getIncomingValueForBlock(self->getLoopLatch()));
-			ind = P;
+			if(P == ind){
+				start = P->getIncomingValueForBlock(self->getLoopPreheader());
+				next = dyn_cast<Instruction>(P->getIncomingValueForBlock(self->getLoopLatch()));
+			}
 		}
 
-		DEBUG(if(!start) return NULL);
+		RET_ON_FAIL(start);
 		assert(start && "couldn't find a start value");
 		//process complex loops later
-		DEBUG(if(self->getLoopDepth()>1 || !self->getSubLoops().empty()) return NULL);
+		//DEBUG(if(self->getLoopDepth()>1 || !self->getSubLoops().empty()) return NULL);
 		DEBUG(outs()<<"loop  depth:"<<self->getLoopDepth()<<"\n");
 		DEBUG(outs()<<"start value:"<<*start<<"\n");
 		DEBUG(outs()<<"ind   value:"<<*ind<<"\n");
@@ -63,6 +71,7 @@ namespace lle
 		}
 		outs()<<count<<"\n";
 
+		Value* END = EC->getOperand(1);
 		//process non add later
 		DEBUG(if(next->getOpcode() != Instruction::Add) return NULL);
 		assert(next->getOpcode() == Instruction::Add && "why induction increment is not Add");
@@ -74,14 +83,6 @@ namespace lle
 		DEBUG(if(!PLUS->equalsInt(1))return NULL);
 		assert(VERBOSE(PLUS->equalsInt(1),PLUS) && "why induction increment number is not 1");
 
-		DEBUG(if(TE->getTerminator()->getOpcode() != Instruction::Br) return NULL);
-		assert(TE->getTerminator()->getOpcode() == Instruction::Br);
-		const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
-		assert(EBR->isConditional());
-		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
-		DEBUG(if(EC->getUnsignedPredicate() != EC->ICMP_EQ) return NULL);
-		assert(VERBOSE(EC->getUnsignedPredicate() == EC->ICMP_EQ,EC) && "why end condition is not ==");
-		Value* END = EC->getOperand(1);
 
 		IRBuilder<> Builder(H->getFirstInsertionPt());
 		Value* RES = NULL;
