@@ -10,27 +10,24 @@ namespace lle
 {
 	using namespace llvm;
 
-	DenseMap<llvm::Loop*, Loop::Storage> Loop::stores;
-
-
 	Value* Loop::insertLoopCycle()
 	{
 		// inspired from Loop::getCanonicalInductionVariable
-		BasicBlock *H = getHeader();
+		BasicBlock *H = self->getHeader();
 
-		outs()<<"loop simplify:"<<this->isLoopSimplifyForm()<<"\n";
+		outs()<<"loop simplify:"<<self->isLoopSimplifyForm()<<"\n";
 		//DEBUG(if(!isLoopSimplifyForm()) return NULL);
 		//assert(isLoopSimplifyForm() && "why is not simplify form");
-		DEBUG(if(!getLoopLatch() || !getLoopPreheader()) return NULL);
-		assert(getLoopLatch() && getLoopPreheader() && "need loop simplify form" );
+		DEBUG(if(!self->getLoopLatch() || !self->getLoopPreheader()) return NULL);
+		assert(self->getLoopLatch() && self->getLoopPreheader() && "need loop simplify form" );
 
-		SmallVector<Edge,4> Exits;
-		getExitEdges(Exits);
+		SmallVector<llvm::Loop::Edge,4> Exits;
+		self->getExitEdges(Exits);
 
 		BasicBlock* TE = NULL;//True Exit
 		for(auto Exit : Exits){
 			//this is a true exit
-			if(getLoopLatch() == Exit.first){
+			if(self->getLoopLatch() == Exit.first){
 				TE = const_cast<BasicBlock*>(Exit.first);
 				break;
 			}
@@ -45,16 +42,16 @@ namespace lle
 		for(auto I = H->begin();isa<PHINode>(I);++I){
 			PHINode* P = cast<PHINode>(I);
 			if(start) assert("there are more than one induction,Why???");
-			start = P->getIncomingValueForBlock(getLoopPreheader());
-			next = dyn_cast<Instruction>(P->getIncomingValueForBlock(getLoopLatch()));
+			start = P->getIncomingValueForBlock(self->getLoopPreheader());
+			next = dyn_cast<Instruction>(P->getIncomingValueForBlock(self->getLoopLatch()));
 			ind = P;
 		}
 
 		DEBUG(if(!start) return NULL);
 		assert(start && "couldn't find a start value");
 		//process complex loops later
-		DEBUG(if(this->getLoopDepth()>1 || !this->getSubLoops().empty()) return NULL);
-		DEBUG(outs()<<"loop  depth:"<<this->getLoopDepth()<<"\n");
+		DEBUG(if(self->getLoopDepth()>1 || !self->getSubLoops().empty()) return NULL);
+		DEBUG(outs()<<"loop  depth:"<<self->getLoopDepth()<<"\n");
 		DEBUG(outs()<<"start value:"<<*start<<"\n");
 		DEBUG(outs()<<"ind   value:"<<*ind<<"\n");
 		DEBUG(outs()<<"next  value:"<<*next<<"\n");
@@ -97,14 +94,14 @@ namespace lle
 		   */
 		//insert the result to last second instruction
 		new BitCastInst(RES,RES->getType(),"loop",const_cast<BranchInst*>(EBR));
-		return stores[this].cycle = RES;
+		return cycle = RES;
 	}
 
 	//may not be constant
 	Value* Loop::getInductionStartValue()
 	{
 		// inspired from Loop::getCanonicalInductionVariable
-		BasicBlock *H = getHeader();
+		BasicBlock *H = self->getHeader();
 
 		BasicBlock *Incoming = 0, *Backedge = 0;
 		pred_iterator PI = pred_begin(H);
@@ -115,11 +112,11 @@ namespace lle
 		Incoming = *PI++;
 		if (PI != pred_end(H)) return 0;  // multiple backedges?
 
-		if (contains(Incoming)) {
-			if (contains(Backedge))
+		if (self->contains(Incoming)) {
+			if (self->contains(Backedge))
 				return 0;
 			std::swap(Incoming, Backedge);
-		} else if (!contains(Backedge))
+		} else if (!self->contains(Backedge))
 			return 0;
 
 		Value* candidate = NULL;
@@ -133,19 +130,19 @@ namespace lle
 	Value* Loop::getCanonicalEndCondition()
 	{
 		//i
-		PHINode* ind = getCanonicalInductionVariable();
+		PHINode* ind = self->getCanonicalInductionVariable();
 		ind->print(outs());
 		if(ind == NULL) return NULL;
 		//i++
-		Value* indpp = ind->getIncomingValueForBlock(getLoopLatch());
+		Value* indpp = ind->getIncomingValueForBlock(self->getLoopLatch());
 		for(auto ii = indpp->use_begin(), ee = indpp->use_end();ii!=ee;++ii){
 			Instruction* inst = dyn_cast<Instruction>(*ii);
 			if(!inst) continue;
 			if(inst->getOpcode() == Instruction::ICmp){
 				Value* v1 = inst->getOperand(0);
 				Value* v2 = inst->getOperand(1);
-				if(v1 == indpp && isLoopInvariant(v2)) return v2;
-				if(v2 == indpp && isLoopInvariant(v1)) return v1;
+				if(v1 == indpp && self->isLoopInvariant(v2)) return v2;
+				if(v2 == indpp && self->isLoopInvariant(v1)) return v1;
 			}
 		}
 		return NULL;

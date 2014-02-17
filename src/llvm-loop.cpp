@@ -46,8 +46,8 @@ namespace {
         }
 		void runOnLoop(Loop* l)
 		{
-			lle::Loop* L = static_cast<lle::Loop*>(l);
-			Value* CC = L->getLoopCycle();
+			lle::Loop L(l);
+			Value* CC = L.getLoopCycle();
 			if(CC) outs()<<"cycles:"<<*CC<<"\n";
 			/*
 			Value* endcond = L->getCanonicalEndCondition();

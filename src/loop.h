@@ -8,18 +8,22 @@
 
 namespace lle
 {
-	class Loop:public llvm::Loop{
-		struct Storage{
-			llvm::Value* cycle;
-		};
+	class Loop{
+		llvm::Value* cycle;
+		llvm::Loop* loop;
+		Loop& self;
 		// 为了能够直接转型(cast),使用体外储存,未来需要改为使用ValueMap
-		static llvm::DenseMap<llvm::Loop*,Storage> stores;
 		public:
+			Loop(llvm::Loop* l):self(*this){
+				loop = l;
+				cycle = NULL;
+			}
+			llvm::Loop* operator->(){ return loop; }
 			llvm::Value* getInductionStartValue();
 			llvm::Value* getCanonicalEndCondition();
 			llvm::Value* insertLoopCycle();
 			llvm::Value* getLoopCycle(){
-				return (stores[this].cycle)?:insertLoopCycle();
+				return (cycle)?:insertLoopCycle();
 			}
 	};
 
