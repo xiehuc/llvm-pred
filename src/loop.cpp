@@ -26,7 +26,10 @@ namespace lle
 		// inspired from Loop::getCanonicalInductionVariable
 		BasicBlock *H = self->getHeader();
 
-		outs()<<"loop simplify:"<<self->isLoopSimplifyForm()<<"\n";
+		DEBUG(outs()<<"\n");
+		DEBUG(outs()<<*loop);
+		DEBUG(outs()<<"loop simplify:"<<self->isLoopSimplifyForm()<<"\n");
+		DEBUG(outs()<<"loop  depth:"<<self->getLoopDepth()<<"\n");
 		//DEBUG(if(!isLoopSimplifyForm()) return NULL);
 		//assert(isLoopSimplifyForm() && "why is not simplify form");
 		RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPreheader());
@@ -70,7 +73,6 @@ namespace lle
 		assert(start && "couldn't find a start value");
 		//process complex loops later
 		//DEBUG(if(self->getLoopDepth()>1 || !self->getSubLoops().empty()) return NULL);
-		DEBUG(outs()<<"loop  depth:"<<self->getLoopDepth()<<"\n");
 		DEBUG(outs()<<"start value:"<<*start<<"\n");
 		DEBUG(outs()<<"ind   value:"<<*ind<<"\n");
 		DEBUG(outs()<<"next  value:"<<*next<<"\n");
