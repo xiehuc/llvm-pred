@@ -26,6 +26,7 @@ namespace lle
 	{
 		// inspired from Loop::getCanonicalInductionVariable
 		BasicBlock *H = self->getHeader();
+		BasicBlock* LoopPred = self->getLoopPredecessor();
 
 		DEBUG(outs()<<"\n");
 		DEBUG(outs()<<*loop);
@@ -76,7 +77,9 @@ namespace lle
 				outs()<<**I<<"\n";
 				StoreInst* SI = dyn_cast<StoreInst>(*I);
 				if(!SI || SI->getOperand(1) != PSi) continue;
-				if(self->isLoopInvariant(SI->getOperand(0))&&SI->getParent() == self->getLoopPredecessor()) {
+				if(!start&&self->isLoopInvariant(SI->getOperand(0))) {
+					if(SI->getParent() != LoopPred)
+						if(std::find(pred_begin(LoopPred),pred_end(LoopPred),SI->getParent()) == pred_end(LoopPred)) continue;
 					start = SI->getOperand(0);
 					++SICount[0];
 				}
