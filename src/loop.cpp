@@ -112,16 +112,21 @@ namespace lle
 		ConstantInt* Step = dyn_cast<ConstantInt>(next->getOperand(1));
 		RET_ON_FAIL(Step);
 		assert(Step);
-		RET_ON_FAIL(Step->equalsInt(1));
-		assert(VERBOSE(Step->equalsInt(1),Step) && "why induction increment number is not 1");
+		//RET_ON_FAIL(Step->equalsInt(1));
+		//assert(VERBOSE(Step->equalsInt(1),Step) && "why induction increment number is not 1");
 
 
 		IRBuilder<> Builder(H->getFirstInsertionPt());
 		Value* RES = NULL;
 		assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() && " why increment is not integer type");
-		RES = Builder.CreateSub(EC->getOperand(1), start);
+		if(Step->isMinusOne())
+			RES = Builder.CreateSub(start,EC->getOperand(1));
+		else//Step Couldn't be zero
+			RES = Builder.CreateSub(EC->getOperand(1), start);
 		if(addfirst)
-			RES = Builder.CreateSub(RES, Step);
+			RES = Step->isMinusOne()?Builder.CreateAdd(RES,Step):Builder.CreateSub(RES, Step);
+		if(!Step->isMinusOne()&&!Step->isOne())
+			RES = Builder.CreateSDiv(RES, Step);
 		/*
 		   Value* LHS = Builder.CreateUIToFP(END, Type::getFloatTy(H->getContext()));
 		   Value* RHS = Builder.CreateUIToFP(start, Type::getFloatTy(H->getContext()));
