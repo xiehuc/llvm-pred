@@ -62,31 +62,54 @@ namespace lle
 		Instruction* IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));
 
 		Value* start = NULL;
-		PHINode* ind = NULL;
+		Value* ind = NULL;
 		Instruction* next = NULL;
 		bool addfirst = false;//add before icmp ed
 
-		if(isa<PHINode>(IndOrNext)){
-			ind = cast<PHINode>(IndOrNext);
-			addfirst = false;
-		}else if(IndOrNext->getOpcode() == Instruction::Add){
-			next = IndOrNext;
-			addfirst = true;
-		}else{
-			RET_ON_FAIL(0);
-			assert(0 && "unknow how to analysis");
-		}
+		outs()<<*IndOrNext<<"\n";
+		if(isa<LoadInst>(IndOrNext)){
+			//memory depend analysis
+			Value* PSi = IndOrNext->getOperand(0);//point type Step.i
 
-		for(auto I = H->begin();isa<PHINode>(I);++I){
-			PHINode* P = cast<PHINode>(I);
-			if(ind && P == ind){
-				start = P->getIncomingValueForBlock(self->getLoopPredecessor());
-				next = dyn_cast<Instruction>(P->getIncomingValueForBlock(self->getLoopLatch()));
-			}else if(next && P->getIncomingValueForBlock(self->getLoopLatch()) == next){
-				start = P->getIncomingValueForBlock(self->getLoopPredecessor());
-				ind = P;
+			int SICount = 0;
+			for( auto I = PSi->use_begin(),E = PSi->use_end();I!=E;++I){
+				outs()<<**I<<"\n";
+				StoreInst* SI = dyn_cast<StoreInst>(*I);
+				if(!SI || SI->getOperand(1) != PSi) continue;
+				++SICount;
+				if(self->isLoopInvariant(SI->getOperand(0))) start = SI->getOperand(0);
+				Instruction* SI0 = dyn_cast<Instruction>(SI->getOperand(0));
+				if(SI0 && SI0->getOpcode() == Instruction::Add) next = SI0;
+
+			}
+			RET_ON_FAIL(SICount == 2);
+			assert(SICount == 2);
+			ind = IndOrNext;
+			outs()<<SICount<<"\n";
+		}else{
+			if(isa<PHINode>(IndOrNext)){
+				ind = IndOrNext;
+				addfirst = false;
+			}else if(IndOrNext->getOpcode() == Instruction::Add){
+				next = IndOrNext;
+				addfirst = true;
+			}else{
+				RET_ON_FAIL(0);
+				assert(0 && "unknow how to analysis");
+			}
+
+			for(auto I = H->begin();isa<PHINode>(I);++I){
+				PHINode* P = cast<PHINode>(I);
+				if(ind && P == ind){
+					start = P->getIncomingValueForBlock(self->getLoopPredecessor());
+					next = dyn_cast<Instruction>(P->getIncomingValueForBlock(self->getLoopLatch()));
+				}else if(next && P->getIncomingValueForBlock(self->getLoopLatch()) == next){
+					start = P->getIncomingValueForBlock(self->getLoopPredecessor());
+					ind = P;
+				}
 			}
 		}
+
 
 		RET_ON_FAIL(start);
 		assert(start && "couldn't find a start value");
@@ -96,12 +119,6 @@ namespace lle
 		DEBUG(outs()<<"ind   value:"<<*ind<<"\n");
 		DEBUG(outs()<<"next  value:"<<*next<<"\n");
 
-		int count = 0;
-		for( auto I = ind->use_begin(),E = ind->use_end();I!=E;++I){
-			outs()<<**I<<"\n";
-			++count;
-		}
-		outs()<<count<<"\n";
 
 		Value* END = EC->getOperand(1);
 		//process non add later
