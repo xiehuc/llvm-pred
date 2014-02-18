@@ -71,21 +71,25 @@ namespace lle
 			//memory depend analysis
 			Value* PSi = IndOrNext->getOperand(0);//point type Step.i
 
-			int SICount = 0;
+			int SICount[2] = {0};//store in predecessor count,store in loop body count
 			for( auto I = PSi->use_begin(),E = PSi->use_end();I!=E;++I){
 				outs()<<**I<<"\n";
 				StoreInst* SI = dyn_cast<StoreInst>(*I);
 				if(!SI || SI->getOperand(1) != PSi) continue;
-				++SICount;
-				if(self->isLoopInvariant(SI->getOperand(0))) start = SI->getOperand(0);
+				if(self->isLoopInvariant(SI->getOperand(0))&&SI->getParent() == self->getLoopPredecessor()) {
+					start = SI->getOperand(0);
+					++SICount[0];
+				}
 				Instruction* SI0 = dyn_cast<Instruction>(SI->getOperand(0));
-				if(SI0 && SI0->getOpcode() == Instruction::Add) next = SI0;
+				if(self->contains(SI) && SI0 && SI0->getOpcode() == Instruction::Add){
+					next = SI0;
+					++SICount[1];
+				}
 
 			}
-			RET_ON_FAIL(SICount == 2);
-			assert(SICount == 2);
+			RET_ON_FAIL(SICount[0]==1 && SICount[1]==1);
+			assert(SICount[0]==1 && SICount[1]==1);
 			ind = IndOrNext;
-			outs()<<SICount<<"\n";
 		}else{
 			if(isa<PHINode>(IndOrNext)){
 				ind = IndOrNext;
@@ -118,6 +122,7 @@ namespace lle
 		DEBUG(outs()<<"start value:"<<*start<<"\n");
 		DEBUG(outs()<<"ind   value:"<<*ind<<"\n");
 		DEBUG(outs()<<"next  value:"<<*next<<"\n");
+		DEBUG(outs()<<"end   value:"<<*EC<<"\n");
 
 
 		Value* END = EC->getOperand(1);

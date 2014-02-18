@@ -68,7 +68,9 @@ namespace {
 		bool runOnFunction(Function& F)
 		{
 			StringRef func_name = F.getName();
+			outs()<<"------------------------\n";
 			outs()<<"Function:"<<func_name<<"\n";
+			outs()<<"------------------------\n";
 			LoopInfo& LI = getAnalysis<LoopInfo>();
 			LI.print(outs(), F.getParent());
 			for(auto ite = LI.begin(), end = LI.end();ite!=end;ite++){
