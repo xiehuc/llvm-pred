@@ -30,10 +30,11 @@ namespace lle
 		DEBUG(outs()<<*loop);
 		DEBUG(outs()<<"loop simplify:"<<self->isLoopSimplifyForm()<<"\n");
 		DEBUG(outs()<<"loop  depth:"<<self->getLoopDepth()<<"\n");
-		//DEBUG(if(!isLoopSimplifyForm()) return NULL);
-		//assert(isLoopSimplifyForm() && "why is not simplify form");
-		RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPreheader());
-		assert(self->getLoopLatch() && self->getLoopPreheader() && "need loop simplify form" );
+		/** whats difference on use of predecessor and preheader??*/
+		//RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPreheader());
+		//assert(self->getLoopLatch() && self->getLoopPreheader() && "need loop simplify form" );
+		RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPredecessor());
+		assert(self->getLoopLatch() && self->getLoopPredecessor() && "need loop simplify form" );
 
 		SmallVector<llvm::Loop::Edge,4> Exits;
 		self->getExitEdges(Exits);
@@ -58,14 +59,32 @@ namespace lle
 		DEBUG(if(EC->getUnsignedPredicate() != EC->ICMP_EQ) return NULL);
 		assert(VERBOSE(EC->getUnsignedPredicate() == EC->ICMP_EQ,EC) && "why end condition is not ==");
 
+		Instruction* IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));
+
 		Value* start = NULL;
-		PHINode* ind = dyn_cast<PHINode>(castoff(EC->getOperand(0)));
+		PHINode* ind = NULL;
 		Instruction* next = NULL;
+		bool addfirst = false;//add before icmp ed
+
+		if(isa<PHINode>(IndOrNext)){
+			ind = cast<PHINode>(IndOrNext);
+			addfirst = false;
+		}else if(IndOrNext->getOpcode() == Instruction::Add){
+			next = IndOrNext;
+			addfirst = true;
+		}else{
+			RET_ON_FAIL(0);
+			assert(0 && "unknow how to analysis");
+		}
+
 		for(auto I = H->begin();isa<PHINode>(I);++I){
 			PHINode* P = cast<PHINode>(I);
-			if(P == ind){
-				start = P->getIncomingValueForBlock(self->getLoopPreheader());
+			if(ind && P == ind){
+				start = P->getIncomingValueForBlock(self->getLoopPredecessor());
 				next = dyn_cast<Instruction>(P->getIncomingValueForBlock(self->getLoopLatch()));
+			}else if(next && P->getIncomingValueForBlock(self->getLoopLatch()) == next){
+				start = P->getIncomingValueForBlock(self->getLoopPredecessor());
+				ind = P;
 			}
 		}
 
@@ -86,21 +105,23 @@ namespace lle
 
 		Value* END = EC->getOperand(1);
 		//process non add later
-		DEBUG(if(next->getOpcode() != Instruction::Add) return NULL);
+		RET_ON_FAIL(next->getOpcode() == Instruction::Add);
 		assert(next->getOpcode() == Instruction::Add && "why induction increment is not Add");
-		DEBUG(if(next->getOperand(0) != ind) return NULL);
+		RET_ON_FAIL(next->getOperand(0) == ind);
 		assert(next->getOperand(0) == ind && "why induction increment is not add it self");
-		ConstantInt* PLUS = dyn_cast<ConstantInt>(next->getOperand(1));
-		DEBUG(if(!PLUS) return NULL);
-		assert(PLUS);
-		DEBUG(if(!PLUS->equalsInt(1))return NULL);
-		assert(VERBOSE(PLUS->equalsInt(1),PLUS) && "why induction increment number is not 1");
+		ConstantInt* Step = dyn_cast<ConstantInt>(next->getOperand(1));
+		RET_ON_FAIL(Step);
+		assert(Step);
+		RET_ON_FAIL(Step->equalsInt(1));
+		assert(VERBOSE(Step->equalsInt(1),Step) && "why induction increment number is not 1");
 
 
 		IRBuilder<> Builder(H->getFirstInsertionPt());
 		Value* RES = NULL;
 		assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() && " why increment is not integer type");
 		RES = Builder.CreateSub(EC->getOperand(1), start);
+		if(addfirst)
+			RES = Builder.CreateSub(RES, Step);
 		/*
 		   Value* LHS = Builder.CreateUIToFP(END, Type::getFloatTy(H->getContext()));
 		   Value* RHS = Builder.CreateUIToFP(start, Type::getFloatTy(H->getContext()));
