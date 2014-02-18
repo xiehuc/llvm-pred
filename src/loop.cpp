@@ -5,6 +5,7 @@
 #include <llvm/IR/IRBuilder.h>
 
 #include <map>
+#include <algorithm>
 
 namespace lle
 {
@@ -36,17 +37,15 @@ namespace lle
 		RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPredecessor());
 		assert(self->getLoopLatch() && self->getLoopPredecessor() && "need loop simplify form" );
 
-		SmallVector<llvm::Loop::Edge,4> Exits;
-		self->getExitEdges(Exits);
-
 		BasicBlock* TE = NULL;//True Exit
-		for(auto Exit : Exits){
-			//this is a true exit
-			if(self->getLoopLatch() == Exit.first){
-				TE = const_cast<BasicBlock*>(Exit.first);
-				break;
-			}
+		SmallVector<BasicBlock*,4> Exits;
+		self->getExitingBlocks(Exits);
+
+		if(Exits.size()==1) TE = Exits.front();
+		else{
+			if(std::find(Exits.begin(),Exits.end(),self->getLoopLatch())!=Exits.end()) TE = self->getLoopLatch();
 		}
+
 		//process true exit
 		RET_ON_FAIL(TE);
 		assert(TE && "need have a true exit");
@@ -54,6 +53,7 @@ namespace lle
 		DEBUG(if(TE->getTerminator()->getOpcode() != Instruction::Br) return NULL);
 		assert(TE->getTerminator()->getOpcode() == Instruction::Br);
 		const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
+		RET_ON_FAIL(EBR->isConditional());
 		assert(EBR->isConditional());
 		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
 		DEBUG(if(EC->getUnsignedPredicate() != EC->ICMP_EQ) return NULL);
@@ -87,6 +87,7 @@ namespace lle
 				}
 
 			}
+			outs()<<SICount[0]<<";"<<SICount[1]<<"\n";
 			RET_ON_FAIL(SICount[0]==1 && SICount[1]==1);
 			assert(SICount[0]==1 && SICount[1]==1);
 			ind = IndOrNext;
@@ -134,6 +135,8 @@ namespace lle
 		ConstantInt* Step = dyn_cast<ConstantInt>(next->getOperand(1));
 		RET_ON_FAIL(Step);
 		assert(Step);
+		RET_ON_FAIL(self->isLoopInvariant(END));
+		assert(self->isLoopInvariant(END) && "end value should be loop invariant");
 		//RET_ON_FAIL(Step->equalsInt(1));
 		//assert(VERBOSE(Step->equalsInt(1),Step) && "why induction increment number is not 1");
 
