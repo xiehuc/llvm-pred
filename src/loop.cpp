@@ -51,14 +51,14 @@ namespace lle
 		RET_ON_FAIL(TE);
 		assert(TE && "need have a true exit");
 
-		DEBUG(if(TE->getTerminator()->getOpcode() != Instruction::Br) return NULL);
-		assert(TE->getTerminator()->getOpcode() == Instruction::Br);
+		RET_ON_FAIL(isa<BranchInst>(TE->getTerminator()));
+		assert(isa<BranchInst>(TE->getTerminator()));
 		const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
 		RET_ON_FAIL(EBR->isConditional());
 		assert(EBR->isConditional());
 		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
-		DEBUG(if(EC->getUnsignedPredicate() != EC->ICMP_EQ) return NULL);
-		assert(VERBOSE(EC->getUnsignedPredicate() == EC->ICMP_EQ,EC) && "why end condition is not ==");
+		RET_ON_FAIL(EC->getPredicate() == EC->ICMP_EQ);
+		assert(VERBOSE(EC->getPredicate() == EC->ICMP_EQ,EC) && "why end condition is not ==");
 
 		Instruction* IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));
 
