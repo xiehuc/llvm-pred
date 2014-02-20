@@ -27,6 +27,8 @@ namespace lle
 		// inspired from Loop::getCanonicalInductionVariable
 		BasicBlock *H = self->getHeader();
 		BasicBlock* LoopPred = self->getLoopPredecessor();
+		IRBuilder<> Builder(H->getFirstInsertionPt());
+		int OneStep = 0;// the extra add or plus step for calc
 
 		DEBUG(outs()<<"\n");
 		DEBUG(outs()<<*loop);
@@ -57,8 +59,9 @@ namespace lle
 		RET_ON_FAIL(EBR->isConditional());
 		assert(EBR->isConditional());
 		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
-		RET_ON_FAIL(EC->getPredicate() == EC->ICMP_EQ);
-		assert(VERBOSE(EC->getPredicate() == EC->ICMP_EQ,EC) && "why end condition is not ==");
+		RET_ON_FAIL(EC->getPredicate() == EC->ICMP_EQ || EC->getPredicate() == EC->ICMP_SGT);
+		assert(VERBOSE(EC->getPredicate() == EC->ICMP_EQ || EC->getPredicate() == EC->ICMP_SGT,EC) && "why end condition is not ==");
+		if(EC->getPredicate() == EC->ICMP_SGT) OneStep += 1;
 
 		Instruction* IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));
 
@@ -144,15 +147,16 @@ namespace lle
 		//assert(VERBOSE(Step->equalsInt(1),Step) && "why induction increment number is not 1");
 
 
-		IRBuilder<> Builder(H->getFirstInsertionPt());
 		Value* RES = NULL;
 		assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() && " why increment is not integer type");
 		if(Step->isMinusOne())
 			RES = Builder.CreateSub(start,EC->getOperand(1));
 		else//Step Couldn't be zero
 			RES = Builder.CreateSub(EC->getOperand(1), start);
-		if(addfirst)
-			RES = Step->isMinusOne()?Builder.CreateAdd(RES,Step):Builder.CreateSub(RES, Step);
+		if(addfirst) OneStep -= 1;
+		if(Step->isMinusOne()) OneStep*=-1;
+		assert(OneStep<=1 && OneStep>=-1);
+		RES = (OneStep==1)?Builder.CreateAdd(RES,Step):(OneStep==-1)?Builder.CreateSub(RES, Step):RES;
 		if(!Step->isMinusOne()&&!Step->isOne())
 			RES = Builder.CreateSDiv(RES, Step);
 		/*
