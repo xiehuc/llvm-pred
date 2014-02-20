@@ -133,16 +133,31 @@ namespace lle
 
 
 		Value* END = EC->getOperand(1);
-		//process non add later
-		RET_ON_FAIL(next->getOpcode() == Instruction::Add);
-		assert(next->getOpcode() == Instruction::Add && "why induction increment is not Add");
-		RET_ON_FAIL(next->getOperand(0) == ind);
-		assert(next->getOperand(0) == ind && "why induction increment is not add it self");
-		ConstantInt* Step = dyn_cast<ConstantInt>(next->getOperand(1));
-		RET_ON_FAIL(Step);
-		assert(Step);
 		RET_ON_FAIL(self->isLoopInvariant(END));
 		assert(self->isLoopInvariant(END) && "end value should be loop invariant");
+		//process non add later
+		int next_phi_idx = 0;
+		ConstantInt* Step = NULL,*PhiStep = NULL;/*only used if next is phi node*/
+		PHINode* next_phi = dyn_cast<PHINode>(next);
+		do{
+			if(next_phi) {
+				next = dyn_cast<Instruction>(next_phi->getIncomingValue(next_phi_idx));
+				RET_ON_FAIL(next);
+				DEBUG(outs()<<"next phi "<<next_phi_idx<<":"<<*next<<"\n");
+				if(Step&&PhiStep){
+					RET_ON_FAIL(Step->getSExtValue() == PhiStep->getSExtValue());
+					assert(Step->getSExtValue() == PhiStep->getSExtValue());
+				}
+				PhiStep = Step;
+			}
+			RET_ON_FAIL(next->getOpcode() == Instruction::Add);
+			assert(next->getOpcode() == Instruction::Add && "why induction increment is not Add");
+			RET_ON_FAIL(next->getOperand(0) == ind);
+			assert(next->getOperand(0) == ind && "why induction increment is not add it self");
+			Step = dyn_cast<ConstantInt>(next->getOperand(1));
+			RET_ON_FAIL(Step);
+			assert(Step);
+		}while(next_phi && ++next_phi_idx<next_phi->getNumIncomingValues());
 		//RET_ON_FAIL(Step->equalsInt(1));
 		//assert(VERBOSE(Step->equalsInt(1),Step) && "why induction increment number is not 1");
 
