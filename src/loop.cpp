@@ -53,17 +53,38 @@ namespace lle
 		RET_ON_FAIL(TE);
 		assert(TE && "need have a true exit");
 
-		RET_ON_FAIL(isa<BranchInst>(TE->getTerminator()));
-		assert(isa<BranchInst>(TE->getTerminator()));
-		const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
-		RET_ON_FAIL(EBR->isConditional());
-		assert(EBR->isConditional());
-		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
-		RET_ON_FAIL(EC->getPredicate() == EC->ICMP_EQ || EC->getPredicate() == EC->ICMP_SGT);
-		assert(VERBOSE(EC->getPredicate() == EC->ICMP_EQ || EC->getPredicate() == EC->ICMP_SGT,EC) && "why end condition is not ==");
-		if(EC->getPredicate() == EC->ICMP_SGT) OneStep += 1;
+		Instruction* IndOrNext = NULL;
+		Value* END = NULL;
 
-		Instruction* IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));
+		if(isa<BranchInst>(TE->getTerminator())){
+			const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
+			RET_ON_FAIL(EBR->isConditional());
+			assert(EBR->isConditional());
+			ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
+			RET_ON_FAIL(EC->getPredicate() == EC->ICMP_EQ || EC->getPredicate() == EC->ICMP_SGT);
+			assert(VERBOSE(EC->getPredicate() == EC->ICMP_EQ || EC->getPredicate() == EC->ICMP_SGT,EC) && "why end condition is not ==");
+			if(EC->getPredicate() == EC->ICMP_SGT) OneStep += 1;
+			IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));
+			END = EC->getOperand(1);
+			DEBUG(outs()<<"end   value:"<<*EC<<"\n");
+		}else if(isa<SwitchInst>(TE->getTerminator())){
+			SwitchInst* ESW = const_cast<SwitchInst*>(cast<SwitchInst>(TE->getTerminator()));
+			IndOrNext = dyn_cast<Instruction>(castoff(ESW->getCondition()));
+			for(auto I = ESW->case_begin(),E = ESW->case_end();I!=E;++I){
+				if(!self->contains(I.getCaseSuccessor())){
+					RET_ON_FAIL(!END);
+					assert(!END && "shouldn't have two ends");
+					END = I.getCaseValue();
+				}
+			}
+		}else{
+			RET_ON_FAIL(0);
+			assert(0 && "unknow terminator type");
+		}
+
+		RET_ON_FAIL(self->isLoopInvariant(END));
+		assert(self->isLoopInvariant(END) && "end value should be loop invariant");
+
 
 		Value* start = NULL;
 		Value* ind = NULL;
@@ -129,12 +150,8 @@ namespace lle
 		DEBUG(outs()<<"start value:"<<*start<<"\n");
 		DEBUG(outs()<<"ind   value:"<<*ind<<"\n");
 		DEBUG(outs()<<"next  value:"<<*next<<"\n");
-		DEBUG(outs()<<"end   value:"<<*EC<<"\n");
 
 
-		Value* END = EC->getOperand(1);
-		RET_ON_FAIL(self->isLoopInvariant(END));
-		assert(self->isLoopInvariant(END) && "end value should be loop invariant");
 		//process non add later
 		int next_phi_idx = 0;
 		ConstantInt* Step = NULL,*PhiStep = NULL;/*only used if next is phi node*/
@@ -165,9 +182,9 @@ namespace lle
 		Value* RES = NULL;
 		assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() && " why increment is not integer type");
 		if(Step->isMinusOne())
-			RES = Builder.CreateSub(start,EC->getOperand(1));
+			RES = Builder.CreateSub(start,END);
 		else//Step Couldn't be zero
-			RES = Builder.CreateSub(EC->getOperand(1), start);
+			RES = Builder.CreateSub(END, start);
 		if(addfirst) OneStep -= 1;
 		if(Step->isMinusOne()) OneStep*=-1;
 		assert(OneStep<=1 && OneStep>=-1);
@@ -180,7 +197,7 @@ namespace lle
 		   RES = Builder.CreateFSub(LHS, RHS);
 		   */
 		//insert the result to last second instruction
-		new BitCastInst(RES,RES->getType(),"loop",const_cast<BranchInst*>(EBR));
+		new BitCastInst(RES,RES->getType(),"loop",TE->getTerminator());
 		return cycle = RES;
 	}
 
