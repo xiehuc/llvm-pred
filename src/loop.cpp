@@ -22,6 +22,22 @@ namespace lle
 			return v;
 	}
 
+	static Value* tryFindStart(PHINode* IND,Loop* l)
+	{
+		Loop& L = *l;
+		if(L->getLoopPredecessor()) 
+			return IND->getIncomingValueForBlock(L->getLoopPredecessor());
+		else{
+			Value* start = NULL;
+			for(int I = 0,E = IND->getNumIncomingValues();I!=E;++I){
+				if(L->contains(IND->getIncomingBlock(I))) continue;
+				if(start && start != IND->getIncomingValue(I)) return NULL;
+				start = IND->getIncomingValue(I);
+			}
+			return start;
+		}
+	}
+
 	Value* Loop::insertLoopCycle()
 	{
 		// inspired from Loop::getCanonicalInductionVariable
@@ -37,8 +53,8 @@ namespace lle
 		/** whats difference on use of predecessor and preheader??*/
 		//RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPreheader());
 		//assert(self->getLoopLatch() && self->getLoopPreheader() && "need loop simplify form" );
-		RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPredecessor());
-		assert(self->getLoopLatch() && self->getLoopPredecessor() && "need loop simplify form" );
+		RET_ON_FAIL(self->getLoopLatch());
+		assert(self->getLoopLatch() && "need loop simplify form" );
 
 		BasicBlock* TE = NULL;//True Exit
 		SmallVector<BasicBlock*,4> Exits;
@@ -47,6 +63,15 @@ namespace lle
 		if(Exits.size()==1) TE = Exits.front();
 		else{
 			if(std::find(Exits.begin(),Exits.end(),self->getLoopLatch())!=Exits.end()) TE = self->getLoopLatch();
+			SmallVector<llvm::Loop::Edge,4> ExitEdges;
+			self->getExitEdges(ExitEdges);
+			for(auto I = ExitEdges.begin(),E = ExitEdges.end();I!=E;){
+				if(isa<UnreachableInst>(I->second->getTerminator())){
+					ExitEdges.erase(I++);
+				}else ++I;
+
+			}
+			if(ExitEdges.size()==1) TE = const_cast<BasicBlock*>(ExitEdges.front().first);
 		}
 
 		//process true exit
@@ -77,6 +102,7 @@ namespace lle
 					END = I.getCaseValue();
 				}
 			}
+			DEBUG(outs()<<"end   value:"<<*ESW<<"\n");
 		}else{
 			RET_ON_FAIL(0);
 			assert(0 && "unknow terminator type");
@@ -120,7 +146,10 @@ namespace lle
 			ind = IndOrNext;
 		}else{
 			if(isa<PHINode>(IndOrNext)){
+				PHINode* PHI = cast<PHINode>(IndOrNext);
 				ind = IndOrNext;
+				if(castoff(PHI->getIncomingValue(0)) == castoff(PHI->getIncomingValue(1)) && PHI->getParent() != H)
+					ind = castoff(PHI->getIncomingValue(0));
 				addfirst = false;
 			}else if(IndOrNext->getOpcode() == Instruction::Add){
 				next = IndOrNext;
@@ -133,10 +162,12 @@ namespace lle
 			for(auto I = H->begin();isa<PHINode>(I);++I){
 				PHINode* P = cast<PHINode>(I);
 				if(ind && P == ind){
-					start = P->getIncomingValueForBlock(self->getLoopPredecessor());
+					//start = P->getIncomingValueForBlock(self->getLoopPredecessor());
+					start = tryFindStart(P, this);
 					next = dyn_cast<Instruction>(P->getIncomingValueForBlock(self->getLoopLatch()));
 				}else if(next && P->getIncomingValueForBlock(self->getLoopLatch()) == next){
-					start = P->getIncomingValueForBlock(self->getLoopPredecessor());
+					//start = P->getIncomingValueForBlock(self->getLoopPredecessor());
+					start = tryFindStart(P, this);
 					ind = P;
 				}
 			}
