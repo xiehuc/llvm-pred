@@ -63,15 +63,16 @@ namespace lle
 		if(Exits.size()==1) TE = Exits.front();
 		else{
 			if(std::find(Exits.begin(),Exits.end(),self->getLoopLatch())!=Exits.end()) TE = self->getLoopLatch();
-			SmallVector<llvm::Loop::Edge,4> ExitEdges;
-			self->getExitEdges(ExitEdges);
-			for(auto I = ExitEdges.begin(),E = ExitEdges.end();I!=E;){
-				if(isa<UnreachableInst>(I->second->getTerminator())){
-					ExitEdges.erase(I++);
-				}else ++I;
-
+			else{
+				SmallVector<llvm::Loop::Edge,4> ExitEdges;
+				self->getExitEdges(ExitEdges);
+				//stl 用法,先把所有满足条件的元素(出口的结束符是不可到达)移动到数组的末尾,再统一删除
+				ExitEdges.erase(std::remove_if(ExitEdges.begin(), ExitEdges.end(), 
+							[](llvm::Loop::Edge& I){
+							return isa<UnreachableInst>(I.second->getTerminator());
+							}), ExitEdges.end());
+				if(ExitEdges.size()==1) TE = const_cast<BasicBlock*>(ExitEdges.front().first);
 			}
-			if(ExitEdges.size()==1) TE = const_cast<BasicBlock*>(ExitEdges.front().first);
 		}
 
 		//process true exit
