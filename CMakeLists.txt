@@ -8,8 +8,10 @@ set(CMAKE_MODULE_PATH
 
 set(LLVM_RECOMMAND_VERSION "" CACHE STRING "Switch the llvm version")
 set_property(CACHE LLVM_RECOMMAND_VERSION PROPERTY STRINGS "" "3.2" "3.3")
-
 find_package(LLVM)
+
+find_package(PkgConfig)
+pkg_check_modules(LLVM_PROF llvm-prof REQUIRED)
 
 configure_file(config.h.in config.h)
 configure_file(head.h head.h COPYONLY)

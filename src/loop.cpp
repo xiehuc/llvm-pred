@@ -22,6 +22,7 @@ namespace lle
 			return v;
 	}
 
+	//find start value fron induction variable
 	static Value* tryFindStart(PHINode* IND,Loop* l)
 	{
 		Loop& L = *l;
@@ -229,7 +230,7 @@ namespace lle
 		   RES = Builder.CreateFSub(LHS, RHS);
 		   */
 		//insert the result to last second instruction
-		new BitCastInst(RES,RES->getType(),"loop",TE->getTerminator());
+		new BitCastInst(RES,RES->getType(),"loop",);
 		return cycle = RES;
 	}
 

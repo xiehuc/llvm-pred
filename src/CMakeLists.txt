@@ -24,6 +24,7 @@ add_executable(llvm-loop
     )
 
 target_link_libraries(llvm-loop
+	${LLVM_PROF_LIBRARIES}
 	${LLVM_LOOP_LIBRARY}
     ${LLVM_LIBRARIES}
     )
