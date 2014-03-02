@@ -23,17 +23,20 @@ namespace lle
 	}
 
 	//find start value fron induction variable
-	static Value* tryFindStart(PHINode* IND,Loop* l)
+	static Value* tryFindStart(PHINode* IND,Loop* l,BasicBlock*& StartBB)
 	{
 		Loop& L = *l;
-		if(L->getLoopPredecessor()) 
-			return IND->getIncomingValueForBlock(L->getLoopPredecessor());
-		else{
+		if(L->getLoopPredecessor()){ 
+			StartBB = L->getLoopPredecessor();
+			return IND->getIncomingValueForBlock(StartBB);
+		} else {
 			Value* start = NULL;
 			for(int I = 0,E = IND->getNumIncomingValues();I!=E;++I){
 				if(L->contains(IND->getIncomingBlock(I))) continue;
+				//if there are many entries, assume they are all equal
 				if(start && start != IND->getIncomingValue(I)) return NULL;
 				start = IND->getIncomingValue(I);
+				StartBB = IND->getIncomingBlock(I);
 			}
 			return start;
 		}
@@ -133,6 +136,7 @@ namespace lle
 					if(SI->getParent() != LoopPred)
 						if(std::find(pred_begin(LoopPred),pred_end(LoopPred),SI->getParent()) == pred_end(LoopPred)) continue;
 					start = SI->getOperand(0);
+					startBB = SI->getParent();
 					++SICount[0];
 				}
 				Instruction* SI0 = dyn_cast<Instruction>(SI->getOperand(0));
@@ -165,11 +169,11 @@ namespace lle
 				PHINode* P = cast<PHINode>(I);
 				if(ind && P == ind){
 					//start = P->getIncomingValueForBlock(self->getLoopPredecessor());
-					start = tryFindStart(P, this);
+					start = tryFindStart(P, this, startBB);
 					next = dyn_cast<Instruction>(P->getIncomingValueForBlock(self->getLoopLatch()));
 				}else if(next && P->getIncomingValueForBlock(self->getLoopLatch()) == next){
 					//start = P->getIncomingValueForBlock(self->getLoopPredecessor());
-					start = tryFindStart(P, this);
+					start = tryFindStart(P, this, startBB);
 					ind = P;
 				}
 			}
@@ -230,7 +234,7 @@ namespace lle
 		   RES = Builder.CreateFSub(LHS, RHS);
 		   */
 		//insert the result to last second instruction
-		new BitCastInst(RES,RES->getType(),"loop",);
+		new BitCastInst(RES,RES->getType(),"loop",startBB->getFirstInsertionPt());
 		return cycle = RES;
 	}
 

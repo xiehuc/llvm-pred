@@ -10,13 +10,14 @@ namespace lle
 {
 	class Loop{
 		llvm::Value* cycle;
+		llvm::BasicBlock* startBB;
 		llvm::Loop* loop;
 		Loop& self;
 		// 为了能够直接转型(cast),使用体外储存,未来需要改为使用ValueMap
 		public:
 			Loop(llvm::Loop* l):self(*this){
 				loop = l;
-				cycle = NULL;
+				cycle = startBB = NULL;
 			}
 			llvm::Loop* operator->(){ return loop; }
 			llvm::Value* getInductionStartValue();
@@ -25,6 +26,7 @@ namespace lle
 			llvm::Value* getLoopCycle(){
 				return (cycle)?:insertLoopCycle();
 			}
+			llvm::BasicBlock* getBlockForStartValue(){return startBB;}
 	};
 
 	void pretty_print(llvm::Value* v);
