@@ -1,5 +1,9 @@
 
-include_directories(${LLVM_INCLUDE_DIRS} ${PROJECT_BINARY_DIR})
+include_directories(
+	${LLVM_PROF_INCLUDE_DIRS}
+	${PROJECT_BINARY_DIR}
+	${LLVM_INCLUDE_DIRS} 
+	)
 link_directories(${LLVM_LIBRARY_DIRS})
 add_definitions(${LLVM_DEFINITIONS} --std=c++11)
 
@@ -25,6 +29,6 @@ add_executable(llvm-loop
 
 target_link_libraries(llvm-loop
 	${LLVM_PROF_LIBRARIES}
-	${LLVM_LOOP_LIBRARY}
+	${LLVM_DYNAMIC_LIBRARY}
     ${LLVM_LIBRARIES}
     )

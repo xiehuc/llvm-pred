@@ -15,6 +15,7 @@
 # LLVM_INCLUDE_DIRS - A list of directories where the LLVM headers are located.
 # LLVM_DEFINITIONS  - The definitions should be used
 # LLVM_LIBRARIES    - A list of libraries which should be linked
+# LLVM_DYNAMIC_LIBRARY - A single dynamic llvm shared library
 # 
 # Using Following macros to set library:
 # llvm_map_components_to_libraries(OUTPUT_VARIABLE ${llvm components})
@@ -30,33 +31,33 @@
 # 
 # add_executable(irread 1.irread.cpp)
 # target_link_libraries(target
-#     ${LLVM_DEPEND_LIBRARIES}
+#     ${LLVM_LIBRARIES}
 #     ${LLVM_IRREADER_LIRARY}
 #     )
 #
 if(NOT DEFINED LLVM_RECOMMAND_VERSION)
-    SET(LLVM_RECOMMAND_VERSION 3.2)
+    SET(LLVM_RECOMMAND_VERSION 3.4)
 endif()
 
 
 #if(NOT(DEFINED LLVM_ROOT) OR NOT("${LLVM_VERSION_LAST}" VERSION_EQUAL "${LLVM_RECOMMAND_VERSION}"))
 if(NOT(DEFINED LLVM_ROOT) )
-    if(NOT "${LLVM_VERSION}" EQUAL "{LLVM_RECOMMAND_VERSION}")
-        unset(LLVM_CONFIG_EXE CACHE)
-    endif()
-    # find llvm-config. perfers to the one with version suffix, Ex:llvm-config-3.2
-    find_program(LLVM_CONFIG_EXE NAMES "llvm-config-${LLVM_RECOMMAND_VERSION}" "llvm-config")
+	if(NOT "${LLVM_VERSION}" EQUAL "{LLVM_RECOMMAND_VERSION}")
+		unset(LLVM_CONFIG_EXE CACHE)
+	endif()
+	# find llvm-config. perfers to the one with version suffix, Ex:llvm-config-3.2
+	find_program(LLVM_CONFIG_EXE NAMES "llvm-config-${LLVM_RECOMMAND_VERSION}" "llvm-config")
 
-  if(NOT LLVM_CONFIG_EXE)
-      set(LLVM_FOUND False)
-      message(FATAL_ERROR "Not Found LLVM")
-  else()
-      set(LLVM_FOUND True)
-  endif()
+	if(NOT LLVM_CONFIG_EXE)
+		set(LLVM_FOUND False)
+		message(FATAL_ERROR "Not Found LLVM")
+	else()
+		set(LLVM_FOUND True)
+	endif()
 
-  # Get the directory of llvm by using llvm-config. also remove whitespaces.
-  execute_process(COMMAND ${LLVM_CONFIG_EXE} --prefix OUTPUT_VARIABLE LLVM_ROOT
-		 OUTPUT_STRIP_TRAILING_WHITESPACE )
+	# Get the directory of llvm by using llvm-config. also remove whitespaces.
+	execute_process(COMMAND ${LLVM_CONFIG_EXE} --prefix OUTPUT_VARIABLE LLVM_ROOT
+		OUTPUT_STRIP_TRAILING_WHITESPACE )
 
 endif()
 
@@ -80,6 +81,9 @@ _llvm_config(LLVM_CPP_FLAGS --cppflags)
 _llvm_config(LLVM_CXX_FLAGS --cxxflags)
 _llvm_config(LLVM_LD_FLAGS --ldflags)
 string(REGEX MATCH "-l.*" LLVM_LIBRARIES ${LLVM_LD_FLAGS})
+
+find_library(LLVM_DYNAMIC_LIBRARY 
+	NAMES "LLVM" "LLVM-${LLVM_VERSION}")
 
 macro(llvm_map_components_to_libraries _var_name)
     _llvm_config(${_var_name} --libs "${ARGN}")
