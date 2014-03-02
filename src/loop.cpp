@@ -47,6 +47,7 @@ namespace lle
 		// inspired from Loop::getCanonicalInductionVariable
 		BasicBlock *H = self->getHeader();
 		BasicBlock* LoopPred = self->getLoopPredecessor();
+		BasicBlock* startBB = NULL;//which basicblock stores start value
 		int OneStep = 0;// the extra add or plus step for calc
 
 		DEBUG(outs()<<"\n");
@@ -216,8 +217,8 @@ namespace lle
 
 
 		Value* RES = NULL;
-		auto insertBB = self->getLoopPredecessor()?self->getLoopPredecessor():startBB;
-		IRBuilder<> Builder(self->getLoopPredecessor()?self->getLoopPredecessor()->getTerminator():startBB->getTerminator());
+		insertBB = LoopPred?:startBB;
+		IRBuilder<> Builder(insertBB->getTerminator());
 		assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() && " why increment is not integer type");
 		if(Step->isMinusOne())
 			RES = Builder.CreateSub(start,END);
@@ -231,62 +232,7 @@ namespace lle
 			RES = Builder.CreateSDiv(RES, Step);
 
 		cycle = RES;
-		return Prof->insertValueTrap(self->getLoopPredecessor()?self->getLoopPredecessor():startBB, RES);
-	}
-
-	//may not be constant
-	Value* Loop::getInductionStartValue()
-	{
-		// inspired from Loop::getCanonicalInductionVariable
-		BasicBlock *H = self->getHeader();
-
-		BasicBlock *Incoming = 0, *Backedge = 0;
-		pred_iterator PI = pred_begin(H);
-		assert(PI != pred_end(H) &&
-				"Loop must have at least one backedge!");
-		Backedge = *PI++;
-		if (PI == pred_end(H)) return 0;  // dead loop
-		Incoming = *PI++;
-		if (PI != pred_end(H)) return 0;  // multiple backedges?
-
-		if (self->contains(Incoming)) {
-			if (self->contains(Backedge))
-				return 0;
-			std::swap(Incoming, Backedge);
-		} else if (!self->contains(Backedge))
-			return 0;
-
-		Value* candidate = NULL;
-		for(auto I = H->begin();isa<PHINode>(I);++I){
-			PHINode* P = cast<PHINode>(I);
-			if(candidate) assert("there are more than one induction,Why???");
-				candidate = P->getIncomingValueForBlock(Incoming);
-		}
-		return candidate;
-	}
-	Value* Loop::getCanonicalEndCondition()
-	{
-		//i
-		PHINode* ind = self->getCanonicalInductionVariable();
-		ind->print(outs());
-		if(ind == NULL) return NULL;
-		//i++
-		Value* indpp = ind->getIncomingValueForBlock(self->getLoopLatch());
-		for(auto ii = indpp->use_begin(), ee = indpp->use_end();ii!=ee;++ii){
-			Instruction* inst = dyn_cast<Instruction>(*ii);
-			if(!inst) continue;
-			if(inst->getOpcode() == Instruction::ICmp){
-				Value* v1 = inst->getOperand(0);
-				Value* v2 = inst->getOperand(1);
-				if(v1 == indpp && self->isLoopInvariant(v2)) return v2;
-				if(v2 == indpp && self->isLoopInvariant(v1)) return v1;
-			}
-		}
-		return NULL;
-	}
-	PHINode* getInductionVariable(llvm::Loop* loop)
-	{
-		return NULL;
+		return Prof->insertValueTrap(RES,insertBB->getTerminator());
 	}
 
 	static
