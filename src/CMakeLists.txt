@@ -5,7 +5,7 @@ include_directories(
 	${LLVM_INCLUDE_DIRS} 
 	)
 link_directories(${LLVM_LIBRARY_DIRS})
-add_definitions(${LLVM_DEFINITIONS} --std=c++11)
+add_definitions(${LLVM_DEFINITIONS} -Wall --std=c++11)
 
 
 llvm_map_components_to_libraries(LLVM_PRED_LIBRARY bitreader analysis)

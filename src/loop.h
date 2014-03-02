@@ -6,6 +6,8 @@
 #include <iostream>
 #include <stdlib.h>
 
+#include <ValueProfiling.h>
+
 namespace lle
 {
 	class Loop{
@@ -22,10 +24,8 @@ namespace lle
 			llvm::Loop* operator->(){ return loop; }
 			llvm::Value* getInductionStartValue();
 			llvm::Value* getCanonicalEndCondition();
-			llvm::Value* insertLoopCycle();
-			llvm::Value* getLoopCycle(){
-				return (cycle)?:insertLoopCycle();
-			}
+			llvm::Value* insertLoopCycle(llvm::ValueProfiler* Prof);
+			llvm::Value* getLoopCycle(){ return cycle; }
 			llvm::BasicBlock* getBlockForStartValue(){return startBB;}
 	};
 

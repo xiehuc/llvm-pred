@@ -20,8 +20,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#include <ValueProfiling.h>
-
 #include "loop.h"
 
 using namespace llvm;
@@ -44,25 +42,17 @@ class LoopPrintPass:public FunctionPass
 	explicit LoopPrintPass(): FunctionPass(ID) {}
 	void getAnalysisUsage(AnalysisUsage &AU) const 
 	{
-		AU.setPreservesAll();
+		//AU.setPreservesAll();
 		AU.addRequired<LoopInfo>();
 	}
 	void runOnLoop(Loop* l)
 	{
 		lle::Loop L(l);
-		Value* CC = L.getLoopCycle();
+		Value* CC = L.insertLoopCycle(VProf);
 		if(CC){
-			outs()<<"cycles:"<<*CC<<"\n";
+			outs()<<"cycles:"<<*L.getLoopCycle()<<"\n";
 		}else
 			outs()<<"cycles:unknow\n";
-		/*
-		   Value* endcond = L->getCanonicalEndCondition();
-		   outs()<<"end condition at depth"<<L->getLoopDepth()<<":";
-		   endcond->print(outs());
-		   outs()<<"\n";
-		   if(endcond){ lle::latex_print(endcond);outs()<<"\n";}
-		   */
-
 		if(!L->getSubLoops().empty()){
 			for(auto I = L->getSubLoops().begin(),E = L->getSubLoops().end();I!=E;I++)
 				runOnLoop(*I);
@@ -79,6 +69,7 @@ class LoopPrintPass:public FunctionPass
 		for(auto ite = LI.begin(), end = LI.end();ite!=end;ite++){
 			runOnLoop(*ite);
 		}
+		return true;
 	}
 };
 
@@ -122,6 +113,7 @@ int main(int argc, char **argv) {
 	for( auto& func : *M ){
 		f_pass_mgr.run(func);
 	}
+	VProf->runOnModule(*M);
 
 	if(!WriteFile.empty()){
 		std::string error;

@@ -42,12 +42,11 @@ namespace lle
 		}
 	}
 
-	Value* Loop::insertLoopCycle()
+	Value* Loop::insertLoopCycle(ValueProfiler* Prof)
 	{
 		// inspired from Loop::getCanonicalInductionVariable
 		BasicBlock *H = self->getHeader();
 		BasicBlock* LoopPred = self->getLoopPredecessor();
-		IRBuilder<> Builder(H->getFirstInsertionPt());
 		int OneStep = 0;// the extra add or plus step for calc
 
 		DEBUG(outs()<<"\n");
@@ -190,7 +189,7 @@ namespace lle
 
 
 		//process non add later
-		int next_phi_idx = 0;
+		unsigned next_phi_idx = 0;
 		ConstantInt* Step = NULL,*PhiStep = NULL;/*only used if next is phi node*/
 		PHINode* next_phi = dyn_cast<PHINode>(next);
 		do{
@@ -217,6 +216,8 @@ namespace lle
 
 
 		Value* RES = NULL;
+		auto insertBB = self->getLoopPredecessor()?self->getLoopPredecessor():startBB;
+		IRBuilder<> Builder(self->getLoopPredecessor()?self->getLoopPredecessor()->getTerminator():startBB->getTerminator());
 		assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() && " why increment is not integer type");
 		if(Step->isMinusOne())
 			RES = Builder.CreateSub(start,END);
@@ -228,14 +229,9 @@ namespace lle
 		RES = (OneStep==1)?Builder.CreateAdd(RES,Step):(OneStep==-1)?Builder.CreateSub(RES, Step):RES;
 		if(!Step->isMinusOne()&&!Step->isOne())
 			RES = Builder.CreateSDiv(RES, Step);
-		/*
-		   Value* LHS = Builder.CreateUIToFP(END, Type::getFloatTy(H->getContext()));
-		   Value* RHS = Builder.CreateUIToFP(start, Type::getFloatTy(H->getContext()));
-		   RES = Builder.CreateFSub(LHS, RHS);
-		   */
-		//insert the result to last second instruction
-		new BitCastInst(RES,RES->getType(),"loop",startBB->getFirstInsertionPt());
-		return cycle = RES;
+
+		cycle = RES;
+		return Prof->insertValueTrap(self->getLoopPredecessor()?self->getLoopPredecessor():startBB, RES);
 	}
 
 	//may not be constant
@@ -290,6 +286,7 @@ namespace lle
 	}
 	PHINode* getInductionVariable(llvm::Loop* loop)
 	{
+		return NULL;
 	}
 
 	static
@@ -406,7 +403,7 @@ namespace lle
 		}
 		else if(isa<GetElementPtrInst>(inst)){
 			pretty_print(inst->getOperand(0));
-			for(int i=1;i<inst->getNumOperands();i++){
+			for(unsigned i=1;i<inst->getNumOperands();i++){
 				outs()<<"[";
 				pretty_print(inst->getOperand(i));
 				outs()<<"]";
@@ -493,7 +490,7 @@ namespace lle
 		}
 		else if(isa<GetElementPtrInst>(inst)){
 			pretty_print(inst->getOperand(0));
-			for(int i=1;i<inst->getNumOperands();i++){
+			for(unsigned i=1;i<inst->getNumOperands();i++){
 				outs()<<"[";
 				pretty_print(inst->getOperand(i));
 				outs()<<"]";
