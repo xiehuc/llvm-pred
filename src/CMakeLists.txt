@@ -32,3 +32,5 @@ target_link_libraries(llvm-loop
 	${LLVM_DYNAMIC_LIBRARY}
     ${LLVM_LIBRARIES}
     )
+
+install(TARGETS llvm-loop DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
