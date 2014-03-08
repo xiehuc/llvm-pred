@@ -220,6 +220,10 @@ namespace lle
 		insertBB = LoopPred?:startBB;
 		IRBuilder<> Builder(insertBB->getTerminator());
 		assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() && " why increment is not integer type");
+		if(start->getType() != END->getType()){
+			start = Builder.CreateCast(CastInst::getCastOpcode(start, false,
+						END->getType(), false),start,END->getType());
+		}
 		if(Step->isMinusOne())
 			RES = Builder.CreateSub(start,END);
 		else//Step Couldn't be zero
