@@ -11,6 +11,8 @@ def parse_one_line(line):
     count=int(ar[0][9:end])
     #remove last \n
     content=tuple(map(int,ar[1].split(',')[:-1]))
+    if not isConstant:
+        assert(len(content)==count)
     return (isConstant,count,content)
 
 def main():
