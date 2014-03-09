@@ -12,21 +12,16 @@ def parse_one_line(line):
     count=int(ar[0][9:end])
     #remove last \n
     compact=tuple(ar[1].split(',')[:-1])
-    content=[[],[]] #x and y
     x=0
     for item in compact:
         c = re.findall('(\d+)<repeat (\d+) times>',item)
         if c:
-            content[0]+=[x]
-            content[1]+=[int(c[0][0])]
+            plt.plot([x,x+int(c[0][1])-1],[int(c[0][0]),int(c[0][0])],'-b')
             x+=int(c[0][1])
-            content[0]+=[x-1]
-            content[1]+=[int(c[0][0])]
         else:
-            content[0]+=[x]
-            content[1]+=[int(item)]
+            plt.plot([x],[int(item)],'.b')
             x+=1
-    return (isConstant,count,content)
+    return (isConstant,count,compact)
 
 def main():
     parser = argparse.ArgumentParser(description="draw lines for value profile processed by llvm-prof -value-content")
@@ -41,12 +36,11 @@ def main():
     f=open(args.filepath)
     idx=0
     for line in f:
-        data = parse_one_line(line)
         print('#',idx)
-        if len(data[2][0])==1:
-            plt.plot(data[2][0],data[2][1],'.')
-        else:
-            plt.plot(data[2][0],data[2][1],'-')
+        plt.hold(True)
+        parse_one_line(line)
+        plt.hold(False)
+        plt.margins(0.05)
         plt.savefig(path.join(outdir,str(idx)+".png"))
         plt.close()
         idx+=1
