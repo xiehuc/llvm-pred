@@ -6,25 +6,28 @@
 #include <iostream>
 #include <stdlib.h>
 
-#include <ValueProfiling.h>
-
 namespace lle
 {
 	class Loop{
 		llvm::Value* cycle;
-		llvm::BasicBlock* insertBB;
 		llvm::Loop* loop;
 		Loop& self;
 		// 为了能够直接转型(cast),使用体外储存,未来需要改为使用ValueMap
 		public:
 			Loop(llvm::Loop* l):self(*this){
 				loop = l;
-				cycle = insertBB = NULL;
+				cycle = NULL;
 			}
 			llvm::Loop* operator->(){ return loop; }
-			llvm::Value* insertLoopCycle(llvm::ValueProfiler* Prof);
+			/**
+			 * trying to find loop cycle, if it is a variable, because it is a
+			 * sub instruction, first insert it into source then we can get it.
+			 * if it is a constant, we couldn't simply insert a constant into
+			 * source, so we directly return it. caller can make a cast
+			 * instruction and insert it by hand.
+			 */
+			llvm::Value* insertLoopCycle();
 			llvm::Value* getLoopCycle(){ return cycle; }
-			llvm::Instruction* getLoopInsertPos(){return insertBB->getTerminator();}
 	};
 
 	void pretty_print(llvm::Value* v);

@@ -15,7 +15,9 @@
 
 #include <llvm/IR/Instructions.h>
 #include <llvm/Analysis/LoopInfo.h>
-#include <llvm/Transforms/Utils/SimplifyIndVar.h>
+#include <llvm/Transforms/Utils/LoopUtils.h>
+
+#include <ValueProfiling.h>
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -31,6 +33,8 @@ namespace {
 	cl::opt<std::string>
 		WriteFile(cl::Positional,cl::desc("<write bitcode file>"),
 				cl::Optional);
+	cl::opt<bool>
+		ValueProfiling("insert-value-profiling", cl::desc("insert value profiling for loop cycle"));
 };
 
 static ValueProfiler* VProf = NULL;
@@ -64,10 +68,14 @@ class LoopPrintPass:public FunctionPass
 	void runOnLoop(Loop* l)
 	{
 		lle::Loop L(l);
-		Value* CC = L.insertLoopCycle(VProf);
+		if(L->getLoopPreheader()==NULL)
+			InsertPreheaderForLoop(l, this);
+		Value* CC = L.insertLoopCycle();
 		if(CC){
 			outs()<<*l<<"\n";
 			outs()<<"cycles:"<<*L.getLoopCycle()<<"\n";
+			if(ValueProfiling)
+				VProf->insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 		}else{
 			++unresolvedNum;
 			delay<<"Function:"<<curFunc->getName()<<"\n";
@@ -135,7 +143,8 @@ int main(int argc, char **argv) {
 	for( auto& func : *M ){
 		f_pass_mgr.run(func);
 	}
-	VProf->runOnModule(*M);
+	if(ValueProfiling)
+		VProf->runOnModule(*M);
 
 	LPP->printUnresolved(outs());
 

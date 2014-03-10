@@ -43,7 +43,7 @@ namespace lle
 		}
 	}
 
-	Value* Loop::insertLoopCycle(ValueProfiler* Prof)
+	Value* Loop::insertLoopCycle()
 	{
 		// inspired from Loop::getCanonicalInductionVariable
 		BasicBlock *H = self->getHeader();
@@ -217,7 +217,8 @@ namespace lle
 
 
 		Value* RES = NULL;
-		insertBB = LoopPred?:startBB;
+		//if there are no predecessor, we can insert code into start value basicblock
+		BasicBlock* insertBB = LoopPred?:startBB;
 		IRBuilder<> Builder(insertBB->getTerminator());
 		assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() && " why increment is not integer type");
 		if(start->getType() != END->getType()){
@@ -235,8 +236,7 @@ namespace lle
 		if(!Step->isMinusOne()&&!Step->isOne())
 			RES = Builder.CreateSDiv(RES, Step);
 
-		cycle = RES;
-		return Prof->insertValueTrap(RES,insertBB->getTerminator());
+		return cycle = RES;
 	}
 
 	static
