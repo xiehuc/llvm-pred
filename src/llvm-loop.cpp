@@ -49,6 +49,7 @@ class LoopPrintPass:public FunctionPass
 	{
 		lle::Loop L(l);
 		Value* CC = L.insertLoopCycle(VProf);
+		outs()<<*l<<"\n";
 		if(CC){
 			outs()<<"cycles:"<<*L.getLoopCycle()<<"\n";
 		}else
@@ -65,7 +66,6 @@ class LoopPrintPass:public FunctionPass
 		outs()<<"Function:"<<func_name<<"\n";
 		outs()<<"------------------------\n";
 		LoopInfo& LI = getAnalysis<LoopInfo>();
-		LI.print(outs(), F.getParent());
 		for(auto ite = LI.begin(), end = LI.end();ite!=end;ite++){
 			runOnLoop(*ite);
 		}

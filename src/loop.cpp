@@ -1,4 +1,5 @@
 #include "loop.h"
+#include "config.h"
 #include "debug.h"
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Constants.h>
@@ -122,14 +123,14 @@ namespace lle
 		Instruction* next = NULL;
 		bool addfirst = false;//add before icmp ed
 
-		outs()<<*IndOrNext<<"\n";
+		DISABLE(outs()<<*IndOrNext<<"\n");
 		if(isa<LoadInst>(IndOrNext)){
 			//memory depend analysis
 			Value* PSi = IndOrNext->getOperand(0);//point type Step.i
 
 			int SICount[2] = {0};//store in predecessor count,store in loop body count
 			for( auto I = PSi->use_begin(),E = PSi->use_end();I!=E;++I){
-				outs()<<**I<<"\n";
+				DISABLE(outs()<<**I<<"\n");
 				StoreInst* SI = dyn_cast<StoreInst>(*I);
 				if(!SI || SI->getOperand(1) != PSi) continue;
 				if(!start&&self->isLoopInvariant(SI->getOperand(0))) {
@@ -146,7 +147,6 @@ namespace lle
 				}
 
 			}
-			outs()<<SICount[0]<<";"<<SICount[1]<<"\n";
 			RET_ON_FAIL(SICount[0]==1 && SICount[1]==1);
 			assert(SICount[0]==1 && SICount[1]==1);
 			ind = IndOrNext;

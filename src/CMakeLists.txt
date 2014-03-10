@@ -24,7 +24,6 @@ llvm_map_components_to_libraries(LLVM_LOOP_LIBRARY bitreader analysis bitwriter)
 add_executable(llvm-loop
     llvm-loop.cpp
 	loop.cpp
-	debug.cpp
     )
 
 target_link_libraries(llvm-loop
