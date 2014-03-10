@@ -38,22 +38,42 @@ static ValueProfiler* VProf = NULL;
 class LoopPrintPass:public FunctionPass 
 {
 	static char ID;
+	std::string delay_str;
+	raw_string_ostream delay;
+	unsigned unresolvedNum;
+	const Function* curFunc;
 	public:
-	explicit LoopPrintPass(): FunctionPass(ID) {}
+	explicit LoopPrintPass(): 
+		FunctionPass(ID),delay(delay_str)
+	{
+		unresolvedNum = 0;
+	}
 	void getAnalysisUsage(AnalysisUsage &AU) const 
 	{
 		//AU.setPreservesAll();
 		AU.addRequired<LoopInfo>();
 	}
+	void printUnresolved(raw_ostream& out)
+	{
+		if(unresolvedNum){
+			outs()<<std::string(73,'*')<<"\n";
+			outs()<<"\tNote!! there are "<<unresolvedNum<<" loop cycles unresolved:\n";
+			outs()<<delay.str();
+		}
+	}
 	void runOnLoop(Loop* l)
 	{
 		lle::Loop L(l);
 		Value* CC = L.insertLoopCycle(VProf);
-		outs()<<*l<<"\n";
 		if(CC){
+			outs()<<*l<<"\n";
 			outs()<<"cycles:"<<*L.getLoopCycle()<<"\n";
-		}else
-			outs()<<"cycles:unknow\n";
+		}else{
+			++unresolvedNum;
+			delay<<"Function:"<<curFunc->getName()<<"\n";
+			delay<<"\t"<<*l<<"\n";
+			//outs()<<"cycles:unknow\n";
+		}
 		if(!L->getSubLoops().empty()){
 			for(auto I = L->getSubLoops().begin(),E = L->getSubLoops().end();I!=E;I++)
 				runOnLoop(*I);
@@ -61,6 +81,7 @@ class LoopPrintPass:public FunctionPass
 	}
 	bool runOnFunction(Function& F)
 	{
+		curFunc = &F;
 		StringRef func_name = F.getName();
 		outs()<<"------------------------\n";
 		outs()<<"Function:"<<func_name<<"\n";
@@ -106,14 +127,17 @@ int main(int argc, char **argv) {
 	// interface.
 
 	VProf = new ValueProfiler();
+	LoopPrintPass* LPP = new LoopPrintPass();
 	FunctionPassManager f_pass_mgr(M);
 	f_pass_mgr.add(new LoopInfo());
-	f_pass_mgr.add(new LoopPrintPass());
+	f_pass_mgr.add(LPP);
 
 	for( auto& func : *M ){
 		f_pass_mgr.run(func);
 	}
 	VProf->runOnModule(*M);
+
+	LPP->printUnresolved(outs());
 
 	if(!WriteFile.empty()){
 		std::string error;
