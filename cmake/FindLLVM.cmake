@@ -5,17 +5,18 @@
 #
 # The following variables are set:
 #
-# LLVM_FOUND        - Set to YES if LLVM is found.
-# LLVM_VERSION      - Set to the decimal version of the LLVM library.
-# LLVM_C_FLAGS      - All flags that should be passed to a C compiler. 
-# LLVM_CXX_FLAGS    - All flags that should be passed to a C++ compiler.
-# LLVM_CPP_FLAGS    - All flags that should be passed to the C pre-processor.
-# LLVM_LD_FLAGS     - Additional flags to pass to the linker.
-# LLVM_LIBRARY_DIRS - A list of directories where the LLVM libraries are located.
-# LLVM_INCLUDE_DIRS - A list of directories where the LLVM headers are located.
-# LLVM_DEFINITIONS  - The definitions should be used
-# LLVM_LIBRARIES    - A list of libraries which should be linked
-# LLVM_DYNAMIC_LIBRARY - A single dynamic llvm shared library
+# LLVM_FOUND                 - Set to YES if LLVM is found.
+# LLVM_VERSION               - Set to the decimal version of the LLVM library.
+# LLVM_C_FLAGS               - All flags that should be passed to a C compiler.
+# LLVM_CXX_FLAGS             - All flags that should be passed to a C++ compiler.
+# LLVM_CPP_FLAGS             - All flags that should be passed to the C pre                - processor.
+# LLVM_LD_FLAGS              - Additional flags to pass to the linker.
+# LLVM_LIBRARY_DIRS          - A list of directories where the LLVM libraries are located.
+# LLVM_INCLUDE_DIRS          - A list of directories where the LLVM headers are located.
+# LLVM_DEFINITIONS           - The definitions should be used
+# LLVM_LIBRARIES             - A list of libraries which should be linked
+# LLVM_DYNAMIC_LIBRARY       - A single dynamic llvm shared library
+# LLVM_DYNAMIC_LIBRARY_FOUND - Whether found the dynamic llvm shared library
 # 
 # Using Following macros to set library:
 # llvm_map_components_to_libraries(OUTPUT_VARIABLE ${llvm components})
@@ -83,7 +84,15 @@ _llvm_config(LLVM_LD_FLAGS --ldflags)
 string(REGEX MATCH "-l.*" LLVM_LIBRARIES ${LLVM_LD_FLAGS})
 
 find_library(LLVM_DYNAMIC_LIBRARY 
-	NAMES "LLVM" "LLVM-${LLVM_VERSION}")
+	NAMES "LLVM" "LLVM-${LLVM_VERSION}"
+    PATHS ${LLVM_LIBRARY_DIRS}
+    )
+
+if(NOT LLVM_DYNAMIC_LIBRARY)
+	set(LLVM_DYNAMIC_LIBRARY_FOUND False)
+else()
+	set(LLVM_DYNAMIC_LIBRARY_FOUND True)
+endif()
 
 macro(llvm_map_components_to_libraries _var_name)
     _llvm_config(${_var_name} --libs "${ARGN}")
