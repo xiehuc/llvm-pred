@@ -17,5 +17,5 @@ pkg_check_modules(LLVM_PROF llvm-prof REQUIRED)
 
 configure_file(config.h.in config.h)
 
-add_subdirectory(test)
+#add_subdirectory(test)
 add_subdirectory(src)
