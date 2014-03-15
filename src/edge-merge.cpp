@@ -43,7 +43,7 @@ int read_filelist(char * dir_name,vector<string> &filelist)
 
 	if((dir = opendir(cur_dir.c_str()))==NULL)
 	{
-		cout << "ERROR:Open " << cur_dir << " failed!" << endl;
+		cerr << "ERROR:Open " << cur_dir << " failed!" << endl;
 		return -1;
 	}
 	while((file_info = readdir(dir)) != NULL)
@@ -104,35 +104,25 @@ int main(int argc,char *argv[])
 {
 	vector<string> filelist;
 	vector<DType> freq_count;
-	string file_path,out_file_name;
-	fstream infile,outfile;
-	stringstream ss;
-	double out_num;
+	string file_path;
+	fstream infile;
 	unsigned long long sum_freq = 0;
 
 	if(argc != 2)
 	{
-		cout << "Usage: "<<argv[0]<<" [directory-where-the-files-exist]" << endl
+		cerr << "Usage: "<<argv[0]<<" [directory-where-the-files-exist]" << endl
 			<< "Like: "<<argv[0]<<" /home/lgz/Document/" << endl;
 		return -1;
 	}
 	if(access(argv[1],R_OK)!=0)
 	{
-		cout << "Sorry,you can not read the director,check to see if the"
+		cerr << "Sorry,you can not read the director,check to see if the"
 			<< " file exists or you have the right to read it" << endl;
 		return -1;
 	}
 
 	read_filelist(argv[1],filelist);
-	ss << "collect" << filelist.size() << ".txt";
-	ss >> out_file_name;
-	outfile.open(out_file_name,fstream::out);
-	if(!outfile)
-	{
-		cerr << "Error:Can't open the file " << out_file_name << endl;
-		return -1;
-	}
-
+	
 	while(!filelist.empty())
 	{
 		file_path = filelist.back();
@@ -149,7 +139,7 @@ int main(int argc,char *argv[])
 	sort(freq_count.begin(),freq_count.end(),compare);
 	for(vector<DType>::iterator it = freq_count.begin();it!=freq_count.end();it++)
 	{
-		outfile  << (it->freqence*1.0/sum_freq)*100.0 << "%   \t" << it->freqence 
+		cout << (it->freqence*1.0/sum_freq)*100.0 << "%   \t" << it->freqence 
 			<< "/" << sum_freq << "\t\t" << it->func_id << endl;
 	}
 	return 0;
