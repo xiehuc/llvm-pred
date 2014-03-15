@@ -7,7 +7,16 @@
 #include <vector>
 #include <regex>
 
-
+/**
+  *以前使用llvmprof处理二进制文件后，得到的可读文件分为两部分，
+  *上半部分是TOP 20的函数，下半部分是TOP 20的基本块。都是用##标志。
+  *使用llvmpred处理二进制文件后，得到的可读文件只有一部分，TOP 20
+  *的基本块，也是用##标志。
+  *在验证本程序的时候，使用的是以前的文件，里面是两部分，所以PART_NUM
+  *定义为2。如果是处理现在的文件，里面只有一部分，就要将PART_NUM定义为1，
+  *不然会出现死循环。
+ **/
+#define PART_NUM 2
 #define MAX_BUF_SIZE 200
 using namespace std;
 
@@ -25,91 +34,74 @@ bool compare(DType num1, DType num2)
 int read_filelist(char * dir_name,vector<string> &filelist)
 {
 	struct dirent * file_info = NULL;
-	string cur_dir = dir_name;
+	string cur_dir = dir_name, pat_pre("llvmprof.out."),pat_suf(".output");
         DIR * dir = NULL;
 	string file_name;
-	try
+
+	if(cur_dir.at(cur_dir.length()-1) != '/')  
+		cur_dir += "/";
+
+	if((dir = opendir(cur_dir.c_str()))==NULL)
 	{
-        	const regex pattern("llvmprof.out.*",regex::icase);//i don't know how to use RE
-		if(cur_dir.at(cur_dir.length()-1) != '/')
-		{
-			cur_dir += "/";
-		}
-		if((dir = opendir(cur_dir.c_str()))==NULL)
-		{
-			cout << "ERROR:Open " << cur_dir << " failed!" << endl;
-			return -1;
-		}
-		while((file_info = readdir(dir)) != NULL)
-		{
-			file_name = file_info->d_name;
-			if(regex_match(file_name,pattern))
-			{
-				filelist.push_back(cur_dir+file_name);
-			}
-		}
+		cout << "ERROR:Open " << cur_dir << " failed!" << endl;
+		return -1;
 	}
-	catch(regex_error &e)
+	while((file_info = readdir(dir)) != NULL)
 	{
-		cout << e.what() << "\ncode: " << e.code() << endl;
+		file_name = file_info->d_name;
+		if(file_name.size() <= 20) continue;
+		if((file_name.compare(0,13,pat_pre)==0) && (file_name.compare(file_name.size()-7,7,pat_suf)==0))
+			filelist.push_back(cur_dir+file_name);
 	}
-	
 	return 0;
 }
 
-unsigned long long  parse_buf(string & info, vector<DType> &freq_count)
+unsigned long long  parse_buf(string & buf, vector<DType> &freq_count)
 {
-	int i,pos;
-	char c_temp;
-	double percent;
-	string name, str_temp;
+	string name;
+	char name_pre[MAX_BUF_SIZE], name_suf[MAX_BUF_SIZE],info[MAX_BUF_SIZE];
 	long double freq_temp,sum_freq_temp;
 	unsigned long long freqence,sum_freq;
-      
-	vector<DType>::iterator itr,itr_end;
-	stringstream line_info(info,ios_base::in);
-        
-	line_info >> i >> c_temp >> percent >> c_temp >> freq_temp >> c_temp 
-		  >> sum_freq_temp >> name;
+	
+	buf.copy(info,buf.size(),0);
+	info[buf.size()] = '\0';
+	sscanf(info,"%*d%*c%*f%*c%Lf%*c%Lf%s%[0-9a-zA-Z<>_- .()]",&freq_temp,&sum_freq_temp,name_pre,name_suf);
 	freqence = freq_temp;
 	sum_freq = sum_freq_temp;
-	
-	name = name+info.substr(line_info.tellg());
+	name = string(name_pre)+string(name_suf);
         
-	itr = freq_count.begin();
-	itr_end = freq_count.end();
-	while(itr != itr_end)
+	for(vector<DType>::iterator I=freq_count.begin(),E=freq_count.end();I!=E;++I)
 	{
-		if(name.compare(itr->func_id)==0)
+		if(name == I->func_id)
 		{
-			itr->freqence = itr->freqence+freqence;
+			I->freqence += freqence;
 			return sum_freq;
 		}
-		itr++;
 	}
 	freq_count.push_back(DType{name,freqence});
 	return sum_freq;
 }
+
 unsigned long long extract_info(fstream &infile,vector<DType> &freq_count)
 {
 	int count = 0;
 	unsigned long long sum_per_file;
-	char buf[MAX_BUF_SIZE];
- 
-	while(count<2)
+        string buf;
+
+	while(count<PART_NUM)
 	{
-		infile.getline(buf,MAX_BUF_SIZE);
+		getline(infile,buf);
 		if(buf[1]=='#') count++;
 	}
 	while(!infile.eof())
 	{
-		infile.getline(buf,MAX_BUF_SIZE);
-		string temp_str(buf);
-		if(temp_str.length()==0) continue;
-		sum_per_file = parse_buf(temp_str,freq_count);
+		getline(infile,buf);
+		if(buf.size() == 0) continue;
+		sum_per_file = parse_buf(buf,freq_count);
 	}
 	return sum_per_file;
 }
+
 int main(int argc,char *argv[])
 {
 	vector<string> filelist;
@@ -139,7 +131,7 @@ int main(int argc,char *argv[])
 	outfile.open(out_file_name,fstream::out);
         if(!outfile)
         {
-		cout << "Error:Can't open the file " << out_file_name << endl;
+		cerr << "Error:Can't open the file " << out_file_name << endl;
 		return -1;
 	}
 
@@ -150,7 +142,7 @@ int main(int argc,char *argv[])
 		infile.open(file_path,fstream::in);
 		if(!infile)
 		{
-			cout << "Error:Can't open the file " << file_path << endl;
+			cerr << "Error:Can't open the file " << file_path << endl;
 			return -1;
 		}
 		sum_freq += extract_info(infile,freq_count);
