@@ -59,14 +59,14 @@ int read_filelist(char * dir_name,vector<string> &filelist)
 unsigned long long  parse_buf(string & buf, vector<DType> &freq_count)
 {
 	string name;
-	char name_pre[MAX_BUF_SIZE], name_suf[MAX_BUF_SIZE];
+	char name_[MAX_BUF_SIZE];
 	long double freq_temp,sum_freq_temp;
 	unsigned long long freqence,sum_freq;
 
-	sscanf(buf.c_str(),"%*d%*c%*f%*c%Lf%*c%Lf%s%[0-9a-zA-Z<>_- .()]",&freq_temp,&sum_freq_temp,name_pre,name_suf);
+	sscanf(buf.c_str(),"%*d. %*f%% %Lf/%Lf\t%[^\n]",&freq_temp,&sum_freq_temp,name_);
 	freqence = freq_temp;
 	sum_freq = sum_freq_temp;
-	name = string(name_pre)+string(name_suf);
+	name = string(name_);
 
 	for(vector<DType>::iterator I=freq_count.begin(),E=freq_count.end();I!=E;++I)
 	{
