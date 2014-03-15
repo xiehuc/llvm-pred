@@ -37,4 +37,8 @@ target_link_libraries(llvm-loop
     ${LLVM_LIBRARIES}
     )
 
+add_executable(edge-merge
+	edge-merge.cpp
+	)
+
 install(TARGETS llvm-loop DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)

@@ -35,6 +35,7 @@ namespace lle
 			for(int I = 0,E = IND->getNumIncomingValues();I!=E;++I){
 				if(L->contains(IND->getIncomingBlock(I))) continue;
 				//if there are many entries, assume they are all equal
+				//****??? should do castoff ???******
 				if(start && start != IND->getIncomingValue(I)) return NULL;
 				start = IND->getIncomingValue(I);
 				StartBB = IND->getIncomingBlock(I);
@@ -191,18 +192,18 @@ namespace lle
 
 		//process non add later
 		unsigned next_phi_idx = 0;
-		ConstantInt* Step = NULL,*PhiStep = NULL;/*only used if next is phi node*/
+		ConstantInt* Step = NULL,*PrevStep = NULL;/*only used if next is phi node*/
 		PHINode* next_phi = dyn_cast<PHINode>(next);
 		do{
 			if(next_phi) {
 				next = dyn_cast<Instruction>(next_phi->getIncomingValue(next_phi_idx));
 				RET_ON_FAIL(next);
 				DEBUG(outs()<<"next phi "<<next_phi_idx<<":"<<*next<<"\n");
-				if(Step&&PhiStep){
-					RET_ON_FAIL(Step->getSExtValue() == PhiStep->getSExtValue());
-					assert(Step->getSExtValue() == PhiStep->getSExtValue());
+				if(Step&&PrevStep){
+					RET_ON_FAIL(Step->getSExtValue() == PrevStep->getSExtValue());
+					assert(Step->getSExtValue() == PrevStep->getSExtValue());
 				}
-				PhiStep = Step;
+				PrevStep = Step;
 			}
 			RET_ON_FAIL(next->getOpcode() == Instruction::Add);
 			assert(next->getOpcode() == Instruction::Add && "why induction increment is not Add");

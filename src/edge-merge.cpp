@@ -59,13 +59,11 @@ int read_filelist(char * dir_name,vector<string> &filelist)
 unsigned long long  parse_buf(string & buf, vector<DType> &freq_count)
 {
 	string name;
-	char name_pre[MAX_BUF_SIZE], name_suf[MAX_BUF_SIZE],info[MAX_BUF_SIZE];
+	char name_pre[MAX_BUF_SIZE], name_suf[MAX_BUF_SIZE];
 	long double freq_temp,sum_freq_temp;
 	unsigned long long freqence,sum_freq;
 	
-	buf.copy(info,buf.size(),0);
-	info[buf.size()] = '\0';
-	sscanf(info,"%*d%*c%*f%*c%Lf%*c%Lf%s%[0-9a-zA-Z<>_- .()]",&freq_temp,&sum_freq_temp,name_pre,name_suf);
+	sscanf(buf.c_str(),"%*d%*c%*f%*c%Lf%*c%Lf%s%[0-9a-zA-Z<>_- .()]",&freq_temp,&sum_freq_temp,name_pre,name_suf);
 	freqence = freq_temp;
 	sum_freq = sum_freq_temp;
 	name = string(name_pre)+string(name_suf);
@@ -114,8 +112,8 @@ int main(int argc,char *argv[])
 
 	if(argc != 2)
 	{
-		cout << "Usage: command [directory-where-the-files-exist]" << endl
- 		     << "Like: ./a.out /home/lgz/Document/" << endl;
+		cout << "Usage: "<<argv[0]<<" [directory-where-the-files-exist]" << endl
+ 		     << "Like: "<<argv[0]<<" /home/lgz/Document/" << endl;
 		return -1;
 	}
 	if(access(argv[1],R_OK)!=0)
