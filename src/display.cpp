@@ -3,7 +3,9 @@
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/InstrTypes.h>
+#include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/Instructions.h>
+
 #include <llvm/Support/raw_ostream.h>
 
 using namespace lle;
@@ -92,8 +94,13 @@ static void pretty_print(Constant* c)
 {
 	if(isa<ConstantInt>(c))
 		cast<ConstantInt>(c)->getValue().print(outs(), true);
-	else if(isa<ConstantFP>(c)){
+	else if(isa<ConstantFP>(c))
 		outs()<< cast<ConstantFP>(c)->getValueAPF().convertToDouble();
+	else if(isa<GlobalValue>(c))
+		outs()<<"@"<<c->getName();
+	else if(isa<ConstantExpr>(c)){
+		ConstantExpr* CExp = cast<ConstantExpr>(c);
+		lle::pretty_print(CExp->getAsInstruction());
 	}else
 		c->print(outs());
 }
@@ -107,12 +114,15 @@ void lle::pretty_print(Value* v)
 	}
 	Instruction* inst = dyn_cast<Instruction>(v);
 	if(!inst) return;
+
 	if(inst->isBinaryOp())
 		::pretty_print(cast<BinaryOperator>(inst));
 	else if(isa<CmpInst>(inst))
 		::pretty_print(cast<CmpInst>(inst));
 	else if(isa<LoadInst>(inst)||isa<StoreInst>(inst))
-		outs()<<inst->getOperand(0)->getName();
+		lle::pretty_print(inst->getOperand(0));
+	else if(isa<AllocaInst>(inst))
+		outs()<<"%"<<inst->getName();
 	else if(isa<SelectInst>(inst)){
 		outs()<<"(";
 		lle::pretty_print(inst->getOperand(0));
@@ -123,10 +133,10 @@ void lle::pretty_print(Value* v)
 	}
 	else if(isa<CastInst>(inst)){
 		CastInst* c = cast<CastInst>(inst);
-		outs()<<"(";
 		c->getDestTy()->print(outs());
-		outs()<<")";
+		outs()<<"(";
 		lle::pretty_print(c->getOperand(0));
+		outs()<<")";
 	}
 	else if(isa<GetElementPtrInst>(inst)){
 		lle::pretty_print(inst->getOperand(0));
