@@ -38,7 +38,16 @@ static void pretty_print(BinaryOperator* bin)
 	if(symbols.at(bin->getOpcode())==""){
 		errs()<<"unknow operator"<<"\n";
 	}
-	outs()<<symbols.at(bin->getOpcode());
+	//if operand 1 is negative ,should ignore + symbol (+-1)-> (-1)
+	bool ignore = false;
+	if(bin->getOpcode()==Instruction::Add){
+		ConstantInt* CInt = dyn_cast<ConstantInt>(bin->getOperand(1));
+		if(CInt && CInt->isNegative()) ignore = true;
+		ConstantFP* CFP = dyn_cast<ConstantFP>(bin->getOperand(1));
+		if(CFP && CFP->isNegative()) ignore = true;
+	}
+	if(!ignore)
+		outs()<<symbols.at(bin->getOpcode());
 
 	pretty_print(bin->getOperand(1));
 }
