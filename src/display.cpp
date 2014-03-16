@@ -1,18 +1,18 @@
 #include "display.h"
 #include "debug.h"
 
+#include <string>
+
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/Instructions.h>
 
-#include <llvm/Support/raw_ostream.h>
-
 using namespace lle;
 using namespace llvm;
 
 
-static void pretty_print(BinaryOperator* bin)
+static void pretty_print(BinaryOperator* bin,raw_ostream& o)
 {
 	static const std::map<int,StringRef> symbols = {
 		{Instruction::Add,"+"},
@@ -36,7 +36,7 @@ static void pretty_print(BinaryOperator* bin)
 		{Instruction::Or,"|"},
 		{Instruction::Xor,"^"}
 	};
-	pretty_print(bin->getOperand(0));
+	pretty_print(bin->getOperand(0),o);
 	if(symbols.at(bin->getOpcode())==""){
 		errs()<<"unknow operator"<<"\n";
 	}
@@ -49,12 +49,12 @@ static void pretty_print(BinaryOperator* bin)
 		if(CFP && CFP->isNegative()) ignore = true;
 	}
 	if(!ignore)
-		outs()<<symbols.at(bin->getOpcode());
+		o<<symbols.at(bin->getOpcode());
 
-	pretty_print(bin->getOperand(1));
+	pretty_print(bin->getOperand(1),o);
 }
 
-static void pretty_print(CmpInst* cmp)
+static void pretty_print(CmpInst* cmp,raw_ostream& o)
 {
 	static const std::map<int,StringRef> symbols = {
 		{CmpInst::FCMP_FALSE,"false"},
@@ -84,66 +84,83 @@ static void pretty_print(CmpInst* cmp)
 		{CmpInst::ICMP_SLT,"<"},
 		{CmpInst::ICMP_SLE,"<="},
 	};
-	pretty_print(cmp->getOperand(0));
-	outs()<<symbols.at(cmp->getPredicate());
+	pretty_print(cmp->getOperand(0),o);
+	o<<symbols.at(cmp->getPredicate());
 
-	pretty_print(cmp->getOperand(1));
+	pretty_print(cmp->getOperand(1),o);
 }
 
-static void pretty_print(Constant* c)
+static void pretty_print(Constant* c,raw_ostream& o)
 {
 	if(isa<ConstantInt>(c))
-		cast<ConstantInt>(c)->getValue().print(outs(), true);
+		cast<ConstantInt>(c)->getValue().print(o, true);
 	else if(isa<ConstantFP>(c))
-		outs()<< cast<ConstantFP>(c)->getValueAPF().convertToDouble();
+		o<< cast<ConstantFP>(c)->getValueAPF().convertToDouble();
 	else if(isa<GlobalValue>(c))
-		outs()<<"@"<<c->getName();
+		o<<"@"<<c->getName();
 	else if(isa<ConstantExpr>(c)){
 		ConstantExpr* CExp = cast<ConstantExpr>(c);
-		lle::pretty_print(CExp->getAsInstruction());
+		lle::pretty_print(CExp->getAsInstruction(),o);
 	}else
-		c->print(outs());
+		o<<*c;
 }
 
+static void pretty_print(PHINode* PH,raw_ostream& o)
+{
+	std::string Lstr;
+	raw_string_ostream Lss(Lstr);
+	lle::pretty_print(PH->getIncomingValue(0),Lss);
+	Lss.flush();
+	for(int i=1,e=PH->getNumIncomingValues();i!=e;++i){
+		std::string Rstr;
+		raw_string_ostream Rss(Rstr);
+		lle::pretty_print(PH->getIncomingValue(i),Rss);
+		Rss.flush();
+		ASSERT(Lstr==Rstr,"Lstr:"+Lstr+",Rstr:"+Rstr,"PHINode all incoming values should be same");
+	}
+	o<<Lstr;
+}
 
-void lle::pretty_print(Value* v)
+void lle::pretty_print(Value* v,raw_ostream& o)
 {
 	if(isa<Constant>(v)){
-		::pretty_print(cast<Constant>(v));
+		::pretty_print(cast<Constant>(v),o);
 		return;
 	}
 	Instruction* inst = dyn_cast<Instruction>(v);
 	if(!inst) return;
 
 	if(inst->isBinaryOp())
-		::pretty_print(cast<BinaryOperator>(inst));
+		::pretty_print(cast<BinaryOperator>(inst),o);
 	else if(isa<CmpInst>(inst))
-		::pretty_print(cast<CmpInst>(inst));
+		::pretty_print(cast<CmpInst>(inst),o);
+	else if(isa<PHINode>(inst))
+		::pretty_print(cast<PHINode>(inst),o);
 	else if(isa<LoadInst>(inst)||isa<StoreInst>(inst))
-		lle::pretty_print(inst->getOperand(0));
+		lle::pretty_print(inst->getOperand(0),o);
 	else if(isa<AllocaInst>(inst))
-		outs()<<"%"<<inst->getName();
+		o<<"%"<<inst->getName();
 	else if(isa<SelectInst>(inst)){
-		outs()<<"(";
-		lle::pretty_print(inst->getOperand(0));
-		outs()<<") ? ";
-		lle::pretty_print(inst->getOperand(1));
-		outs()<<" : ";
-		lle::pretty_print(inst->getOperand(2));
+		o<<"(";
+		lle::pretty_print(inst->getOperand(0),o);
+		o<<") ? ";
+		lle::pretty_print(inst->getOperand(1),o);
+		o<<" : ";
+		lle::pretty_print(inst->getOperand(2),o);
 	}
 	else if(isa<CastInst>(inst)){
 		CastInst* c = cast<CastInst>(inst);
-		c->getDestTy()->print(outs());
-		outs()<<"(";
-		lle::pretty_print(c->getOperand(0));
-		outs()<<")";
+		c->getDestTy()->print(o);
+		o<<"(";
+		lle::pretty_print(c->getOperand(0),o);
+		o<<")";
 	}
 	else if(isa<GetElementPtrInst>(inst)){
-		lle::pretty_print(inst->getOperand(0));
+		lle::pretty_print(inst->getOperand(0),o);
 		for(unsigned i=1;i<inst->getNumOperands();i++){
-			outs()<<"[";
-			lle::pretty_print(inst->getOperand(i));
-			outs()<<"]";
+			o<<"[";
+			lle::pretty_print(inst->getOperand(i),o);
+			o<<"]";
 		}
 	}
 	else{
