@@ -5,6 +5,7 @@ include_directories(
 	${LLVM_INCLUDE_DIRS} 
 	)
 link_directories(${LLVM_LIBRARY_DIRS})
+add_definitions(-fno-rtti)
 add_definitions(${LLVM_DEFINITIONS} -Wall --std=c++11)
 
 
@@ -19,7 +20,11 @@ target_link_libraries(llvm-prob
     ${LLVM_LIBRARIES}
     )
 
-llvm_map_components_to_libraries(LLVM_LOOP_LIBRARY bitreader analysis bitwriter)
+if(DYNAMIC_LINK)
+	set(LLVM_LOOP_LIBRARY ${LLVM_DYNAMIC_LIBRARY})
+else()
+	llvm_map_components_to_libraries(LLVM_LOOP_LIBRARY bitreader analysis bitwriter)
+endif()
 
 add_executable(llvm-loop
     llvm-loop.cpp
@@ -28,8 +33,12 @@ add_executable(llvm-loop
 
 target_link_libraries(llvm-loop
 	${LLVM_PROF_LIBRARIES}
-	${LLVM_DYNAMIC_LIBRARY}
+	${LLVM_LOOP_LIBRARY}
     ${LLVM_LIBRARIES}
     )
+
+add_executable(edge-merge
+	edge-merge.cpp
+	)
 
 install(TARGETS llvm-loop DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
