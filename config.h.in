@@ -1,3 +1,6 @@
+#ifndef LLE_CONFIG_H_H
+#define LLE_CONFIG_H_H
+
 #cmakedefine LLVM_VERSION_MAJOR @LLVM_VERSION_MAJOR@
 #cmakedefine LLVM_VERSION_MINOR @LLVM_VERSION_MINOR@
 #cmakedefine ENABLE_DEBUG
@@ -17,4 +20,6 @@
 
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/InstIterator.h>
+#endif
+
 #endif

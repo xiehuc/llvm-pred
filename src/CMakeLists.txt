@@ -27,15 +27,16 @@ else()
 endif()
 
 add_executable(llvm-loop
-    llvm-loop.cpp
+	llvm-loop.cpp
+	display.cpp
 	loop.cpp
-    )
+	)
 
 target_link_libraries(llvm-loop
 	${LLVM_PROF_LIBRARIES}
 	${LLVM_LOOP_LIBRARY}
-    ${LLVM_LIBRARIES}
-    )
+	${LLVM_LIBRARIES}
+	)
 
 add_executable(edge-merge
 	edge-merge.cpp

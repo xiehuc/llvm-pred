@@ -1,3 +1,6 @@
+#ifndef LLE_LOOP_H_H
+#define LLE_LOOP_H_H
+
 #include <llvm/Analysis/LoopInfo.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/ADT/DenseMap.h>
@@ -30,7 +33,6 @@ namespace lle
 			llvm::Value* getLoopCycle(){ return cycle; }
 	};
 
-	void pretty_print(llvm::Value* v);
-	/** unfinished yet **/
-	void latex_print(llvm::Value* v);
 }
+
+#endif

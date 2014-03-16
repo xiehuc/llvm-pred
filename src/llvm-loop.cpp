@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 
 #include "loop.h"
+#include "display.h"
 
 using namespace llvm;
 
@@ -35,6 +36,8 @@ namespace {
 				cl::Optional);
 	cl::opt<bool>
 		ValueProfiling("insert-value-profiling", cl::desc("insert value profiling for loop cycle"));
+	cl::opt<bool>
+		PrettyPrint("pretty-print", cl::desc("pretty print loop cycle"));
 };
 
 static ValueProfiler* VProf = NULL;
@@ -73,7 +76,12 @@ class LoopPrintPass:public FunctionPass
 		Value* CC = L.insertLoopCycle();
 		if(CC){
 			outs()<<*l<<"\n";
-			outs()<<"cycles:"<<*L.getLoopCycle()<<"\n";
+			outs()<<"cycles:";
+			if(PrettyPrint)
+				lle::pretty_print(L.getLoopCycle());
+			else
+				outs()<<*L.getLoopCycle();
+			outs()<<"\n";
 			if(ValueProfiling)
 				VProf->insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 		}else{
