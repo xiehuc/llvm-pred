@@ -11,6 +11,9 @@
 using namespace lle;
 using namespace llvm;
 
+//phinode circle recursion visit magic word
+#define PHINODE_CIRCLE "unary"
+
 
 static void pretty_print(BinaryOperator* bin,raw_ostream& o)
 {
@@ -107,18 +110,25 @@ static void pretty_print(Constant* c,raw_ostream& o)
 
 static void pretty_print(PHINode* PH,raw_ostream& o)
 {
+	static SmallVector<PHINode*, 8> visitStack;
+	//if we found a circle recursion, we must pass it
+	if(std::find(visitStack.begin(), visitStack.end(), PH) != visitStack.end()){
+		o<<PHINODE_CIRCLE;
+		return;
+	}
+	visitStack.push_back(PH);
 	std::string Lstr;
-	raw_string_ostream Lss(Lstr);
-	lle::pretty_print(PH->getIncomingValue(0),Lss);
-	Lss.flush();
-	for(int i=1,e=PH->getNumIncomingValues();i!=e;++i){
+	for(int i=0,e=PH->getNumIncomingValues();i!=e;++i){
 		std::string Rstr;
-		raw_string_ostream Rss(Rstr);
-		lle::pretty_print(PH->getIncomingValue(i),Rss);
-		Rss.flush();
+		raw_string_ostream Collect(Rstr);
+		lle::pretty_print(PH->getIncomingValue(i),Collect);
+		Collect.flush();
+		if(Rstr == PHINODE_CIRCLE) continue;
+		if(Lstr==""){ Lstr = Rstr; continue; }
 		ASSERT(Lstr==Rstr,"Lstr:"+Lstr+",Rstr:"+Rstr,"PHINode all incoming values should be same");
 	}
 	o<<Lstr;
+	visitStack.pop_back();
 }
 
 void lle::pretty_print(Value* v,raw_ostream& o)
