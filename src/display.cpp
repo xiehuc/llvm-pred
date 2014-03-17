@@ -150,9 +150,10 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 		::pretty_print(cast<CmpInst>(inst),o);
 	else if(isa<PHINode>(inst))
 		::pretty_print(cast<PHINode>(inst),o);
-	else if(isa<LoadInst>(inst)||isa<StoreInst>(inst))
+	else if(isa<LoadInst>(inst)||isa<StoreInst>(inst)){
+		o<<"*";
 		lle::pretty_print(inst->getOperand(0),o);
-	else if(isa<AllocaInst>(inst))
+	}else if(isa<AllocaInst>(inst))
 		o<<"%"<<inst->getName();
 	else if(isa<SelectInst>(inst)){
 		o<<"(";
