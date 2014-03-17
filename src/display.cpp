@@ -104,8 +104,10 @@ static void pretty_print(Constant* c,raw_ostream& o)
 	else if(isa<ConstantExpr>(c)){
 		ConstantExpr* CExp = cast<ConstantExpr>(c);
 		lle::pretty_print(CExp->getAsInstruction(),o);
-	}else
+	}else{
 		o<<*c;
+		//ASSERT(0,*c,"not defined Constant print");
+	}
 }
 
 static void pretty_print(PHINode* PH,raw_ostream& o)
@@ -137,6 +139,8 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 		::pretty_print(cast<Constant>(v),o);
 		return;
 	}
+	if(isa<Argument>(v))
+		o<<"%"<<v->getName();
 	Instruction* inst = dyn_cast<Instruction>(v);
 	if(!inst) return;
 
