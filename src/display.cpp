@@ -168,10 +168,11 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 	else if(isa<SelectInst>(inst)){
 		o<<"(";
 		lle::pretty_print(inst->getOperand(0),o);
-		o<<")? ";
+		o<<")?{";
 		lle::pretty_print(inst->getOperand(1),o);
-		o<<" : ";
+		o<<"}:{";
 		lle::pretty_print(inst->getOperand(2),o);
+		o<<"}";
 		ASSERT(inst->getNumOperands() == 3, *inst, "select should have only 3 operant");
 	}
 	else if(isa<CastInst>(inst)){
