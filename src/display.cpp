@@ -1,6 +1,7 @@
 #include "display.h"
 #include "debug.h"
 
+#include <set>
 #include <string>
 
 #include <llvm/IR/Constants.h>
@@ -12,7 +13,7 @@ using namespace lle;
 using namespace llvm;
 
 //phinode circle recursion visit magic word
-#define PHINODE_CIRCLE "unary"
+#define PHINODE_CIRCLE "Δ"
 
 
 static void pretty_print(BinaryOperator* bin,raw_ostream& o)
@@ -118,6 +119,7 @@ static void pretty_print(PHINode* PH,raw_ostream& o)
 		o<<PHINODE_CIRCLE;
 		return;
 	}
+	std::set<std::string> StrS;//str set
 	visitStack.push_back(PH);
 	std::string Lstr;
 	for(int i=0,e=PH->getNumIncomingValues();i!=e;++i){
@@ -126,10 +128,18 @@ static void pretty_print(PHINode* PH,raw_ostream& o)
 		lle::pretty_print(PH->getIncomingValue(i),Collect);
 		Collect.flush();
 		if(Rstr == PHINODE_CIRCLE) continue;
-		if(Lstr==""){ Lstr = Rstr; continue; }
-		ASSERT(Lstr==Rstr,"Lstr:"+Lstr+",Rstr:"+Rstr,"PHINode all incoming values should be same");
+		//if(Lstr==""){ Lstr = Rstr; continue; }
+		//ASSERT(Lstr==Rstr,"Lstr:"+Lstr+",Rstr:"+Rstr,"PHINode all incoming values should be same");
+		StrS.insert(Rstr);
 	}
-	o<<Lstr;
+	if(StrS.size()==1){
+		o<<*StrS.begin();
+	}else{
+		o<<"{"<<*StrS.begin()<<"}";
+		for(auto I=++StrS.begin(),E=StrS.end();I!=E;++I)
+			o<<"||{"<<*I<<"}";
+	}
+	//o<<Lstr;
 	visitStack.pop_back();
 }
 
@@ -162,6 +172,7 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 		lle::pretty_print(inst->getOperand(1),o);
 		o<<" : ";
 		lle::pretty_print(inst->getOperand(2),o);
+		ASSERT(inst->getNumOperands() == 3, *inst, "select should have only 3 operant");
 	}
 	else if(isa<CastInst>(inst)){
 		o<<"(";
