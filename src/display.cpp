@@ -52,7 +52,7 @@ static void pretty_print(BinaryOperator* bin,raw_ostream& o)
 		if(CFP && CFP->isNegative()) ignore = true;
 	}
 	if(!ignore)
-		o<<symbols.at(bin->getOpcode());
+		o<<" "<<symbols.at(bin->getOpcode())<<" ";
 
 	pretty_print(bin->getOperand(1),o);
 }
@@ -88,7 +88,7 @@ static void pretty_print(CmpInst* cmp,raw_ostream& o)
 		{CmpInst::ICMP_SLE,"<="},
 	};
 	pretty_print(cmp->getOperand(0),o);
-	o<<symbols.at(cmp->getPredicate());
+	o<<" "<<symbols.at(cmp->getPredicate())<<" ";
 
 	pretty_print(cmp->getOperand(1),o);
 }
@@ -158,15 +158,16 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 	else if(isa<SelectInst>(inst)){
 		o<<"(";
 		lle::pretty_print(inst->getOperand(0),o);
-		o<<") ? ";
+		o<<")? ";
 		lle::pretty_print(inst->getOperand(1),o);
 		o<<" : ";
 		lle::pretty_print(inst->getOperand(2),o);
 	}
 	else if(isa<CastInst>(inst)){
+		o<<"(";
 		CastInst* c = cast<CastInst>(inst);
 		c->getDestTy()->print(o);
-		o<<"(";
+		o<<")(";
 		lle::pretty_print(c->getOperand(0),o);
 		o<<")";
 	}
