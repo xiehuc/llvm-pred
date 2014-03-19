@@ -9,40 +9,49 @@
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/ADT/SmallVector.h>
 
 using namespace lle;
 using namespace llvm;
 
 //phinode circle recursion visit magic word
 #define PHINODE_CIRCLE "Δ"
+#define LEFT_BRACKET "{"
+#define RIGHT_BRACKET "}"
+#define PUSH_BRACKETS(precd) if(precd>op_precd.back()) o<<LEFT_BRACKET; op_precd.push_back(precd);
+#define POP_BRACKETS(precd) op_precd.pop_back(); if(precd>op_precd.back()) o<<RIGHT_BRACKET;
 
+static SmallVector<int,16> op_precd((unsigned)1,16); // operator precedence with 1 element 16 back
 
 static void pretty_print(BinaryOperator* bin,raw_ostream& o)
 {
-	static const std::map<int,StringRef> symbols = {
-		{Instruction::Add,"+"},
-		{Instruction::FAdd,"+"},
-		{Instruction::Sub,"-"},
-		{Instruction::FSub,"-"},
-		{Instruction::Mul,"*"},
-		{Instruction::FMul,"*"},
-		{Instruction::UDiv,"/"},
-		{Instruction::SDiv,"/"},
-		{Instruction::FDiv,"/"},
-		{Instruction::URem,"%"},
-		{Instruction::SRem,"%"},
-		{Instruction::FRem,"%"},
+	static const std::map<int,std::pair<StringRef,int> > symbols = {
+		{Instruction::Add,{"+",5}},
+		{Instruction::FAdd,{"+",5}},
+		{Instruction::Sub,{"-",5}},
+		{Instruction::FSub,{"-",5}},
+		{Instruction::Mul,{"*",4}},
+		{Instruction::FMul,{"*",4}},
+		{Instruction::UDiv,{"/",4}},
+		{Instruction::SDiv,{"/",4}},
+		{Instruction::FDiv,{"/",4}},
+		{Instruction::URem,{"%",4}},
+		{Instruction::SRem,{"%",4}},
+		{Instruction::FRem,{"%",4}},
 
-		{Instruction::Shl,"<<"},
-		{Instruction::LShr,">>"},
-		{Instruction::AShr,">>"},
+		{Instruction::Shl,{"<<",6}},
+		{Instruction::LShr,{">>",6}},
+		{Instruction::AShr,{">>",6}},
 
-		{Instruction::And,"&"},
-		{Instruction::Or,"|"},
-		{Instruction::Xor,"^"}
+		{Instruction::And,{"&",9}},
+		{Instruction::Or,{"|",11}},
+		{Instruction::Xor,{"^",10}}
 	};
+	int precd = symbols.at(bin->getOpcode()).second;
+	PUSH_BRACKETS(precd);
+
 	pretty_print(bin->getOperand(0),o);
-	if(symbols.at(bin->getOpcode())==""){
+	if(symbols.at(bin->getOpcode()).first==""){
 		errs()<<"unknow operator"<<"\n";
 	}
 	//if operand 1 is negative ,should ignore + symbol (+-1)-> (-1)
@@ -54,45 +63,50 @@ static void pretty_print(BinaryOperator* bin,raw_ostream& o)
 		if(CFP && CFP->isNegative()) ignore = true;
 	}
 	if(!ignore)
-		o<<" "<<symbols.at(bin->getOpcode())<<" ";
-
+		o<<" "<<symbols.at(bin->getOpcode()).first<<" ";
 	pretty_print(bin->getOperand(1),o);
+
+	POP_BRACKETS(precd);
 }
 
 static void pretty_print(CmpInst* cmp,raw_ostream& o)
 {
-	static const std::map<int,StringRef> symbols = {
-		{CmpInst::FCMP_FALSE,"false"},
-		{CmpInst::FCMP_OEQ,"=="},
-		{CmpInst::FCMP_OGT,">"},
-		{CmpInst::FCMP_OGE,">="},
-		{CmpInst::FCMP_OLT,"<"},
-		{CmpInst::FCMP_OLE,"<="},
-		{CmpInst::FCMP_ONE,"!="},
-		{CmpInst::FCMP_ORD,"??"},
-		{CmpInst::FCMP_UNO,"??"},
-		{CmpInst::FCMP_UEQ,"=="},
-		{CmpInst::FCMP_UGT,">"},
-		{CmpInst::FCMP_UGE,">="},
-		{CmpInst::FCMP_ULT,"<"},
-		{CmpInst::FCMP_ULE,"<="},
-		{CmpInst::FCMP_UNE,"!="},
-		{CmpInst::FCMP_TRUE,"true"},
-		{CmpInst::ICMP_EQ,"=="},
-		{CmpInst::ICMP_NE,"!="},
-		{CmpInst::ICMP_UGT,">"},
-		{CmpInst::ICMP_UGE,">="},
-		{CmpInst::ICMP_ULT,"<"},
-		{CmpInst::ICMP_ULE,"<="},
-		{CmpInst::ICMP_SGT,">"},
-		{CmpInst::ICMP_SGE,">="},
-		{CmpInst::ICMP_SLT,"<"},
-		{CmpInst::ICMP_SLE,"<="},
+	static const std::map<int,std::pair<StringRef,int> > symbols = {
+		{CmpInst::FCMP_FALSE,{"false",1}},
+		{CmpInst::FCMP_OEQ,{"==",8}},
+		{CmpInst::FCMP_OGT,{">",7}},
+		{CmpInst::FCMP_OGE,{">=",7}},
+		{CmpInst::FCMP_OLT,{"<",7}},
+		{CmpInst::FCMP_OLE,{"<=",7}},
+		{CmpInst::FCMP_ONE,{"!=",8}},
+		{CmpInst::FCMP_ORD,{"??",8}},
+		{CmpInst::FCMP_UNO,{"??",8}},
+		{CmpInst::FCMP_UEQ,{"==",8}},
+		{CmpInst::FCMP_UGT,{">",7}},
+		{CmpInst::FCMP_UGE,{">=",7}},
+		{CmpInst::FCMP_ULT,{"<",7}},
+		{CmpInst::FCMP_ULE,{"<=",7}},
+		{CmpInst::FCMP_UNE,{"!=",8}},
+		{CmpInst::FCMP_TRUE,{"true",1}},
+		{CmpInst::ICMP_EQ,{"==",8}},
+		{CmpInst::ICMP_NE,{"!=",8}},
+		{CmpInst::ICMP_UGT,{">",7}},
+		{CmpInst::ICMP_UGE,{">=",7}},
+		{CmpInst::ICMP_ULT,{"<",7}},
+		{CmpInst::ICMP_ULE,{"<=",7}},
+		{CmpInst::ICMP_SGT,{">",7}},
+		{CmpInst::ICMP_SGE,{">=",7}},
+		{CmpInst::ICMP_SLT,{"<",7}},
+		{CmpInst::ICMP_SLE,{"<=",7}},
 	};
-	pretty_print(cmp->getOperand(0),o);
-	o<<" "<<symbols.at(cmp->getPredicate())<<" ";
+	int precd = symbols.at(cmp->getPredicate()).second;
+	PUSH_BRACKETS(precd);
 
+	pretty_print(cmp->getOperand(0),o);
+	o<<" "<<symbols.at(cmp->getPredicate()).first<<" ";
 	pretty_print(cmp->getOperand(1),o);
+
+	POP_BRACKETS(precd);
 }
 
 static void pretty_print(Constant* c,raw_ostream& o)
@@ -115,6 +129,7 @@ static void pretty_print(Constant* c,raw_ostream& o)
 static void pretty_print(PHINode* PH,raw_ostream& o)
 {
 	static SmallVector<PHINode*, 8> visitStack;
+	const int precd = 1;
 	//if we found a circle recursion, we must pass it
 	auto circle = std::find(visitStack.begin(), visitStack.end(), PH);
 	if(circle != visitStack.end()){
@@ -123,23 +138,25 @@ static void pretty_print(PHINode* PH,raw_ostream& o)
 	}
 	std::set<std::string> StrS;//str set
 	visitStack.push_back(PH);
+	PUSH_BRACKETS(precd);
 	std::string Lstr;
 	for(int i=0,e=PH->getNumIncomingValues();i!=e;++i){
 		std::string Rstr;
 		raw_string_ostream Collect(Rstr);
 		lle::pretty_print(PH->getIncomingValue(i),Collect);
 		Collect.flush();
-		//Δ is 3 bytes, # is 1 byte. if Rstr is Δ#\d+ then we can ignore it
-		if(std::all_of(Rstr.begin()+4,Rstr.end(),isdigit)) continue;
+		//Δ is 2 bytes, # is 1 byte. if Rstr is Δ#\d+ then we can ignore it
+		if((Rstr.compare(0, 3, PHINODE_CIRCLE"#")==0)&&std::all_of(Rstr.begin()+3,Rstr.end(),isdigit)) continue;
 		StrS.insert(Rstr);
 	}
 	if(StrS.size()==1){
 		o<<*StrS.begin();
 	}else{
-		o<<"{"<<*StrS.begin()<<"}";
+		o<<*StrS.begin();
 		for(auto I=++StrS.begin(),E=StrS.end();I!=E;++I)
-			o<<"||{"<<*I<<"}";
+			o<<"||"<<*I;
 	}
+	POP_BRACKETS(precd);
 	visitStack.pop_back();
 }
 
@@ -166,22 +183,28 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 	}else if(isa<AllocaInst>(inst))
 		o<<"%"<<inst->getName();
 	else if(isa<SelectInst>(inst)){
+		PUSH_BRACKETS(14);
 		o<<"(";
 		lle::pretty_print(inst->getOperand(0),o);
-		o<<")?{";
+		o<<")?";
 		lle::pretty_print(inst->getOperand(1),o);
-		o<<"}:{";
+		o<<":";
 		lle::pretty_print(inst->getOperand(2),o);
-		o<<"}";
+		POP_BRACKETS(14);
 		ASSERT(inst->getNumOperands() == 3, *inst, "select should have only 3 operant");
 	}
 	else if(isa<CastInst>(inst)){
 		o<<"(";
 		CastInst* c = cast<CastInst>(inst);
 		c->getDestTy()->print(o);
-		o<<")(";
-		lle::pretty_print(c->getOperand(0),o);
 		o<<")";
+#undef LEFT_BRACKET
+#undef RIGHT_BRACKET
+#define LEFT_BRACKET "("
+#define RIGHT_BRACKET ")"
+		PUSH_BRACKETS(14);
+		lle::pretty_print(c->getOperand(0),o);
+		POP_BRACKETS(14);
 	}
 	else if(isa<GetElementPtrInst>(inst)){
 		lle::pretty_print(inst->getOperand(0),o);
