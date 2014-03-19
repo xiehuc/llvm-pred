@@ -3,6 +3,7 @@
 
 #include <set>
 #include <string>
+#include <algorithm>
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/InstrTypes.h>
@@ -115,8 +116,9 @@ static void pretty_print(PHINode* PH,raw_ostream& o)
 {
 	static SmallVector<PHINode*, 8> visitStack;
 	//if we found a circle recursion, we must pass it
-	if(std::find(visitStack.begin(), visitStack.end(), PH) != visitStack.end()){
-		o<<PHINODE_CIRCLE;
+	auto circle = std::find(visitStack.begin(), visitStack.end(), PH);
+	if(circle != visitStack.end()){
+		o<<PHINODE_CIRCLE"#"<<visitStack.end()-circle;
 		return;
 	}
 	std::set<std::string> StrS;//str set
@@ -127,9 +129,8 @@ static void pretty_print(PHINode* PH,raw_ostream& o)
 		raw_string_ostream Collect(Rstr);
 		lle::pretty_print(PH->getIncomingValue(i),Collect);
 		Collect.flush();
-		if(Rstr == PHINODE_CIRCLE) continue;
-		//if(Lstr==""){ Lstr = Rstr; continue; }
-		//ASSERT(Lstr==Rstr,"Lstr:"+Lstr+",Rstr:"+Rstr,"PHINode all incoming values should be same");
+		//Δ is 3 bytes, # is 1 byte. if Rstr is Δ#\d+ then we can ignore it
+		if(std::all_of(Rstr.begin()+4,Rstr.end(),isdigit)) continue;
 		StrS.insert(Rstr);
 	}
 	if(StrS.size()==1){
@@ -139,7 +140,6 @@ static void pretty_print(PHINode* PH,raw_ostream& o)
 		for(auto I=++StrS.begin(),E=StrS.end();I!=E;++I)
 			o<<"||{"<<*I<<"}";
 	}
-	//o<<Lstr;
 	visitStack.pop_back();
 }
 

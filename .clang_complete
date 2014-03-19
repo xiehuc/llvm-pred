@@ -1,1 +1,2 @@
+-std=c++11
 -I/usr/local/include/llvm-prof
