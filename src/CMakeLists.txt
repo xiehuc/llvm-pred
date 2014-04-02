@@ -42,4 +42,12 @@ add_executable(edge-merge
 	edge-merge.cpp
 	)
 
+add_library(KnownLibCall SHARED
+	KnownLibCallInfo.cpp
+	)
+
+target_link_libraries(KnownLibCall
+	${LLVM_DYNAMIC_LIBRARY}
+	)
+
 install(TARGETS llvm-loop DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
