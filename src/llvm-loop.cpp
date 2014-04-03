@@ -23,8 +23,9 @@
 #include <sys/stat.h>
 
 #include "loop.h"
-#include "display.h"
+#include "util.h"
 
+using namespace std;
 using namespace llvm;
 
 namespace {
@@ -77,9 +78,18 @@ class LoopPrintPass:public FunctionPass
 		if(CC){
 			outs()<<*l<<"\n";
 			outs()<<"cycles:";
-			if(PrettyPrint)
-				lle::pretty_print(L.getLoopCycle());
-			else
+			if(PrettyPrint){
+				vector<Value*> resolved;
+				vector<Value*> unsolved;
+				unsolved = lle::resolve(L.getLoopCycle(), resolved);
+				outs()<<"::resolved list\n";
+				for(auto i : resolved)
+					outs()<<*i<<"\n";
+				outs()<<"::unresolved\n";
+				for(auto i : unsolved)
+					outs()<<*i<<"\n";
+				//lle::pretty_print(L.getLoopCycle());
+			}else
 				outs()<<*L.getLoopCycle();
 			outs()<<"\n";
 			if(ValueProfiling)

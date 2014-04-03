@@ -1,4 +1,4 @@
-#include "display.h"
+#include "util.h"
 #include "debug.h"
 
 #include <set>
@@ -11,6 +11,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/ADT/SmallVector.h>
 
+using namespace std;
 using namespace lle;
 using namespace llvm;
 
@@ -146,7 +147,7 @@ static void pretty_print(PHINode* PH,raw_ostream& o)
 		lle::pretty_print(PH->getIncomingValue(i),Collect);
 		Collect.flush();
 		//Δ is 2 bytes, # is 1 byte. if Rstr is Δ#\d+ then we can ignore it
-		if((Rstr.compare(0, 3, PHINODE_CIRCLE"#")==0)&&std::all_of(Rstr.begin()+3,Rstr.end(),isdigit)) continue;
+		if((Rstr.compare(0, 3, PHINODE_CIRCLE"#")==0)&&std::all_of(Rstr.begin()+3,Rstr.end(),::isdigit)) continue;
 		StrS.insert(Rstr);
 	}
 	if(StrS.size()==1){
@@ -220,6 +221,27 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 
 }
 
+vector<Value*> lle::resolve(Value* V,vector<Value*>& resolved)
+{
+	vector<Value*> unresolved;
+	if(find(resolved.begin(),resolved.end(),V)!=resolved.end())
+		return unresolved;
+	if(isa<Constant>(V))
+		resolved.push_back(V);
+	if(Instruction* I = dyn_cast<Instruction>(V)){
+		if(isa<LoadInst>(I) || isa<StoreInst>(I) || isa<CallInst>(I)){
+			unresolved.push_back(I);
+		}else{
+			resolved.push_back(V);
+			for(unsigned int i=0;i<I->getNumOperands();i++){
+				Value* R = I->getOperand(i);
+				auto rhs = resolve(R, resolved);
+				unresolved.insert(unresolved.end(), rhs.begin(), rhs.end());
+			}
+		}
+	}
+	return unresolved;
+}
 
 #if 0
 static void latex_print(BinaryOperator* bin)

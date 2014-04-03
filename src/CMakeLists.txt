@@ -28,7 +28,7 @@ endif()
 
 add_executable(llvm-loop
 	llvm-loop.cpp
-	display.cpp
+	util.cpp
 	loop.cpp
 	)
 
