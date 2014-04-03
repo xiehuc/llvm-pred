@@ -15,7 +15,9 @@
 
 #include <llvm/IR/Instructions.h>
 #include <llvm/Analysis/LoopInfo.h>
+#include <llvm/Analysis/AliasAnalysis.h>
 #include <llvm/Transforms/Utils/LoopUtils.h>
+#include <llvm/Analysis/MemoryDependenceAnalysis.h>
 
 #include <ValueProfiling.h>
 
@@ -24,6 +26,7 @@
 
 #include "loop.h"
 #include "util.h"
+#include "debug.h"
 
 using namespace std;
 using namespace llvm;
@@ -43,6 +46,14 @@ namespace {
 
 static ValueProfiler* VProf = NULL;
 
+static StringRef depToStr(MemDepResult& dr)
+{
+	if(dr.isDef()) return "Def";
+	else if(dr.isClobber()) return "Clobber";
+	else if(dr.isNonLocal()) return "NonLocal";
+	else return "???";
+}
+
 class LoopPrintPass:public FunctionPass 
 {
 	static char ID;
@@ -60,6 +71,8 @@ class LoopPrintPass:public FunctionPass
 	{
 		//AU.setPreservesAll();
 		AU.addRequired<LoopInfo>();
+		AU.addRequired<AliasAnalysis>();
+		AU.addRequired<MemoryDependenceAnalysis>();
 	}
 	void printUnresolved(raw_ostream& out)
 	{
@@ -67,6 +80,53 @@ class LoopPrintPass:public FunctionPass
 			outs()<<std::string(73,'*')<<"\n";
 			outs()<<"\tNote!! there are "<<unresolvedNum<<" loop cycles unresolved:\n";
 			outs()<<delay.str();
+		}
+	}
+	void tryResolve(Value* V)
+	{
+		MemoryDependenceAnalysis& MDA = getAnalysis<MemoryDependenceAnalysis>();
+		AliasAnalysis& AA = getAnalysis<AliasAnalysis>();
+		vector<Value*> resolved;
+		vector<Value*> unsolved;
+		unsolved = lle::resolve(V, resolved);
+		outs()<<"::resolved list\n";
+		for(auto i : resolved)
+			outs()<<*i<<"\n";
+		outs()<<"::unresolved\n";
+		for(auto i : unsolved){
+			Instruction* I = dyn_cast<Instruction>(i);
+			outs()<<*I<<" in '"<<I->getParent()->getName()<<"'\n";
+			MemDepResult r = MDA.getDependency(I);
+			if(r.isNonLocal()){
+				AliasAnalysis::Location Loc;
+				if(LoadInst* LI = dyn_cast<LoadInst>(i))
+					Loc = AA.getLocation(LI);
+				else if(StoreInst* SI = dyn_cast<StoreInst>(i))
+					Loc = AA.getLocation(SI);
+				else
+					ASSERT(0,0,"Instruction not Load or Store");
+				outs()<<"::possible\n";
+				SmallVector<NonLocalDepResult,8> Result;
+				BasicBlock* StartBB = I->getParent();
+				bool quit = false;
+				while(!quit){
+					MDA.getNonLocalPointerDependency(Loc, isa<LoadInst>(I), StartBB, Result);
+					if(!Result.empty()){
+						for(auto r : Result){
+							MemDepResult d = r.getResult();
+							outs()<<depToStr(d);
+							if(d.isDef()||d.isClobber())
+								outs()<<*d.getInst();
+							outs()<<" in '"<<r.getBB()->getName()<<"'\n";
+							if(d.isClobber()){
+								StartBB = r.getBB();
+							}
+							if(d.isDef())
+								quit = true;
+						}
+					}
+				}
+			}
 		}
 	}
 	void runOnLoop(Loop* l)
@@ -79,16 +139,8 @@ class LoopPrintPass:public FunctionPass
 			outs()<<*l<<"\n";
 			outs()<<"cycles:";
 			if(PrettyPrint){
-				vector<Value*> resolved;
-				vector<Value*> unsolved;
-				unsolved = lle::resolve(L.getLoopCycle(), resolved);
-				outs()<<"::resolved list\n";
-				for(auto i : resolved)
-					outs()<<*i<<"\n";
-				outs()<<"::unresolved\n";
-				for(auto i : unsolved)
-					outs()<<*i<<"\n";
-				//lle::pretty_print(L.getLoopCycle());
+				lle::pretty_print(L.getLoopCycle());
+				tryResolve(L.getLoopCycle());
 			}else
 				outs()<<*L.getLoopCycle();
 			outs()<<"\n";
@@ -156,6 +208,11 @@ int main(int argc, char **argv) {
 	LoopPrintPass* LPP = new LoopPrintPass();
 	FunctionPassManager f_pass_mgr(M);
 	f_pass_mgr.add(new LoopInfo());
+
+	f_pass_mgr.add(createBasicAliasAnalysisPass());
+	f_pass_mgr.add(createScalarEvolutionAliasAnalysisPass());
+	f_pass_mgr.add(new MemoryDependenceAnalysis());
+
 	f_pass_mgr.add(LPP);
 
 	for( auto& func : *M ){
