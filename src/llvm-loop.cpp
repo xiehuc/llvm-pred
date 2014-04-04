@@ -48,12 +48,12 @@ static ValueProfiler* VProf = NULL;
 
 class LoopPrintPass:public FunctionPass 
 {
-	static char ID;
 	std::string delay_str;
 	raw_string_ostream delay;
 	unsigned unresolvedNum;
 	const Function* curFunc;
 	public:
+	static char ID;
 	explicit LoopPrintPass(): 
 		FunctionPass(ID),delay(delay_str)
 	{
@@ -136,6 +136,7 @@ class LoopPrintPass:public FunctionPass
 };
 
 char LoopPrintPass::ID = 0;
+static RegisterPass<LoopPrintPass> X("loop-cycle","Loop Cycle Pass",false,false);
 
 int main(int argc, char **argv) {
 	// Print a stack trace if we signal out.
@@ -169,26 +170,18 @@ int main(int argc, char **argv) {
 
 	VProf = new ValueProfiler();
 	LoopPrintPass* LPP = new LoopPrintPass();
-	FunctionPassManager f_pass_mgr(M);
-	f_pass_mgr.add(new LoopInfo());
+	PassManager pass_mgr;
 
-	f_pass_mgr.add(createBasicAliasAnalysisPass());
-	f_pass_mgr.add(createScalarEvolutionAliasAnalysisPass());
-	f_pass_mgr.add(new MemoryDependenceAnalysis());
-	f_pass_mgr.add(LPP);
+	pass_mgr.add(createBasicAliasAnalysisPass());
+	pass_mgr.add(createGlobalsModRefPass());
+	pass_mgr.add(createScalarEvolutionAliasAnalysisPass());
+	pass_mgr.add(new MemoryDependenceAnalysis());
+	pass_mgr.add(LPP);
 
-	PassManager p_mgr;
-	p_mgr.add(createGlobalsModRefPass());
 	if(ValueProfiling)
-		p_mgr.add(VProf);
+		pass_mgr.add(VProf);
 
-	f_pass_mgr.doInitialization();
-	for( auto& func : *M ){
-		f_pass_mgr.run(func);
-	}
-	f_pass_mgr.doFinalization();
-
-	p_mgr.run(*M);
+	pass_mgr.run(*M);
 
 	LPP->printUnresolved(outs());
 
