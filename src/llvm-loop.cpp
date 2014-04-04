@@ -175,14 +175,20 @@ int main(int argc, char **argv) {
 	f_pass_mgr.add(createBasicAliasAnalysisPass());
 	f_pass_mgr.add(createScalarEvolutionAliasAnalysisPass());
 	f_pass_mgr.add(new MemoryDependenceAnalysis());
-
 	f_pass_mgr.add(LPP);
 
+	PassManager p_mgr;
+	p_mgr.add(createGlobalsModRefPass());
+	if(ValueProfiling)
+		p_mgr.add(VProf);
+
+	f_pass_mgr.doInitialization();
 	for( auto& func : *M ){
 		f_pass_mgr.run(func);
 	}
-	if(ValueProfiling)
-		VProf->runOnModule(*M);
+	f_pass_mgr.doFinalization();
+
+	p_mgr.run(*M);
 
 	LPP->printUnresolved(outs());
 
