@@ -11,6 +11,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/ADT/SmallVector.h>
 
+
 using namespace std;
 using namespace lle;
 using namespace llvm;
@@ -221,9 +222,9 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 
 }
 
-vector<Value*> lle::resolve(Value* V,vector<Value*>& resolved)
+vector<Instruction*> lle::resolve(Value* V,vector<Value*>& resolved)
 {
-	vector<Value*> unresolved;
+	vector<Instruction*> unresolved;
 	if(find(resolved.rbegin(),resolved.rend(),V)!=resolved.rend())
 		return unresolved;
 	if(isa<Constant>(V))
@@ -241,6 +242,48 @@ vector<Value*> lle::resolve(Value* V,vector<Value*>& resolved)
 		}
 	}
 	return unresolved;
+}
+
+void lle::find_dependencies( Instruction* I, FunctionPass* P,
+		SmallVectorImpl<FindedDependenciesType>& Result, NonLocalDepResult* NLDR){
+
+	MemDepResult d;
+	BasicBlock* SearchPos;
+	MemoryDependenceAnalysis& MDA = P->getAnalysis<MemoryDependenceAnalysis>();
+	AliasAnalysis& AA = P->getAnalysis<AliasAnalysis>();
+
+	if(!NLDR){
+		d = MDA.getDependency(I);
+		SearchPos = I->getParent();
+	} else {
+		d = NLDR->getResult();
+		SearchPos = NLDR->getBB();
+		if(find_if(Result.begin(),Result.end(),[&d](FindedDependenciesType& f){
+					return f.first == d;}
+					) != Result.end()){
+			return;
+		}
+	}
+
+	if(d.isDef()||d.isClobber()){
+		Result.push_back(make_pair(d,SearchPos));
+	}
+	if(d.isNonLocal() || (d.isClobber()&&NLDR) ){
+		AliasAnalysis::Location Loc;
+		SmallVector<NonLocalDepResult,32> NonLocals;
+
+		if(LoadInst* LI = dyn_cast<LoadInst>(I))
+			Loc = AA.getLocation(LI);
+		else if(StoreInst* SI = dyn_cast<StoreInst>(I))
+			Loc = AA.getLocation(SI);
+		else
+			assert(0);
+
+		MDA.getNonLocalPointerDependency(Loc, isa<LoadInst>(I), SearchPos, NonLocals);
+		for(auto r : NonLocals){
+			find_dependencies(I, P, Result, &r);
+		}
+	}
 }
 
 #if 0

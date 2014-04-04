@@ -1,15 +1,28 @@
 #ifndef LLE_DISPLAY_H_H
 #define LLE_DISPLAY_H_H
 
+#include <vector>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/raw_ostream.h>
-#include <vector>
+
+#include <llvm/Analysis/MemoryDependenceAnalysis.h>
 
 namespace lle
 {
+	typedef std::pair<llvm::MemDepResult,llvm::BasicBlock*> FindedDependenciesType;
+
 	void pretty_print(llvm::Value* v,llvm::raw_ostream& o = llvm::outs());
-	/** unfinished yet **/
-	//void latex_print(llvm::Value* v);
-	std::vector<llvm::Value*> resolve(llvm::Value*,std::vector<llvm::Value*>& resolved);
+	std::vector<llvm::Instruction*> resolve(llvm::Value*,std::vector<llvm::Value*>& resolved);
+	void find_dependencies(llvm::Instruction*, llvm::FunctionPass*,
+			llvm::SmallVectorImpl<FindedDependenciesType>&,
+			llvm::NonLocalDepResult* NLDR = NULL);
+}
+
+inline 
+llvm::raw_ostream& operator<<(llvm::raw_ostream& o,const llvm::MemDepResult& d){
+	if(d.isClobber()) o<<"Clobber";
+	else if(d.isDef()) o<<"Def";
+	else o<<"???";
+	return o;
 }
 #endif

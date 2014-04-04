@@ -46,14 +46,6 @@ namespace {
 
 static ValueProfiler* VProf = NULL;
 
-static StringRef depToStr(MemDepResult& dr)
-{
-	if(dr.isDef()) return "Def";
-	else if(dr.isClobber()) return "Clobber";
-	else if(dr.isNonLocal()) return "NonLocal";
-	else return "???";
-}
-
 class LoopPrintPass:public FunctionPass 
 {
 	static char ID;
@@ -84,49 +76,19 @@ class LoopPrintPass:public FunctionPass
 	}
 	void tryResolve(Value* V)
 	{
-		MemoryDependenceAnalysis& MDA = getAnalysis<MemoryDependenceAnalysis>();
-		AliasAnalysis& AA = getAnalysis<AliasAnalysis>();
 		vector<Value*> resolved;
-		vector<Value*> unsolved;
+		vector<Instruction*> unsolved;
 		unsolved = lle::resolve(V, resolved);
 		outs()<<"::resolved list\n";
 		for(auto i : resolved)
 			outs()<<*i<<"\n";
 		outs()<<"::unresolved\n";
-		for(auto i : unsolved){
-			Instruction* I = dyn_cast<Instruction>(i);
-			outs()<<*I<<" in '"<<I->getParent()->getName()<<"'\n";
-			MemDepResult r = MDA.getDependency(I);
-			if(r.isNonLocal()){
-				AliasAnalysis::Location Loc;
-				if(LoadInst* LI = dyn_cast<LoadInst>(i))
-					Loc = AA.getLocation(LI);
-				else if(StoreInst* SI = dyn_cast<StoreInst>(i))
-					Loc = AA.getLocation(SI);
-				else
-					ASSERT(0,0,"Instruction not Load or Store");
-				outs()<<"::possible\n";
-				SmallVector<NonLocalDepResult,8> Result;
-				BasicBlock* StartBB = I->getParent();
-				bool quit = false;
-				while(!quit){
-					MDA.getNonLocalPointerDependency(Loc, isa<LoadInst>(I), StartBB, Result);
-					if(!Result.empty()){
-						for(auto r : Result){
-							MemDepResult d = r.getResult();
-							outs()<<depToStr(d);
-							if(d.isDef()||d.isClobber())
-								outs()<<*d.getInst();
-							outs()<<" in '"<<r.getBB()->getName()<<"'\n";
-							if(d.isClobber()){
-								StartBB = r.getBB();
-							}
-							if(d.isDef())
-								quit = true;
-						}
-					}
-				}
-			}
+		for(auto I : unsolved){
+			SmallVector<lle::FindedDependenciesType,64> Result;
+			outs()<<"::possible dependence for "<<*I<<"\n";
+			lle::find_dependencies(I, this, Result);
+			for(auto f : Result)
+				outs()<<f.first<<"\t"<<*f.first.getInst()<<" in '"<<f.second->getName()<<"'\n";
 		}
 	}
 	void runOnLoop(Loop* l)
@@ -140,6 +102,7 @@ class LoopPrintPass:public FunctionPass
 			outs()<<"cycles:";
 			if(PrettyPrint){
 				lle::pretty_print(L.getLoopCycle());
+				outs()<<"\n";
 				tryResolve(L.getLoopCycle());
 			}else
 				outs()<<*L.getLoopCycle();
