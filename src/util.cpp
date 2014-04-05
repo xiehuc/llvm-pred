@@ -7,9 +7,9 @@
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/InstrTypes.h>
-#include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/IR/GlobalVariable.h>
 
 
 using namespace std;
@@ -244,6 +244,14 @@ vector<Instruction*> lle::resolve(Value* V,vector<Value*>& resolved)
 	return unresolved;
 }
 
+static void find_global_dependencies(const GlobalVariable* GV,SmallVectorImpl<FindedDependenciesType>& Result)
+{
+	outs()<<"::hello::\n";
+	for(auto U = GV->use_begin(),E = GV->use_end();U!=E;++U){
+		outs()<<*U<<"\n";
+	}
+}
+
 void lle::find_dependencies( Instruction* I, FunctionPass* P,
 		SmallVectorImpl<FindedDependenciesType>& Result, NonLocalDepResult* NLDR){
 
@@ -251,6 +259,18 @@ void lle::find_dependencies( Instruction* I, FunctionPass* P,
 	BasicBlock* SearchPos;
 	MemoryDependenceAnalysis& MDA = P->getAnalysis<MemoryDependenceAnalysis>();
 	AliasAnalysis& AA = P->getAnalysis<AliasAnalysis>();
+
+	AliasAnalysis::Location Loc;
+	if(LoadInst* LI = dyn_cast<LoadInst>(I))
+		Loc = AA.getLocation(LI);
+	else if(StoreInst* SI = dyn_cast<StoreInst>(I))
+		Loc = AA.getLocation(SI);
+	else
+		assert(0);
+	if(const GlobalVariable* GV = dyn_cast<GlobalVariable>(Loc.Ptr)){
+		find_global_dependencies(GV, Result);
+		return;
+	}
 
 	if(!NLDR){
 		d = MDA.getDependency(I);
@@ -269,15 +289,8 @@ void lle::find_dependencies( Instruction* I, FunctionPass* P,
 		Result.push_back(make_pair(d,SearchPos));
 	}
 	if(d.isNonLocal() || (d.isClobber()&&NLDR) ){
-		AliasAnalysis::Location Loc;
 		SmallVector<NonLocalDepResult,32> NonLocals;
 
-		if(LoadInst* LI = dyn_cast<LoadInst>(I))
-			Loc = AA.getLocation(LI);
-		else if(StoreInst* SI = dyn_cast<StoreInst>(I))
-			Loc = AA.getLocation(SI);
-		else
-			assert(0);
 
 		MDA.getNonLocalPointerDependency(Loc, isa<LoadInst>(I), SearchPos, NonLocals);
 		for(auto r : NonLocals){
