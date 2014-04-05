@@ -1,4 +1,5 @@
 #include "loop.h"
+#include "util.h"
 #include "config.h"
 #include "debug.h"
 #include <llvm/IR/InstrTypes.h>
@@ -11,17 +12,6 @@
 namespace lle
 {
 	using namespace llvm;
-
-	//remove cast instruction for a value
-	//because cast means the original value and the returned value is
-	//semanticly equal
-	static Value* castoff(Value* v)
-	{
-		if(CastInst* CI = dyn_cast<CastInst>(v)){
-			return castoff(CI->getOperand(0));
-		}else
-			return v;
-	}
 
 	//find start value fron induction variable
 	static Value* tryFindStart(PHINode* IND,Loop* l,BasicBlock*& StartBB)

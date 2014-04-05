@@ -244,12 +244,35 @@ vector<Instruction*> lle::resolve(Value* V,vector<Value*>& resolved)
 	return unresolved;
 }
 
-static void find_global_dependencies(const GlobalVariable* GV,SmallVectorImpl<FindedDependenciesType>& Result)
+static void find_global_dependencies(const Value* GV,SmallVectorImpl<FindedDependenciesType>& Result)
 {
-	outs()<<"::hello::\n";
 	for(auto U = GV->use_begin(),E = GV->use_end();U!=E;++U){
-		outs()<<*U<<"\n";
+		Instruction* I = const_cast<Instruction*>(dyn_cast<Instruction>(*U));
+		if(!I){
+			find_global_dependencies(*U, Result);
+			continue;
+		}
+		if(isa<StoreInst>(I)){
+			Result.push_back(make_pair(MemDepResult::getDef(I),I->getParent()));
+		}
 	}
+}
+
+static Value* access_global_variable(Instruction* I)
+{
+	Value* Address = NULL, *Test = NULL;
+	if(isa<LoadInst>(I) || isa<StoreInst>(I))
+		Test = Address = I->getOperand(0);
+	while(ConstantExpr* CE = dyn_cast<ConstantExpr>(Address)){
+		Test = CE->getAsInstruction();
+		if(isa<CastInst>(Test))
+			Test = Address = castoff(Test);
+		else break;
+	}
+	if(GetElementPtrInst* GEP = dyn_cast<GetElementPtrInst>(Test))
+		Test = GEP->getPointerOperand();
+	if(isa<GlobalVariable>(Test)) return Address;
+	return NULL;
 }
 
 void lle::find_dependencies( Instruction* I, FunctionPass* P,
@@ -260,14 +283,7 @@ void lle::find_dependencies( Instruction* I, FunctionPass* P,
 	MemoryDependenceAnalysis& MDA = P->getAnalysis<MemoryDependenceAnalysis>();
 	AliasAnalysis& AA = P->getAnalysis<AliasAnalysis>();
 
-	AliasAnalysis::Location Loc;
-	if(LoadInst* LI = dyn_cast<LoadInst>(I))
-		Loc = AA.getLocation(LI);
-	else if(StoreInst* SI = dyn_cast<StoreInst>(I))
-		Loc = AA.getLocation(SI);
-	else
-		assert(0);
-	if(const GlobalVariable* GV = dyn_cast<GlobalVariable>(Loc.Ptr)){
+	if(Value* GV = access_global_variable(I)){
 		find_global_dependencies(GV, Result);
 		return;
 	}
@@ -291,6 +307,13 @@ void lle::find_dependencies( Instruction* I, FunctionPass* P,
 	if(d.isNonLocal() || (d.isClobber()&&NLDR) ){
 		SmallVector<NonLocalDepResult,32> NonLocals;
 
+		AliasAnalysis::Location Loc;
+		if(LoadInst* LI = dyn_cast<LoadInst>(I)){
+			Loc = AA.getLocation(LI);
+		}else if(StoreInst* SI = dyn_cast<StoreInst>(I))
+			Loc = AA.getLocation(SI);
+		else
+			assert(0);
 
 		MDA.getNonLocalPointerDependency(Loc, isa<LoadInst>(I), SearchPos, NonLocals);
 		for(auto r : NonLocals){
@@ -299,6 +322,13 @@ void lle::find_dependencies( Instruction* I, FunctionPass* P,
 	}
 }
 
+Value* lle::castoff(Value* v)
+{
+	if(CastInst* CI = dyn_cast<CastInst>(v)){
+		return castoff(CI->getOperand(0));
+	}else
+		return v;
+}
 #if 0
 static void latex_print(BinaryOperator* bin)
 {
