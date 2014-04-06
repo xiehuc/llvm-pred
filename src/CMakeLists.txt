@@ -26,28 +26,30 @@ else()
 	llvm_map_components_to_libraries(LLVM_LOOP_LIBRARY bitreader analysis bitwriter)
 endif()
 
+add_library(LLVMPred SHARED
+	KnownLibCallInfo.cpp
+	loop.cpp
+	util.cpp
+	)
+
+target_link_libraries(LLVMPred
+	${LLVM_DYNAMIC_LIBRARY}
+	)
+
 add_executable(llvm-loop
 	llvm-loop.cpp
-	util.cpp
-	loop.cpp
 	)
 
 target_link_libraries(llvm-loop
 	${LLVM_PROF_LIBRARIES}
 	${LLVM_LOOP_LIBRARY}
 	${LLVM_LIBRARIES}
+	LLVMPred
 	)
 
 add_executable(edge-merge
 	edge-merge.cpp
 	)
 
-add_library(KnownLibCall SHARED
-	KnownLibCallInfo.cpp
-	)
-
-target_link_libraries(KnownLibCall
-	${LLVM_DYNAMIC_LIBRARY}
-	)
 
 install(TARGETS llvm-loop DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)

@@ -46,7 +46,7 @@ namespace {
 
 static ValueProfiler* VProf = NULL;
 
-class LoopPrintPass:public FunctionPass 
+class LoopPrintPass:public LoopPass
 {
 	std::string delay_str;
 	raw_string_ostream delay;
@@ -55,14 +55,14 @@ class LoopPrintPass:public FunctionPass
 	public:
 	static char ID;
 	explicit LoopPrintPass(): 
-		FunctionPass(ID),delay(delay_str)
+		LoopPass(ID),delay(delay_str)
 	{
 		unresolvedNum = 0;
 	}
 	void getAnalysisUsage(AnalysisUsage &AU) const 
 	{
 		//AU.setPreservesAll();
-		AU.addRequired<LoopInfo>();
+		AU.addRequired<lle::LoopCycle>();
 		AU.addRequired<AliasAnalysis>();
 		AU.addRequired<MemoryDependenceAnalysis>();
 	}
@@ -91,52 +91,36 @@ class LoopPrintPass:public FunctionPass
 				outs()<<f.first<<"\t"<<*f.first.getInst()<<" in '"<<f.second->getName()<<"'\n";
 		}
 	}
-	void runOnLoop(Loop* l)
+	bool runOnLoop(Loop* L,LPPassManager& LPM)
 	{
-		lle::Loop L(l);
+		lle::LoopCycle& LC = getAnalysis<lle::LoopCycle>();
 		if(L->getLoopPreheader()==NULL)
-			InsertPreheaderForLoop(l, this);
-		Value* CC = L.insertLoopCycle();
+			InsertPreheaderForLoop(L, this);
+		Value* CC = LC.insertLoopCycle(L);
 		if(CC){
-			outs()<<*l<<"\n";
+			outs()<<*L<<"\n";
 			outs()<<"cycles:";
 			if(PrettyPrint){
-				lle::pretty_print(L.getLoopCycle());
+				lle::pretty_print(LC.getLoopCycle(L));
 				outs()<<"\n";
-				tryResolve(L.getLoopCycle());
+				tryResolve(LC.getLoopCycle(L));
 			}else
-				outs()<<*L.getLoopCycle();
+				outs()<<*LC.getLoopCycle(L);
 			outs()<<"\n";
 			if(ValueProfiling)
 				VProf->insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 		}else{
 			++unresolvedNum;
 			delay<<"Function:"<<curFunc->getName()<<"\n";
-			delay<<"\t"<<*l<<"\n";
+			delay<<"\t"<<*L<<"\n";
 			//outs()<<"cycles:unknow\n";
-		}
-		if(!L->getSubLoops().empty()){
-			for(auto I = L->getSubLoops().begin(),E = L->getSubLoops().end();I!=E;I++)
-				runOnLoop(*I);
-		}
-	}
-	bool runOnFunction(Function& F)
-	{
-		curFunc = &F;
-		StringRef func_name = F.getName();
-		outs()<<"------------------------\n";
-		outs()<<"Function:"<<func_name<<"\n";
-		outs()<<"------------------------\n";
-		LoopInfo& LI = getAnalysis<LoopInfo>();
-		for(auto ite = LI.begin(), end = LI.end();ite!=end;ite++){
-			runOnLoop(*ite);
 		}
 		return true;
 	}
 };
 
 char LoopPrintPass::ID = 0;
-static RegisterPass<LoopPrintPass> X("loop-cycle","Loop Cycle Pass",false,false);
+static RegisterPass<LoopPrintPass> X("print-loop-cycle","Print Loop Cycle Pass",false,false);
 
 int main(int argc, char **argv) {
 	// Print a stack trace if we signal out.
@@ -176,6 +160,7 @@ int main(int argc, char **argv) {
 	pass_mgr.add(createGlobalsModRefPass());
 	pass_mgr.add(createScalarEvolutionAliasAnalysisPass());
 	pass_mgr.add(new MemoryDependenceAnalysis());
+	//pass_mgr.add(new LoopInfo());
 	pass_mgr.add(LPP);
 
 	if(ValueProfiling)

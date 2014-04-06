@@ -275,7 +275,7 @@ static Value* access_global_variable(Instruction* I)
 	return NULL;
 }
 
-void lle::find_dependencies( Instruction* I, FunctionPass* P,
+void lle::find_dependencies( Instruction* I, Pass* P,
 		SmallVectorImpl<FindedDependenciesType>& Result, NonLocalDepResult* NLDR){
 
 	MemDepResult d;

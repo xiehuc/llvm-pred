@@ -20,7 +20,7 @@ namespace lle
 	//semanticly equal
 	llvm::Value* castoff(llvm::Value* v);
 
-	void find_dependencies(llvm::Instruction*, llvm::FunctionPass*,
+	void find_dependencies(llvm::Instruction*, llvm::Pass*,
 			llvm::SmallVectorImpl<FindedDependenciesType>&,
 			llvm::NonLocalDepResult* NLDR = NULL);
 }
