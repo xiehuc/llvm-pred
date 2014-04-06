@@ -16,11 +16,13 @@ namespace lle
 	class LoopCycle:public llvm::LoopPass
 	{
 		std::map<llvm::Loop*,llvm::Value*> CycleMap;
+		llvm::Loop* CurL;
 		public:
 		static char ID;
 		explicit LoopCycle():LoopPass(ID){ }
 		void getAnalysisUsage(llvm::AnalysisUsage&) const;
-		virtual bool runOnLoop(llvm::Loop*,llvm::LPPassManager&){return false;}
+		bool runOnLoop(llvm::Loop* L,llvm::LPPassManager&);
+		void print(llvm::raw_ostream&,const llvm::Module*) const;
 		/**
 		 * trying to find loop cycle, if it is a variable, because it is a
 		 * sub instruction, first insert it into source then we can get it.
@@ -29,11 +31,9 @@ namespace lle
 		 * instruction and insert it by hand.
 		 */
 		llvm::Value* insertLoopCycle(llvm::Loop* l);
-		llvm::Value* getLoopCycle(llvm::Loop* l)
+		llvm::Value* getLoopCycle(llvm::Loop* l) const
 		{ 
-			if(CycleMap[l]==NULL)
-				insertLoopCycle(l);
-			return CycleMap[l]; 
+			return CycleMap.at(l);
 		}
 	};
 

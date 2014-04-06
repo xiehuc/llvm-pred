@@ -61,7 +61,7 @@ class LoopPrintPass:public LoopPass
 	}
 	void getAnalysisUsage(AnalysisUsage &AU) const 
 	{
-		//AU.setPreservesAll();
+		AU.setPreservesAll();
 		AU.addRequired<lle::LoopCycle>();
 		AU.addRequired<AliasAnalysis>();
 		AU.addRequired<MemoryDependenceAnalysis>();
@@ -96,7 +96,7 @@ class LoopPrintPass:public LoopPass
 		lle::LoopCycle& LC = getAnalysis<lle::LoopCycle>();
 		if(L->getLoopPreheader()==NULL)
 			InsertPreheaderForLoop(L, this);
-		Value* CC = LC.insertLoopCycle(L);
+		Value* CC = LC.getLoopCycle(L);
 		if(CC){
 			outs()<<*L<<"\n";
 			outs()<<"cycles:";

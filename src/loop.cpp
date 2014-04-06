@@ -39,6 +39,7 @@ static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
 void lle::LoopCycle::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
 	AU.setPreservesAll();
+	//setPreservesCFG would block llvm-loop
 }
 
 Value* lle::LoopCycle::insertLoopCycle(Loop* L)
@@ -237,3 +238,18 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	return CycleMap[L] = RES;
 }
 
+bool lle::LoopCycle::runOnLoop(llvm::Loop* L,llvm::LPPassManager&)
+{
+	CurL = L;
+
+	if(isa<GlobalVariable>(insertLoopCycle(L))) 
+		return false;
+	return true;
+
+}
+void lle::LoopCycle::print(llvm::raw_ostream& OS,const llvm::Module*) const
+{
+	OS<<*CurL<<"\n";
+	OS<<"Cycle:"<<*getLoopCycle(CurL)<<"\n";
+	
+}
