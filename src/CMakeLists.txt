@@ -34,6 +34,7 @@ add_library(LLVMPred SHARED
 
 target_link_libraries(LLVMPred
 	${LLVM_DYNAMIC_LIBRARY}
+	${LLVM_LOOP_LIBRARY}
 	)
 
 add_executable(llvm-loop
@@ -42,7 +43,6 @@ add_executable(llvm-loop
 
 target_link_libraries(llvm-loop
 	${LLVM_PROF_LIBRARIES}
-	${LLVM_LOOP_LIBRARY}
 	${LLVM_LIBRARIES}
 	LLVMPred
 	)

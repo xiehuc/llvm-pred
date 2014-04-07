@@ -113,7 +113,6 @@ int main(int argc, char **argv) {
 	VProf = new ValueProfiler();
 	lle::LoopCycleSimplify* LPP = new lle::LoopCycleSimplify();
 	PassManager pass_mgr;
-
 	pass_mgr.add(createBasicAliasAnalysisPass());
 	pass_mgr.add(createGlobalsModRefPass());
 	pass_mgr.add(createScalarEvolutionAliasAnalysisPass());

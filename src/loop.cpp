@@ -3,9 +3,11 @@
 #include "config.h"
 #include "debug.h"
 
+#define DEBUG_TYPE "loop-cycle"
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/ADT/Statistic.h>
 
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Transforms/Utils/LoopUtils.h>
@@ -23,6 +25,8 @@ char lle::LoopCycleSimplify::ID = 0;
 
 static RegisterPass<LoopCycle> X("loop-cycle","Loop Cycle Pass",false,true);
 static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simplify Pass",false,false);
+
+STATISTIC(NumUnfoundCycle, "Number of unfound loop cycle");
 
 namespace {
 //cl::opt<bool> PrettyPrint("pretty-print", cl::desc("pretty print loop cycle"));
@@ -48,21 +52,21 @@ static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
 	}
 }
 
-static void tryResolve(Value* V,Pass* P)
+static void tryResolve(Value* V,const Pass* P,raw_ostream& OS = outs())
 {
 	vector<Value*> resolved;
 	vector<Instruction*> unsolved;
 	unsolved = lle::resolve(V, resolved);
-	outs()<<"::resolved list\n";
+	OS<<"::resolved list\n";
 	for(auto i : resolved)
-		outs()<<*i<<"\n";
-	outs()<<"::unresolved\n";
+		OS<<*i<<"\n";
+	OS<<"::unresolved\n";
 	for(auto I : unsolved){
 		SmallVector<lle::FindedDependenciesType,64> Result;
-		outs()<<"::possible dependence for "<<*I<<"\n";
+		OS<<"::possible dependence for "<<*I<<"\n";
 		lle::find_dependencies(I, P, Result);
 		for(auto f : Result)
-			outs()<<f.first<<"\t"<<*f.first.getInst()<<" in '"<<f.second->getName()<<"'\n";
+			OS<<f.first<<"\t"<<*f.first.getInst()<<" in '"<<f.second->getName()<<"'\n";
 	}
 }
 
@@ -81,8 +85,6 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	BasicBlock* startBB = NULL;//which basicblock stores start value
 	int OneStep = 0;// the extra add or plus step for calc
 
-	DEBUG(outs()<<"\n");
-	DEBUG(outs()<<*L);
 	DEBUG(outs()<<"loop simplify:"<<L->isLoopSimplifyForm()<<"\n");
 	DEBUG(outs()<<"loop  depth:"<<L->getLoopDepth()<<"\n");
 	/** whats difference on use of predecessor and preheader??*/
@@ -320,6 +322,7 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 			*/
 #endif
 	}else{
+		++NumUnfoundCycle;
 #if 0
 		++unresolvedNum;
 		delay<<"Function:"<<curFunc->getName()<<"\n";
@@ -342,8 +345,9 @@ void lle::LoopCycleSimplify::print(llvm::raw_ostream &OS, const llvm::Module *) 
 	if(CC){
 		OS<<*CurL<<"\n";
 		OS<<"Cycles:";
-		lle::pretty_print(CC,OS);
+		lle::pretty_print(CC, OS);
 		OS<<"\n";
-		tryResolve(CC, this);
+		tryResolve(CC, this, OS);
+		OS<<"\n";
 	}
 }
