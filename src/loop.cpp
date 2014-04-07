@@ -9,8 +9,9 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/ADT/Statistic.h>
 
-#include <llvm/Support/CommandLine.h>
 #include <llvm/Transforms/Utils/LoopUtils.h>
+
+#include <ValueProfiling.h>
 
 #include <map>
 #include <vector>
@@ -28,9 +29,8 @@ static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simpl
 
 STATISTIC(NumUnfoundCycle, "Number of unfound loop cycle");
 
-namespace {
 //cl::opt<bool> PrettyPrint("pretty-print", cl::desc("pretty print loop cycle"));
-}
+cl::opt<bool> ValueProfiling("insert-value-trap", cl::desc("insert value profiling trap for loop cycle"));
 
 //find start value fron induction variable
 static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
@@ -307,6 +307,8 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 	}
 	Value* CC = LC.getLoopCycle(L);
 	if(CC){
+		if(ValueProfiling)
+			ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 #if 0
 		outs()<<*L<<"\n";
 		outs()<<"cycles:";
@@ -317,9 +319,6 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 		}else
 			outs()<<*LC.getLoopCycle(L);
 		outs()<<"\n";
-		/*if(ValueProfiling)
-			VProf->insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
-			*/
 #endif
 	}else{
 		++NumUnfoundCycle;

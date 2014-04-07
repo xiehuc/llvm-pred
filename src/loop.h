@@ -7,9 +7,13 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Analysis/LoopPass.h>
 
+#include <llvm/Support/CommandLine.h>
+
 #include <iostream>
 #include <map>
 #include <stdlib.h>
+
+extern llvm::cl::opt<bool> ValueProfiling;
 
 namespace lle
 {

@@ -37,11 +37,8 @@ namespace {
 	cl::opt<std::string>
 		WriteFile(cl::Positional,cl::desc("<write bitcode file>"),
 				cl::Optional);
-	cl::opt<bool>
-		ValueProfiling("insert-value-profiling", cl::desc("insert value profiling for loop cycle"));
 };
 
-static ValueProfiler* VProf = NULL;
 #if 0
 class LoopPrintPass:public LoopPass
 {
@@ -110,7 +107,6 @@ int main(int argc, char **argv) {
 	// access to additional information not exposed via the ProfileInfo
 	// interface.
 
-	VProf = new ValueProfiler();
 	lle::LoopCycleSimplify* LPP = new lle::LoopCycleSimplify();
 	PassManager pass_mgr;
 	pass_mgr.add(createBasicAliasAnalysisPass());
@@ -121,7 +117,7 @@ int main(int argc, char **argv) {
 	pass_mgr.add(LPP);
 
 	if(ValueProfiling)
-		pass_mgr.add(VProf);
+		pass_mgr.add(new ValueProfiler());
 
 	pass_mgr.run(*M);
 
