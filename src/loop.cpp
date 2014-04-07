@@ -276,9 +276,13 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 bool lle::LoopCycle::runOnLoop(llvm::Loop* L,llvm::LPPassManager&)
 {
 	CurL = L;
+	Function* CurF = L->getHeader()->getParent();
 	Value* CC = insertLoopCycle(L);
 	if(!CC){
 		++NumUnfoundCycle;
+		++::NumUnfoundCycle;
+		unfound<<"Function:"<<CurF->getName()<<"\n";
+		unfound<<"\t"<<*L<<"\n";
 		return false;
 	}
 
@@ -286,6 +290,18 @@ bool lle::LoopCycle::runOnLoop(llvm::Loop* L,llvm::LPPassManager&)
 		return false;
 	return true;
 }
+
+lle::LoopCycle::~LoopCycle()
+	//we have no place to print out statistics information
+{
+	if(NumUnfoundCycle){
+		errs()<<std::string(73,'*')<<"\n";
+		errs()<<"\tNote!! there are "<<NumUnfoundCycle<<" loop cycles unresolved:\n";
+		errs()<<unfound.str();
+		errs()<<std::string(73,'*')<<"\n";
+	}
+}
+
 void lle::LoopCycle::print(llvm::raw_ostream& OS,const llvm::Module*) const
 {
 	OS<<*CurL<<"\n";
@@ -314,24 +330,6 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 	if(CC){
 		if(ValueProfiling)
 			ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
-#if 0
-		outs()<<*L<<"\n";
-		outs()<<"cycles:";
-		if(PrettyPrint){
-			lle::pretty_print(LC.getLoopCycle(L));
-			outs()<<"\n";
-			tryResolve(LC.getLoopCycle(L),this);
-		}else
-			outs()<<*LC.getLoopCycle(L);
-		outs()<<"\n";
-#endif
-	}else{
-#if 0
-		++unresolvedNum;
-		delay<<"Function:"<<curFunc->getName()<<"\n";
-		delay<<"\t"<<*L<<"\n";
-#endif
-		//outs()<<"cycles:unknow\n";
 	}
 	return changed;
 }

@@ -19,11 +19,20 @@ namespace lle
 {
 	class LoopCycle:public llvm::LoopPass
 	{
+		//statistics variable:{
+		std::string unfound_str;
+		llvm::raw_string_ostream unfound;
+		unsigned NumUnfoundCycle;
+		//}
+
 		std::map<llvm::Loop*,llvm::Value*> CycleMap;
 		llvm::Loop* CurL;
 		public:
 		static char ID;
-		explicit LoopCycle():LoopPass(ID){ }
+		explicit LoopCycle():LoopPass(ID),unfound(unfound_str){
+			NumUnfoundCycle = 0;
+		}
+		virtual ~LoopCycle();
 		void getAnalysisUsage(llvm::AnalysisUsage&) const;
 		bool runOnLoop(llvm::Loop* L,llvm::LPPassManager&);
 		void print(llvm::raw_ostream&,const llvm::Module*) const;
