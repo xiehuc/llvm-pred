@@ -39,6 +39,7 @@ namespace lle
 
 	class LoopCycleSimplify:public llvm::LoopPass
 	{
+		llvm::Loop* CurL;
 		public:
 		static char ID;
 		explicit LoopCycleSimplify():LoopPass(ID){}

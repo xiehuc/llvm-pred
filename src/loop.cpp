@@ -25,7 +25,7 @@ static RegisterPass<LoopCycle> X("loop-cycle","Loop Cycle Pass",false,true);
 static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simplify Pass",false,false);
 
 namespace {
-cl::opt<bool> PrettyPrint("pretty-print", cl::desc("pretty print loop cycle"));
+//cl::opt<bool> PrettyPrint("pretty-print", cl::desc("pretty print loop cycle"));
 }
 
 //find start value fron induction variable
@@ -296,6 +296,7 @@ void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 
 bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 {
+	CurL = L;
 	bool changed = false;
 	lle::LoopCycle& LC = getAnalysis<lle::LoopCycle>();
 	if(L->getLoopPreheader()==NULL){
@@ -304,6 +305,7 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 	}
 	Value* CC = LC.getLoopCycle(L);
 	if(CC){
+#if 0
 		outs()<<*L<<"\n";
 		outs()<<"cycles:";
 		if(PrettyPrint){
@@ -316,6 +318,7 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 		/*if(ValueProfiling)
 			VProf->insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 			*/
+#endif
 	}else{
 #if 0
 		++unresolvedNum;
@@ -332,6 +335,15 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 	return false;
 }*/
 
-void lle::LoopCycleSimplify::print(llvm::raw_ostream &, const llvm::Module *) const
+void lle::LoopCycleSimplify::print(llvm::raw_ostream &OS, const llvm::Module *) const
 {
+	auto& LC = getAnalysis<lle::LoopCycle>();
+	Value* CC = LC.getLoopCycle(CurL);
+	if(CC){
+		OS<<*CurL<<"\n";
+		OS<<"Cycles:";
+		lle::pretty_print(CC,OS);
+		OS<<"\n";
+		tryResolve(CC, this);
+	}
 }
