@@ -2,19 +2,31 @@
 #include "util.h"
 #include "config.h"
 #include "debug.h"
+
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
 
+#include <llvm/Support/CommandLine.h>
+#include <llvm/Transforms/Utils/LoopUtils.h>
+
 #include <map>
+#include <vector>
 #include <algorithm>
 
+using namespace std;
 using namespace lle;
 using namespace llvm;
 
 char lle::LoopCycle::ID = 0;
-//INITIALIZE_PASS(LoopCycle, "loop-cycle", "Loop Cycle Pass", false, true);
+char lle::LoopCycleSimplify::ID = 0;
+
 static RegisterPass<LoopCycle> X("loop-cycle","Loop Cycle Pass",false,true);
+static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simplify Pass",false,false);
+
+namespace {
+cl::opt<bool> PrettyPrint("pretty-print", cl::desc("pretty print loop cycle"));
+}
 
 //find start value fron induction variable
 static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
@@ -36,9 +48,28 @@ static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
 	}
 }
 
+static void tryResolve(Value* V,Pass* P)
+{
+	vector<Value*> resolved;
+	vector<Instruction*> unsolved;
+	unsolved = lle::resolve(V, resolved);
+	outs()<<"::resolved list\n";
+	for(auto i : resolved)
+		outs()<<*i<<"\n";
+	outs()<<"::unresolved\n";
+	for(auto I : unsolved){
+		SmallVector<lle::FindedDependenciesType,64> Result;
+		outs()<<"::possible dependence for "<<*I<<"\n";
+		lle::find_dependencies(I, P, Result);
+		for(auto f : Result)
+			outs()<<f.first<<"\t"<<*f.first.getInst()<<" in '"<<f.second->getName()<<"'\n";
+	}
+}
+
 void lle::LoopCycle::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
 	AU.setPreservesAll();
+	AU.addRequired<LoopInfo>();
 	//setPreservesCFG would block llvm-loop
 }
 
@@ -234,6 +265,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	RES = (OneStep==1)?Builder.CreateAdd(RES,Step):(OneStep==-1)?Builder.CreateSub(RES, Step):RES;
 	if(!Step->isMinusOne()&&!Step->isOne())
 		RES = Builder.CreateSDiv(RES, Step);
+	RES->setName("loop-cycle");
 
 	return CycleMap[L] = RES;
 }
@@ -251,5 +283,55 @@ void lle::LoopCycle::print(llvm::raw_ostream& OS,const llvm::Module*) const
 {
 	OS<<*CurL<<"\n";
 	OS<<"Cycle:"<<*getLoopCycle(CurL)<<"\n";
-	
+}
+
+void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
+{
+	AU.setPreservesAll();
+	AU.addRequired<LoopInfo>();
+	AU.addRequired<lle::LoopCycle>();
+	AU.addRequired<MemoryDependenceAnalysis>();
+	AU.addRequired<AliasAnalysis>();
+}
+
+bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
+{
+	bool changed = false;
+	lle::LoopCycle& LC = getAnalysis<lle::LoopCycle>();
+	if(L->getLoopPreheader()==NULL){
+		InsertPreheaderForLoop(L, this);
+		changed = true;
+	}
+	Value* CC = LC.getLoopCycle(L);
+	if(CC){
+		outs()<<*L<<"\n";
+		outs()<<"cycles:";
+		if(PrettyPrint){
+			lle::pretty_print(LC.getLoopCycle(L));
+			outs()<<"\n";
+			tryResolve(LC.getLoopCycle(L),this);
+		}else
+			outs()<<*LC.getLoopCycle(L);
+		outs()<<"\n";
+		/*if(ValueProfiling)
+			VProf->insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
+			*/
+	}else{
+#if 0
+		++unresolvedNum;
+		delay<<"Function:"<<curFunc->getName()<<"\n";
+		delay<<"\t"<<*L<<"\n";
+#endif
+		//outs()<<"cycles:unknow\n";
+	}
+	return changed;
+}
+
+/*bool lle::LoopCycleSimplify::runOnModule(llvm::Module& M)
+{
+	return false;
+}*/
+
+void lle::LoopCycleSimplify::print(llvm::raw_ostream &, const llvm::Module *) const
+{
 }

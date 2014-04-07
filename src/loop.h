@@ -37,6 +37,17 @@ namespace lle
 		}
 	};
 
+	class LoopCycleSimplify:public llvm::LoopPass
+	{
+		public:
+		static char ID;
+		explicit LoopCycleSimplify():LoopPass(ID){}
+		void getAnalysisUsage(llvm::AnalysisUsage&) const;
+		bool runOnLoop(llvm::Loop* L,llvm::LPPassManager&);
+		//bool runOnModule(llvm::Module&);
+		void print(llvm::raw_ostream&,const llvm::Module*) const;
+	};
+
 }
 
 #endif

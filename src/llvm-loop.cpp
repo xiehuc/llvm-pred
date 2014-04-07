@@ -16,7 +16,6 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/Analysis/LoopInfo.h>
 #include <llvm/Analysis/AliasAnalysis.h>
-#include <llvm/Transforms/Utils/LoopUtils.h>
 #include <llvm/Analysis/MemoryDependenceAnalysis.h>
 
 #include <ValueProfiling.h>
@@ -40,12 +39,10 @@ namespace {
 				cl::Optional);
 	cl::opt<bool>
 		ValueProfiling("insert-value-profiling", cl::desc("insert value profiling for loop cycle"));
-	cl::opt<bool>
-		PrettyPrint("pretty-print", cl::desc("pretty print loop cycle"));
 };
 
 static ValueProfiler* VProf = NULL;
-
+#if 0
 class LoopPrintPass:public LoopPass
 {
 	std::string delay_str;
@@ -74,53 +71,14 @@ class LoopPrintPass:public LoopPass
 			outs()<<delay.str();
 		}
 	}
-	void tryResolve(Value* V)
-	{
-		vector<Value*> resolved;
-		vector<Instruction*> unsolved;
-		unsolved = lle::resolve(V, resolved);
-		outs()<<"::resolved list\n";
-		for(auto i : resolved)
-			outs()<<*i<<"\n";
-		outs()<<"::unresolved\n";
-		for(auto I : unsolved){
-			SmallVector<lle::FindedDependenciesType,64> Result;
-			outs()<<"::possible dependence for "<<*I<<"\n";
-			lle::find_dependencies(I, this, Result);
-			for(auto f : Result)
-				outs()<<f.first<<"\t"<<*f.first.getInst()<<" in '"<<f.second->getName()<<"'\n";
-		}
-	}
 	bool runOnLoop(Loop* L,LPPassManager& LPM)
 	{
-		lle::LoopCycle& LC = getAnalysis<lle::LoopCycle>();
-		if(L->getLoopPreheader()==NULL)
-			InsertPreheaderForLoop(L, this);
-		Value* CC = LC.getLoopCycle(L);
-		if(CC){
-			outs()<<*L<<"\n";
-			outs()<<"cycles:";
-			if(PrettyPrint){
-				lle::pretty_print(LC.getLoopCycle(L));
-				outs()<<"\n";
-				tryResolve(LC.getLoopCycle(L));
-			}else
-				outs()<<*LC.getLoopCycle(L);
-			outs()<<"\n";
-			if(ValueProfiling)
-				VProf->insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
-		}else{
-			++unresolvedNum;
-			delay<<"Function:"<<curFunc->getName()<<"\n";
-			delay<<"\t"<<*L<<"\n";
-			//outs()<<"cycles:unknow\n";
-		}
-		return true;
 	}
 };
 
 char LoopPrintPass::ID = 0;
 static RegisterPass<LoopPrintPass> X("print-loop-cycle","Print Loop Cycle Pass",false,false);
+#endif
 
 int main(int argc, char **argv) {
 	// Print a stack trace if we signal out.
@@ -153,7 +111,7 @@ int main(int argc, char **argv) {
 	// interface.
 
 	VProf = new ValueProfiler();
-	LoopPrintPass* LPP = new LoopPrintPass();
+	lle::LoopCycleSimplify* LPP = new lle::LoopCycleSimplify();
 	PassManager pass_mgr;
 
 	pass_mgr.add(createBasicAliasAnalysisPass());
@@ -168,7 +126,7 @@ int main(int argc, char **argv) {
 
 	pass_mgr.run(*M);
 
-	LPP->printUnresolved(outs());
+	//LPP->printUnresolved(outs());
 
 	if(!WriteFile.empty()){
 		std::string error;
