@@ -3,6 +3,8 @@
 # It requires that the llvm-config executable be available on the system path.
 # Once found, llvm-config is used for everything else.
 #
+# update: 2014-04-07
+#
 # The following variables are set:
 #
 # LLVM_FOUND                 - Set to YES if LLVM is found.
@@ -13,7 +15,7 @@
 # LLVM_LD_FLAGS              - Additional flags to pass to the linker.
 # LLVM_LIBRARY_DIRS          - A list of directories where the LLVM libraries are located.
 # LLVM_INCLUDE_DIRS          - A list of directories where the LLVM headers are located.
-# LLVM_DEFINITIONS           - The definitions should be used
+# LLVM_DEFINITIONS           - (DELETE) The definitions should be used
 # LLVM_LIBRARIES             - A list of libraries which should be linked
 # LLVM_DYNAMIC_LIBRARY       - A single dynamic llvm shared library
 # LLVM_DYNAMIC_LIBRARY_FOUND - Whether found the dynamic llvm shared library
@@ -25,7 +27,8 @@
 # 
 # include_directories(${LLVM_INCLUDE_DIRS})
 # link_directories(${LLVM_LIBRARY_DIRS})
-# add_definitions(${LLVM_DEFINITIONS} --std=c++11)
+# set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${LLVM_CXX_FLAGS}")
+# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${LLVM_CPP_FLAGS}")
 # 
 # 
 # llvm_map_components_to_libraries(LLVM_IRREADER_LIRARY irreader)

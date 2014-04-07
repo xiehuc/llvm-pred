@@ -1,9 +1,10 @@
+#define DEBUG_TYPE "loop-cycle"
+
 #include "loop.h"
 #include "util.h"
 #include "config.h"
 #include "debug.h"
 
-#define DEBUG_TYPE "loop-cycle"
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
@@ -275,11 +276,15 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 bool lle::LoopCycle::runOnLoop(llvm::Loop* L,llvm::LPPassManager&)
 {
 	CurL = L;
+	Value* CC = insertLoopCycle(L);
+	if(!CC){
+		++NumUnfoundCycle;
+		return false;
+	}
 
-	if(isa<GlobalVariable>(insertLoopCycle(L))) 
+	if(isa<Constant>(CC)) 
 		return false;
 	return true;
-
 }
 void lle::LoopCycle::print(llvm::raw_ostream& OS,const llvm::Module*) const
 {
@@ -321,7 +326,6 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 		outs()<<"\n";
 #endif
 	}else{
-		++NumUnfoundCycle;
 #if 0
 		++unresolvedNum;
 		delay<<"Function:"<<curFunc->getName()<<"\n";

@@ -39,44 +39,6 @@ namespace {
 				cl::Optional);
 };
 
-#if 0
-class LoopPrintPass:public LoopPass
-{
-	std::string delay_str;
-	raw_string_ostream delay;
-	unsigned unresolvedNum;
-	const Function* curFunc;
-	public:
-	static char ID;
-	explicit LoopPrintPass(): 
-		LoopPass(ID),delay(delay_str)
-	{
-		unresolvedNum = 0;
-	}
-	void getAnalysisUsage(AnalysisUsage &AU) const 
-	{
-		AU.setPreservesAll();
-		AU.addRequired<lle::LoopCycle>();
-		AU.addRequired<AliasAnalysis>();
-		AU.addRequired<MemoryDependenceAnalysis>();
-	}
-	void printUnresolved(raw_ostream& out)
-	{
-		if(unresolvedNum){
-			outs()<<std::string(73,'*')<<"\n";
-			outs()<<"\tNote!! there are "<<unresolvedNum<<" loop cycles unresolved:\n";
-			outs()<<delay.str();
-		}
-	}
-	bool runOnLoop(Loop* L,LPPassManager& LPM)
-	{
-	}
-};
-
-char LoopPrintPass::ID = 0;
-static RegisterPass<LoopPrintPass> X("print-loop-cycle","Print Loop Cycle Pass",false,false);
-#endif
-
 int main(int argc, char **argv) {
 	// Print a stack trace if we signal out.
 	sys::PrintStackTraceOnErrorSignal();
