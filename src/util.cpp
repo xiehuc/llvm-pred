@@ -304,7 +304,9 @@ void lle::find_dependencies( Instruction* I, const Pass* P,
 	if(d.isDef()||d.isClobber()){
 		Result.push_back(make_pair(d,SearchPos));
 	}
-	if(d.isNonLocal() || (d.isClobber()&&NLDR) ){
+	//if local analysis result is nonLocal or clobber
+	//we didn't found a good result, so we continue search
+	if(d.isNonLocal() || d.isClobber() ){
 		SmallVector<NonLocalDepResult,32> NonLocals;
 
 		AliasAnalysis::Location Loc;

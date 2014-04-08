@@ -23,6 +23,7 @@ namespace lle
 	void find_dependencies(llvm::Instruction*, const llvm::Pass*,
 			llvm::SmallVectorImpl<FindedDependenciesType>&,
 			llvm::NonLocalDepResult* NLDR = NULL);
+
 }
 
 inline 

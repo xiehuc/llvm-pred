@@ -33,6 +33,7 @@ STATISTIC(NumUnfoundCycle, "Number of unfound loop cycle");
 //cl::opt<bool> PrettyPrint("pretty-print", cl::desc("pretty print loop cycle"));
 cl::opt<bool> ValueProfiling("insert-value-trap", cl::desc("insert value profiling trap for loop cycle"));
 
+
 //find start value fron induction variable
 static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
 {
@@ -55,20 +56,34 @@ static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
 
 static void tryResolve(Value* V,const Pass* P,raw_ostream& OS = outs())
 {
+	static int NumTab = 0;
+	++NumTab;
+	string Tab(NumTab,'\t');
 	vector<Value*> resolved;
 	vector<Instruction*> unsolved;
 	unsolved = lle::resolve(V, resolved);
-	OS<<"::resolved list\n";
+	OS<<Tab<<"::resolved list\n";
 	for(auto i : resolved)
-		OS<<*i<<"\n";
-	OS<<"::unresolved\n";
+		OS<<Tab<<*i<<"\n";
+	OS<<Tab<<"::unresolved\n";
 	for(auto I : unsolved){
 		SmallVector<lle::FindedDependenciesType,64> Result;
-		OS<<"::possible dependence for "<<*I<<"\n";
+		OS<<Tab<<"::possible dependence for "<<*I<<"\n";
 		lle::find_dependencies(I, P, Result);
-		for(auto f : Result)
-			OS<<f.first<<"\t"<<*f.first.getInst()<<" in '"<<f.second->getName()<<"'\n";
+		for(auto f : Result){
+			if(HIDE_CLOBBER && f.first.isClobber()) continue;
+			Instruction* DI = f.first.getInst(); //Dependend Instruction
+			OS<<Tab<<f.first<<" : "<<*DI<<" in '"<<f.second->getName()<<"'\n";
+			/*if(DI == I) continue;
+			if(isa<StoreInst>(DI)){
+				resolved.push_back(DI->getOperand(0));
+				tryResolve(DI->getOperand(0), P, OS);
+			}else{
+				ASSERT(0, DI, "unknow Dependence Instruction Type");
+			}*/
+		}
 	}
+	--NumTab;
 }
 
 void lle::LoopCycle::getAnalysisUsage(llvm::AnalysisUsage & AU) const
@@ -344,6 +359,7 @@ void lle::LoopCycleSimplify::print(llvm::raw_ostream &OS, const llvm::Module *) 
 	auto& LC = getAnalysis<lle::LoopCycle>();
 	Value* CC = LC.getLoopCycle(CurL);
 	if(CC){
+		OS<<"in Function:\t"<<CurL->getHeader()->getParent()->getName()<<"\n";
 		OS<<*CurL<<"\n";
 		OS<<"Cycles:";
 		lle::pretty_print(CC, OS);

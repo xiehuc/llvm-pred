@@ -5,6 +5,9 @@
 #cmakedefine LLVM_VERSION_MINOR @LLVM_VERSION_MINOR@
 #cmakedefine ENABLE_DEBUG
 
+//hide clobber result when doing memory analysis dependencies
+#define HIDE_CLOBBER 1
+
 #if 0
 #if LLVM_VERSION_MAJOR == 3 
 #if LLVM_VERSION_MINOR == 2
