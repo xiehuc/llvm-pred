@@ -46,7 +46,8 @@ namespace lle
 		llvm::Value* insertLoopCycle(llvm::Loop* l);
 		llvm::Value* getLoopCycle(llvm::Loop* l) const
 		{ 
-			return CycleMap.at(l);
+			auto ite = CycleMap.find(l);
+			return ite!=CycleMap.end()?ite->second:NULL;
 		}
 	};
 

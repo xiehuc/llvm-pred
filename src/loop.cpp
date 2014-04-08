@@ -74,7 +74,7 @@ static void tryResolve(Value* V,const Pass* P,raw_ostream& OS = outs())
 void lle::LoopCycle::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
 	AU.setPreservesAll();
-	AU.addRequired<LoopInfo>();
+	//AU.addRequired<LoopInfo>();
 	//setPreservesCFG would block llvm-loop
 }
 
@@ -312,9 +312,9 @@ void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
 	AU.setPreservesAll();
 	AU.addRequired<LoopInfo>();
-	AU.addRequired<lle::LoopCycle>();
-	AU.addRequired<MemoryDependenceAnalysis>();
 	AU.addRequired<AliasAnalysis>();
+	AU.addRequired<MemoryDependenceAnalysis>();
+	AU.addRequired<lle::LoopCycle>();
 }
 
 bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
