@@ -22,6 +22,10 @@ class KnownLCAA:public LibCallAliasAnalysis
 		InitializeAliasAnalysis(this);
 		return false;
 	}
+	//print nothing
+	void print(raw_ostream& OS, const Module*) const
+	{
+	}
 };
 
 char KnownLCAA::ID = 0;
@@ -30,9 +34,8 @@ char KnownLCAA::ID = 0;
 //
 // .. _2.2: http://www.cs.ucla.edu/classes/spring08/cs259/llvm-2.2/docs/WritingAnLLVMPass.html#analysisgroup
 //
-//INITIALIZE_AG_PASS(KnownLCAA, AliasAnalysis, "klc-aa",
+// INITIALIZE_AG_PASS(KnownLCAA, AliasAnalysis, "klc-aa",
 //                   "KnownLibCall Alias Analysis", false, true, false)
-
 // 注册自身为Pass
 static RegisterPass<KnownLCAA> X("klc-aa","KnowLibCall Alias Analysis",false,true);
 // 将Pass加入到AliasAnalysis中.
@@ -48,6 +51,7 @@ const LibCallFunctionInfo* KnownLibCall::getFunctionInfoArray() const
 		{"llvm.lifetime.end"         , AliasAnalysis::ModRefResult::NoModRef} , 
 		{"_gfortran_st_write_done"   , AliasAnalysis::ModRefResult::NoModRef} , 
 		{"_gfortran_st_write"        , AliasAnalysis::ModRefResult::NoModRef} , 
+		{"free"                      , AliasAnalysis::ModRefResult::NoModRef} , 
 	};
 	return Array;
 }
