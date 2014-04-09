@@ -222,9 +222,9 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 
 }
 
-vector<Instruction*> lle::resolve(Value* V,vector<Value*>& resolved)
+list<Instruction*> lle::resolve(Value* V,vector<Value*>& resolved)
 {
-	vector<Instruction*> unresolved;
+	list<Instruction*> unresolved;
 	if(find(resolved.rbegin(),resolved.rend(),V)!=resolved.rend())
 		return unresolved;
 	if(isa<Constant>(V))

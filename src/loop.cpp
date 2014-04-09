@@ -56,34 +56,46 @@ static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
 
 static void tryResolve(Value* V,const Pass* P,raw_ostream& OS = outs())
 {
-	static int NumTab = 0;
-	++NumTab;
-	string Tab(NumTab,'\t');
+	bool changed = false;
+	string Tab(3,' ');
 	vector<Value*> resolved;
-	vector<Instruction*> unsolved;
+	list<Instruction*> unsolved;
 	unsolved = lle::resolve(V, resolved);
-	OS<<Tab<<"::resolved list\n";
+	list<Instruction*>::iterator I = unsolved.begin();
+	while(I != unsolved.end()){
+		changed = false;
+		SmallVector<lle::FindedDependenciesType,64> Result;
+		OS<<"::possible dependence for "<<**I<<"\n";
+		lle::find_dependencies(*I, P, Result);
+		for(auto f : Result){
+			Instruction* DI = f.first.getInst(); //Dependend Instruction
+			if(f.first.isClobber()){
+				if(!HIDE_CLOBBER)
+					OS<<Tab<<f.first<<" : "<<*DI<<" in '"<<f.second->getName()<<"'\n";
+				continue;
+			}
+			if(DI == *I) continue;
+			if(isa<StoreInst>(DI)){
+				resolved.push_back(*I);
+				resolved.push_back(DI);
+				list<Instruction*> temp = lle::resolve(DI->getOperand(0),resolved);
+				unsolved.insert(unsolved.end(), temp.begin(), temp.end());
+				changed = true;
+				break;
+			}/*else{
+				ASSERT(0, DI, "unknow Dependence Instruction Type");
+				}*/
+		}
+		if(changed) I = unsolved.erase(I);
+		else ++I;
+	}
+
+	OS<<"::resolved list\n";
 	for(auto i : resolved)
 		OS<<Tab<<*i<<"\n";
-	OS<<Tab<<"::unresolved\n";
-	for(auto I : unsolved){
-		SmallVector<lle::FindedDependenciesType,64> Result;
-		OS<<Tab<<"::possible dependence for "<<*I<<"\n";
-		lle::find_dependencies(I, P, Result);
-		for(auto f : Result){
-			if(HIDE_CLOBBER && f.first.isClobber()) continue;
-			Instruction* DI = f.first.getInst(); //Dependend Instruction
-			OS<<Tab<<f.first<<" : "<<*DI<<" in '"<<f.second->getName()<<"'\n";
-			/*if(DI == I) continue;
-			if(isa<StoreInst>(DI)){
-				resolved.push_back(DI->getOperand(0));
-				tryResolve(DI->getOperand(0), P, OS);
-			}else{
-				ASSERT(0, DI, "unknow Dependence Instruction Type");
-			}*/
-		}
-	}
-	--NumTab;
+	OS<<"::unresolved\n";
+	for(auto i : unsolved)
+		OS<<Tab<<*i<<"\n";
 }
 
 void lle::LoopCycle::getAnalysisUsage(llvm::AnalysisUsage & AU) const
