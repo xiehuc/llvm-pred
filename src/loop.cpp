@@ -65,7 +65,6 @@ static void tryResolve(Value* V,const Pass* P,raw_ostream& OS = outs())
 	while(I != unsolved.end()){
 		changed = false;
 		SmallVector<lle::FindedDependenciesType,64> Result;
-		OS<<"::possible dependence for "<<**I<<"\n";
 		lle::find_dependencies(*I, P, Result);
 		for(auto f : Result){
 			Instruction* DI = f.first.getInst(); //Dependend Instruction
