@@ -69,6 +69,7 @@ static void tryResolve(Value* V,const Pass* P,raw_ostream& OS = outs())
 		lle::find_dependencies(*I, P, Result);
 		for(auto f : Result){
 			Instruction* DI = f.first.getInst(); //Dependend Instruction
+			if(f.first.isNonLocal()) continue;
 			if(f.first.isClobber()){
 				if(!HIDE_CLOBBER)
 					OS<<Tab<<f.first<<" : "<<*DI<<" in '"<<f.second->getName()<<"'\n";

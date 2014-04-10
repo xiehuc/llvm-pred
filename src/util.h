@@ -31,6 +31,7 @@ inline
 llvm::raw_ostream& operator<<(llvm::raw_ostream& o,const llvm::MemDepResult& d){
 	if(d.isClobber()) o<<"Clobber";
 	else if(d.isDef()) o<<"Def";
+	else if(d.isNonLocal()) o<<"NonLocal";
 	else o<<"???";
 	return o;
 }

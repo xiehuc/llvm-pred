@@ -280,6 +280,7 @@ void lle::find_dependencies( Instruction* I, const Pass* P,
 
 	MemDepResult d;
 	BasicBlock* SearchPos;
+	Instruction* ScanPos;
 	MemoryDependenceAnalysis& MDA = P->getAnalysis<MemoryDependenceAnalysis>();
 	AliasAnalysis& AA = P->getAnalysis<AliasAnalysis>();
 
@@ -288,34 +289,50 @@ void lle::find_dependencies( Instruction* I, const Pass* P,
 		return;
 	}
 
+	AliasAnalysis::Location Loc;
+	if(LoadInst* LI = dyn_cast<LoadInst>(I)){
+		Loc = AA.getLocation(LI);
+	}else if(StoreInst* SI = dyn_cast<StoreInst>(I))
+		Loc = AA.getLocation(SI);
+	else
+		assert(0);
+
 	if(!NLDR){
-		d = MDA.getDependency(I);
 		SearchPos = I->getParent();
-	} else {
-		d = NLDR->getResult();
+		d = MDA.getPointerDependencyFrom(Loc, isa<LoadInst>(I), I, SearchPos, I);
+		ScanPos = d.getInst();
+	}else{
+		ScanPos = NLDR->getResult().getInst();
 		SearchPos = NLDR->getBB();
-		if(find_if(Result.begin(),Result.end(),[&d](FindedDependenciesType& f){
-					return f.first == d;}
+		d = NLDR->getResult();
+		//we have already visit this BB;
+		if(find_if(Result.begin(),Result.end(),[&SearchPos](FindedDependenciesType& f){
+					return f.second == SearchPos;}
 					) != Result.end()){
 			return;
 		}
 	}
 
-	if(d.isDef()||d.isClobber()){
-		Result.push_back(make_pair(d,SearchPos));
-	}
-	//if local analysis result is nonLocal or clobber
-	//we didn't found a good result, so we continue search
-	if(d.isNonLocal() || d.isClobber() ){
-		SmallVector<NonLocalDepResult,32> NonLocals;
+	while(ScanPos){
+		if(!HIDE_CLOBBER) errs()<<d<<*d.getInst()<<"in '"<<SearchPos->getName()<<"'\n";
+		//if isDef, that's what we want
+		//if isNonLocal, record BasicBlock to avoid visit twice
+		if(d.isDef()||d.isNonLocal())
+			Result.push_back(make_pair(d,SearchPos));
+		if(d.isDef())
+			return;
 
-		AliasAnalysis::Location Loc;
-		if(LoadInst* LI = dyn_cast<LoadInst>(I)){
-			Loc = AA.getLocation(LI);
-		}else if(StoreInst* SI = dyn_cast<StoreInst>(I))
-			Loc = AA.getLocation(SI);
-		else
-			assert(0);
+		d = MDA.getPointerDependencyFrom(Loc, isa<LoadInst>(I), ScanPos, SearchPos, I);
+		ScanPos = d.getInst();
+	}
+
+	//if local analysis result is nonLocal 
+	//we didn't found a good result, so we continue search
+	if(d.isNonLocal()){
+		//we didn't record in last time
+		Result.push_back(make_pair(d,SearchPos));
+
+		SmallVector<NonLocalDepResult,32> NonLocals;
 
 		MDA.getNonLocalPointerDependency(Loc, isa<LoadInst>(I), SearchPos, NonLocals);
 		for(auto r : NonLocals){
