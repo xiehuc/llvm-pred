@@ -314,12 +314,12 @@ void lle::find_dependencies( Instruction* I, const Pass* P,
 	}
 
 	while(ScanPos){
-		if(!HIDE_CLOBBER) errs()<<d<<*d.getInst()<<"in '"<<SearchPos->getName()<<"'\n";
+		if(!HIDE_CLOBBER) outs()<<d<<*d.getInst()<<"in '"<<SearchPos->getName()<<"'\n";
 		//if isDef, that's what we want
 		//if isNonLocal, record BasicBlock to avoid visit twice
 		if(d.isDef()||d.isNonLocal())
 			Result.push_back(make_pair(d,SearchPos));
-		if(d.isDef())
+		if(d.isDef() && isa<StoreInst>(d.getInst()) )
 			return;
 
 		d = MDA.getPointerDependencyFrom(Loc, isa<LoadInst>(I), ScanPos, SearchPos, I);
@@ -338,6 +338,8 @@ void lle::find_dependencies( Instruction* I, const Pass* P,
 		for(auto r : NonLocals){
 			find_dependencies(I, P, Result, &r);
 		}
+	}else if(d.isNonFuncLocal()){
+		//doing some thing here
 	}
 }
 
