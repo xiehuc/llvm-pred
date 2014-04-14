@@ -222,11 +222,13 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 
 }
 
-list<Instruction*> lle::resolve(Value* V,vector<Value*>& resolved)
+list<Value*> lle::resolve(Value* V,vector<Value*>& resolved)
 {
-	list<Instruction*> unresolved;
+	list<Value*> unresolved;
 	if(find(resolved.rbegin(),resolved.rend(),V)!=resolved.rend())
 		return unresolved;
+	if(isa<Argument>(V))
+		unresolved.push_back(V);
 	if(isa<Constant>(V))
 		resolved.push_back(V);
 	if(Instruction* I = dyn_cast<Instruction>(V)){
@@ -263,6 +265,7 @@ static Value* access_global_variable(Instruction* I)
 	Value* Address = NULL, *Test = NULL;
 	if(isa<LoadInst>(I) || isa<StoreInst>(I))
 		Test = Address = I->getOperand(0);
+	else return NULL;
 	while(ConstantExpr* CE = dyn_cast<ConstantExpr>(Address)){
 		Test = CE->getAsInstruction();
 		if(isa<CastInst>(Test))
@@ -340,6 +343,11 @@ void lle::find_dependencies( Instruction* I, const Pass* P,
 		}
 	}else if(d.isNonFuncLocal()){
 		//doing some thing here
+		bool has_argument = walk_through_if(I->getOperand(0), [](Value* V){
+				return isa<Argument>(V);
+				});
+		if(has_argument)
+			Result.push_back(make_pair(d,SearchPos));
 	}
 }
 
@@ -435,3 +443,23 @@ void latex_print(Value* v)
 
 }
 #endif
+
+
+bool lle::walk_through_if(llvm::Value* V,std::function<bool(llvm::Value*)> func)
+{
+	static int depth = 0;
+	bool found = false;
+	if(depth > WALK_THROUGH_DEPTH) return false;
+	if(func(V))
+		return true;
+	if(llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(V)){
+		++depth;
+		for(auto O = I->op_begin(),E = I->op_end(); O!=E;++O)
+			if(walk_through_if(*O,func)){
+				found = true;
+				break;
+			}
+		--depth;
+	}
+	return found;
+}

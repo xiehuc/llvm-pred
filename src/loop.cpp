@@ -59,13 +59,18 @@ static void tryResolve(Value* V,const Pass* P,raw_ostream& OS = outs())
 	bool changed = false;
 	string Tab(3,' ');
 	vector<Value*> resolved;
-	list<Instruction*> unsolved;
+	list<Value*> unsolved;
 	unsolved = lle::resolve(V, resolved);
-	list<Instruction*>::iterator I = unsolved.begin();
+	list<Value*>::iterator I = unsolved.begin();
 	while(I != unsolved.end()){
 		changed = false;
+		if(!isa<Instruction>(*I)){
+			++I;
+			continue;
+		}
+		Instruction* II = dyn_cast<Instruction>(*I);
 		SmallVector<lle::FindedDependenciesType,64> Result;
-		lle::find_dependencies(*I, P, Result);
+		lle::find_dependencies(II, P, Result);
 		for(auto f : Result){
 			Instruction* DI = f.first.getInst(); //Dependend Instruction
 			if(f.first.isNonLocal()) continue;
@@ -74,11 +79,18 @@ static void tryResolve(Value* V,const Pass* P,raw_ostream& OS = outs())
 					OS<<Tab<<f.first<<" : "<<*DI<<" in '"<<f.second->getName()<<"'\n";
 				continue;
 			}
-			if(DI == *I) continue;
+			if(f.first.isNonFuncLocal()){
+				resolved.push_back(II);
+				list<Value*> temp = lle::resolve(II->getOperand(0), resolved);
+				unsolved.insert(unsolved.end(),temp.begin(),temp.end());
+				changed = true;
+				break;
+			}
+			if(DI == II) continue;
 			if(isa<StoreInst>(DI)){
-				resolved.push_back(*I);
+				resolved.push_back(II);
 				resolved.push_back(DI);
-				list<Instruction*> temp = lle::resolve(DI->getOperand(0),resolved);
+				list<Value*> temp = lle::resolve(DI->getOperand(0),resolved);
 				unsolved.insert(unsolved.end(), temp.begin(), temp.end());
 				changed = true;
 				break;

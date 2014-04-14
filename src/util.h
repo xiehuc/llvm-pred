@@ -8,13 +8,19 @@
 
 #include <llvm/Analysis/MemoryDependenceAnalysis.h>
 
+#define WALK_THROUGH_DEPTH 10
+
 namespace lle
 {
 	typedef std::pair<llvm::MemDepResult,llvm::BasicBlock*> FindedDependenciesType;
 
 	void pretty_print(llvm::Value* v,llvm::raw_ostream& o = llvm::outs());
 
-	std::list<llvm::Instruction*> resolve(llvm::Value*,std::vector<llvm::Value*>& resolved);
+	std::list<llvm::Value*> resolve(llvm::Value*,std::vector<llvm::Value*>& resolved);
+
+	//walk through value depend tree to find func(V) == true
+	//walk depth is under WALK_THROUTH_DEPTH
+	bool walk_through_if(llvm::Value* V,std::function<bool(llvm::Value*)> func);
 
 	//remove cast instruction for a value
 	//because cast means the original value and the returned value is
