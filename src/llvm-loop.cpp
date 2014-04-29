@@ -23,6 +23,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#include "LoopSimplify.h"
 #include "loop.h"
 #include "util.h"
 #include "debug.h"

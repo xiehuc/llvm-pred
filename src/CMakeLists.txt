@@ -29,6 +29,7 @@ endif()
 
 add_library(LLVMPred SHARED
 	KnownLibCallInfo.cpp
+   LoopSimplify.cpp
    SlashShrink.cpp
 	loop.cpp
 	util.cpp
@@ -39,18 +40,17 @@ target_link_libraries(LLVMPred
 	${LLVM_PROF_LIBRARIES}
 	)
 
-add_executable(llvm-loop
-	llvm-loop.cpp
-	)
-
-target_link_libraries(llvm-loop
-	${LLVM_LIBRARIES}
-	LLVMPred
-	)
-
 add_executable(edge-merge
 	edge-merge.cpp
 	)
 
+#add_executable(llvm-loop
+#	llvm-loop.cpp
+#	)
+#
+#target_link_libraries(llvm-loop
+#	${LLVM_LIBRARIES}
+#	LLVMPred
+#	)
 
-install(TARGETS llvm-loop DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+#install(TARGETS llvm-loop DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)

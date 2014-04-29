@@ -7,13 +7,9 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Analysis/LoopPass.h>
 
-#include <llvm/Support/CommandLine.h>
-
 #include <iostream>
 #include <map>
 #include <stdlib.h>
-
-extern llvm::cl::opt<bool> ValueProfiling;
 
 namespace lle
 {
@@ -50,20 +46,6 @@ namespace lle
 			return ite!=CycleMap.end()?ite->second:NULL;
 		}
 	};
-
-	class LoopCycleSimplify:public llvm::LoopPass
-	{
-		llvm::Loop* CurL;
-		public:
-		static char ID;
-		explicit LoopCycleSimplify():LoopPass(ID){}
-		void getAnalysisUsage(llvm::AnalysisUsage&) const;
-		bool runOnLoop(llvm::Loop* L,llvm::LPPassManager&);
-		//bool runOnModule(llvm::Module&);
-		void print(llvm::raw_ostream&,const llvm::Module*) const;
-	};
-
-
 }
 
 #endif
