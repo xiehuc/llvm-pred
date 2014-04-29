@@ -3,19 +3,19 @@
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Metadata.h>
 namespace lle {
-   class MarkPreserve;
+   struct MarkPreserve;
 };
 
-class lle::MarkPreserve
+struct lle::MarkPreserve
 {
-   enum {
-      MarkNode = 1050 // must  unique with other
-   };
+   static llvm::StringRef MarkNode;
    static bool enabled();
    static void mark(llvm::Instruction* Inst);
    static bool is_marked(llvm::Instruction* Inst)
    {
-      return Inst->getMetadata(MarkNode)->getOperand(0) != NULL;
+      llvm::MDNode* MD = Inst->getMetadata(MarkNode);
+      if(MD) return MD->getOperand(0) != NULL;
+      return false;
    }
 };
 #endif

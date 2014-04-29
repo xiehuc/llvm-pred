@@ -5,6 +5,8 @@ using namespace llvm;
 
 cl::opt<bool> markd("Mark", cl::desc("Enable Mark some code on IR"));
 
+StringRef MarkPreserve::MarkNode = "lle.mark";
+
 bool MarkPreserve::enabled()
 {
    return ::markd;
@@ -12,6 +14,7 @@ bool MarkPreserve::enabled()
 
 void MarkPreserve::mark(Instruction* Inst)
 {
+   if(!Inst) return;
    if(is_marked(Inst)) return;
 
    LLVMContext& C = Inst->getContext();

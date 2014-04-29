@@ -10,6 +10,7 @@
 #include "loop.h"
 #include "util.h"
 #include "config.h"
+#include "SlashShrink.h"
 
 using namespace std;
 using namespace lle;
