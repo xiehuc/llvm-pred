@@ -10,6 +10,7 @@
 #include "loop.h"
 #include "util.h"
 #include "config.h"
+#include "Resolver.h"
 #include "SlashShrink.h"
 
 using namespace std;
@@ -62,9 +63,10 @@ static void tryResolve(Value* V,const Pass* P,raw_ostream& OS = outs())
 				unsolved.insert(unsolved.end(), temp.begin(), temp.end());
 				changed = true;
 				break;
-			}/*else{
-				ASSERT(0, DI, "unknow Dependence Instruction Type");
-				}*/
+			}
+         /*else{
+           ASSERT(0, DI, "unknow Dependence Instruction Type");
+           }*/
 		}
 		if(changed) I = unsolved.erase(I);
 		else ++I;
@@ -97,10 +99,14 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 		changed = true;
 	}
 	Value* CC = LC.getLoopCycle(L);
-	if(CC){
-		if(ValueProfiling)
-			ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
-	}
+	if(!CC) return changed;
+
+   if(ValueProfiling)
+      ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
+
+   lle::Resolver R;
+   R.resolve(CC);
+
 	return changed;
 }
 

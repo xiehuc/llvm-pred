@@ -31,6 +31,7 @@ add_library(LLVMPred SHARED
 	KnownLibCallInfo.cpp
    LoopSimplify.cpp
    SlashShrink.cpp
+   Resolver.cpp
 	loop.cpp
 	util.cpp
 	)
