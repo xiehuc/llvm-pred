@@ -29,6 +29,7 @@ endif()
 
 add_library(LLVMPred SHARED
 	KnownLibCallInfo.cpp
+   SlashShrink.cpp
 	loop.cpp
 	util.cpp
 	)
