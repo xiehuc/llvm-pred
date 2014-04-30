@@ -23,6 +23,7 @@ static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simpl
 
 cl::opt<bool> ValueProfiling("insert-value-trap", cl::desc("insert value profiling trap for loop cycle"));
 
+#if 0
 static void tryResolve(Value* V,const Pass* P,raw_ostream& OS = outs())
 {
 	bool changed = false;
@@ -79,6 +80,7 @@ static void tryResolve(Value* V,const Pass* P,raw_ostream& OS = outs())
 	for(auto i : unsolved)
 		OS<<Tab<<*i<<"\n";
 }
+#endif
 
 void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
@@ -131,7 +133,9 @@ void lle::LoopCycleSimplify::print(llvm::raw_ostream &OS, const llvm::Module *) 
 		OS<<"Cycles:";
 		lle::pretty_print(CC, OS);
 		OS<<"\n";
+#if 0
 		tryResolve(CC, this, OS);
 		OS<<"\n";
+#endif
 	}
 }

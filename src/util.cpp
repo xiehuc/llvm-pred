@@ -222,30 +222,6 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 
 }
 
-list<Value*> lle::resolve(Value* V,vector<Value*>& resolved)
-{
-	list<Value*> unresolved;
-	if(find(resolved.rbegin(),resolved.rend(),V)!=resolved.rend())
-		return unresolved;
-	if(isa<Argument>(V))
-		unresolved.push_back(V);
-	if(isa<Constant>(V))
-		resolved.push_back(V);
-	if(Instruction* I = dyn_cast<Instruction>(V)){
-		if(isa<LoadInst>(I) || isa<StoreInst>(I) || isa<CallInst>(I)){
-			unresolved.push_back(I);
-		}else{
-			resolved.push_back(V);
-			for(unsigned int i=0;i<I->getNumOperands();i++){
-				Value* R = I->getOperand(i);
-				auto rhs = resolve(R, resolved);
-				unresolved.insert(unresolved.end(), rhs.begin(), rhs.end());
-			}
-		}
-	}
-	return unresolved;
-}
-
 static void find_global_dependencies(const Value* GV,SmallVectorImpl<FindedDependenciesType>& Result)
 {
 	for(auto U = GV->use_begin(),E = GV->use_end();U!=E;++U){

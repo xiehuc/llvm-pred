@@ -16,8 +16,6 @@ namespace lle
 
 	void pretty_print(llvm::Value* v,llvm::raw_ostream& o = llvm::outs());
 
-	std::list<llvm::Value*> resolve(llvm::Value*,std::vector<llvm::Value*>& resolved);
-
 	//walk through value depend tree to find func(V) == true
 	//walk depth is under WALK_THROUTH_DEPTH
 	bool walk_through_if(llvm::Value* V,std::function<bool(llvm::Value*)> func);
