@@ -1,12 +1,22 @@
+#ifndef PRED_DEBUG_H_H
+#define PRED_DEBUG_H_H
+//**********************************************
+//  Must Include this File After All #include
+//**********************************************
+
 #include "config.h"
-#include <llvm/IR/Value.h>
 #include <llvm/Support/raw_ostream.h>
 
 #ifdef ENABLE_DEBUG
 #define DEBUG(expr) expr
+#undef NDEBUG
 #else
 #define DEBUG(expr) 
+#undef NDEBUG
+#define NDEBUG
 #endif
+
+#include <assert.h> // NDEBUG macro would affact this
 
 //disable some output code 
 //dont use comment because consider code may used in future
@@ -25,4 +35,6 @@
 #else
 #define ASSERT(expr,value,desc) assert((expr ||(outs()<<__LINE__<<":"<<value<<"\n",0)) && desc)
 #define ASSERET(expr,value,desc) ASSERT(expr,value,desc)
+#endif
+
 #endif

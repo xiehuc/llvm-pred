@@ -1,9 +1,10 @@
-#include "debug.h"
 #include "SlashShrink.h"
-#include <assert.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/CommandLine.h>
+
+#include "debug.h"
+
 using namespace lle;
 using namespace llvm;
 
