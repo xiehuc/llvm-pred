@@ -34,14 +34,15 @@ class lle::Resolver
 {
 
    // hash map, provide quick search Value* ---> Value*
-   std::unordered_map<llvm::Value*, llvm::Value*> PartCache;
+   std::unordered_map<llvm::Value*, llvm::Instruction*> PartCache;
 
-   llvm::Value* deep_resolve(llvm::Instruction* I)
+   llvm::Instruction* deep_resolve(llvm::Instruction* I)
    {
-      llvm::Value* Ret = NULL;
+      llvm::Instruction* Ret = NULL;
       auto Ite = PartCache.find(I);
       if(Ite != PartCache.end())
          return Ite->second;
+      Ret = UseOnlyResolve()(I);
       //Ret = impl.resolve(I);
       PartCache.insert(std::make_pair(I, Ret));
       return Ret;

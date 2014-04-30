@@ -9,12 +9,29 @@ using namespace llvm;
 
 Instruction* UseOnlyResolve::operator()(Value* V)
 {
-   Value* Target = NULL;
+   Use* Target = NULL;
    if(LoadInst* LI = dyn_cast<LoadInst>(V)){
-      Target = LI->getOperand(0);
+      Target = &LI->getOperandUse(0);
+   }else{
+      outs()<<__LINE__<<*V<<"\n";
+      return NULL;
    }
-   for(auto U = Target->use_begin(), E = Target->use_end(); U != E; ++U){
+   while( (Target = Target->getNext()) ){
+      //seems all things who use target is after target
+      if(isa<StoreInst>(Target->getUser())) return dyn_cast<Instruction>(Target->getUser());
    }
+#if 0
+   for(auto U = Target->get()->use_begin(), E = Target->get()->use_end(); U != E; ++U){
+      /*if(!isa<StoreInst>(*U) && !isa<CallInst>(*U))
+         continue;
+      Instruction* I = dyn_cast<Instruction>(*U);
+      if(I->getParent()->getParend() != VI-*/
+      outs()<<"xxx"<<**U<<"\n";
+      //if(&U.getUse() == Target) break;
+
+   }
+   assert(0);
+#endif
 
    return NULL;
 }
@@ -48,7 +65,7 @@ list<Value*> Resolver::direct_resolve( Value* V, unordered_set<Value*>& resolved
 void Resolver::resolve(llvm::Value* V)
 {
    using namespace llvm;
-   bool changed = false;
+   //bool changed = false;
    std::unordered_set<Value*> resolved;
    std::list<Value*> unsolved;
 
@@ -69,12 +86,26 @@ void Resolver::resolve(llvm::Value* V)
          continue;
       }
 
-      if(!isa<Instruction>(*Ite)){
+      Instruction* I = dyn_cast<Instruction>(*Ite);
+      if(!I){
          ++Ite;
          continue;
       }
 
-      ++Ite;
+      outs()<<__LINE__<<*I<<"\n";
+      Instruction* res = deep_resolve(I);
+      if(!res){
+         ++Ite;
+         continue;
+      }
+
+      resolved.insert(*Ite);
+      Ite = unsolved.erase(Ite);
+      if(isa<StoreInst>(res)){
+         resolved.insert(res);
+         next = res->getOperand(0);
+      }else
+         next = res;
    }
    auto& OS = outs();
    OS<<"::resolved list\n";
