@@ -109,6 +109,9 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
          if(Instruction* I = dyn_cast<Instruction>(V))
             MarkPreserve::mark(I);
          });
+   for(auto V : get<1>(RR)){
+      MarkPreserve::mark_all(V);
+   }
 
 	return changed;
 }

@@ -1,4 +1,8 @@
+#include "debug.h"
 #include "SlashShrink.h"
+#include <assert.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/Support/CommandLine.h>
 using namespace lle;
 using namespace llvm;
@@ -22,3 +26,19 @@ void MarkPreserve::mark(Instruction* Inst)
    Inst->setMetadata(MarkNode, N);
 }
 
+void MarkPreserve::mark_all(Value* V)
+{
+   if(!V) return;
+   Instruction* I = NULL;
+   if(ConstantExpr* CE = dyn_cast<ConstantExpr>(V))
+      I = CE->getAsInstruction();
+   else I = dyn_cast<Instruction>(V);
+   if(!I) return;
+
+   mark(I);
+   outs()<<__LINE__<<*I<<"\n";
+   if(isa<LoadInst>(I))
+      mark_all(I->getOperand(0));
+   else
+      assert(0);
+}
