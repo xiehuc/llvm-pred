@@ -6,6 +6,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/Analysis/Verifier.h>
 #include <llvm/Support/CommandLine.h>
 
 #include "debug.h"
@@ -55,9 +56,26 @@ void MarkPreserve::mark_all(Value* V, ResolverBase& R)
 
 bool SlashShrink::runOnFunction(Function &F)
 {
+   // mask all br inst to keep structure
    for(auto BB = F.begin(), E = F.end(); BB != E; ++BB){
       MarkPreserve::mark_all<UseOnlyResolve>(BB->getTerminator());
    }
 
-   return false;
+   for(auto BB = F.begin(), E = F.end(); BB != E; ++BB){
+      auto I = BB->begin();
+      while(I != BB->end()){
+         if(!MarkPreserve::is_marked(I))
+            (I++)->eraseFromParent();
+         else
+            ++I;
+
+      }
+   }
+
+   /*
+   if(verifyFunction(F))
+      exit(-1);
+   */
+
+   return true;
 }
