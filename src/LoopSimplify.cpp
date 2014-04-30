@@ -105,7 +105,10 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
       ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 
    lle::Resolver<UseOnlyResolve> R;
-   R.resolve(CC);
+   ResolveResult RR = R.resolve(CC, [](Value* V){
+         if(Instruction* I = dyn_cast<Instruction>(V))
+            MarkPreserve::mark(I);
+         });
 
 	return changed;
 }

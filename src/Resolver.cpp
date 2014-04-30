@@ -37,23 +37,26 @@ Instruction* UseOnlyResolve::operator()(Value* V)
 }
 
 
-list<Value*> ResolverBase::direct_resolve( Value* V, unordered_set<Value*>& resolved)
+list<Value*> ResolverBase::direct_resolve( Value* V, unordered_set<Value*>& resolved, function<void(Value*)> lambda)
 {
    std::list<llvm::Value*> unresolved;
    if(resolved.find(V) != resolved.end())
       return unresolved;
    if(llvm::isa<Argument>(V))
       unresolved.push_back(V);
-   if(isa<Constant>(V))
+   if(isa<Constant>(V)){
       resolved.insert(V);
+      lambda(V);
+   }
    if(Instruction* I = dyn_cast<Instruction>(V)){
       if(isa<LoadInst>(I) || isa<StoreInst>(I) || isa<CallInst>(I)){
          unresolved.push_back(I);
       }else{
          resolved.insert(I);
+         lambda(I);
          for(unsigned int i=0;i<I->getNumOperands();i++){
             Value* R = I->getOperand(i);
-            auto rhs = direct_resolve(R, resolved);
+            auto rhs = direct_resolve(R, resolved, lambda);
             unresolved.insert(unresolved.end(), rhs.begin(), rhs.end());
          }
       }
@@ -62,7 +65,7 @@ list<Value*> ResolverBase::direct_resolve( Value* V, unordered_set<Value*>& reso
 }
 
 
-ResolveResult ResolverBase::resolve(llvm::Value* V)
+ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> lambda)
 {
    using namespace llvm;
    //bool changed = false;
@@ -77,7 +80,7 @@ ResolveResult ResolverBase::resolve(llvm::Value* V)
 
    while(next || *Ite != NULL){
       if(next){
-         list<Value*> mid = direct_resolve(next, resolved);
+         list<Value*> mid = direct_resolve(next, resolved, lambda);
          unsolved.insert(--unsolved.end(),mid.begin(),mid.end()); 
             // insert before NULL, makes NULL always be tail
          next = NULL;
@@ -101,9 +104,11 @@ ResolveResult ResolverBase::resolve(llvm::Value* V)
       }
 
       resolved.insert(*Ite);
+      lambda(*Ite);
       Ite = unsolved.erase(Ite);
       if(isa<StoreInst>(res)){
          resolved.insert(res);
+         lambda(res);
          next = res->getOperand(0);
       }else
          next = res;

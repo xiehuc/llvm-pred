@@ -35,7 +35,10 @@ struct lle::MDAResolve
 class lle::ResolverBase
 {
    static std::list<llvm::Value*> direct_resolve(
-         llvm::Value* V, std::unordered_set<llvm::Value*>& resolved);
+         llvm::Value* V, 
+         std::unordered_set<llvm::Value*>& resolved,
+         std::function<void(llvm::Value*)>
+         );
 
    virtual llvm::Instruction* deep_resolve(llvm::Instruction* I) = 0;
 
@@ -44,7 +47,7 @@ class lle::ResolverBase
    std::unordered_map<llvm::Value*, llvm::Instruction*> PartCache;
 
    public:
-      ResolveResult resolve(llvm::Value* V);
+      ResolveResult resolve(llvm::Value* V, std::function<void(llvm::Value*)>);
 };
 
 template<typename Impl>
