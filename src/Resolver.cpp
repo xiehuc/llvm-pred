@@ -37,7 +37,7 @@ Instruction* UseOnlyResolve::operator()(Value* V)
 }
 
 
-list<Value*> Resolver::direct_resolve( Value* V, unordered_set<Value*>& resolved)
+list<Value*> ResolverBase::direct_resolve( Value* V, unordered_set<Value*>& resolved)
 {
    std::list<llvm::Value*> unresolved;
    if(resolved.find(V) != resolved.end())
@@ -62,7 +62,7 @@ list<Value*> Resolver::direct_resolve( Value* V, unordered_set<Value*>& resolved
 }
 
 
-void Resolver::resolve(llvm::Value* V)
+void ResolverBase::resolve(llvm::Value* V)
 {
    using namespace llvm;
    //bool changed = false;

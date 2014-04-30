@@ -104,7 +104,7 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
    if(ValueProfiling)
       ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 
-   lle::Resolver R;
+   lle::Resolver<UseOnlyResolve> R;
    R.resolve(CC);
 
 	return changed;
