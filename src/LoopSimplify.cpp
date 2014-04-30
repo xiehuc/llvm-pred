@@ -112,7 +112,7 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
             MarkPreserve::mark(I);
          });
    for(auto V : get<1>(RR)){
-      MarkPreserve::mark_all(V);
+      MarkPreserve::mark_all<NoResolve>(V);
    }
 
 	return changed;

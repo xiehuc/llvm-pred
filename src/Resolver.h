@@ -10,6 +10,7 @@
 #include <llvm/IR/Instruction.h>
 
 namespace lle{
+   struct NoResolve;
    struct UseOnlyResolve;
    struct MDAResolve;
    class ResolverBase;
@@ -23,11 +24,25 @@ namespace lle{
       ResolveResult;
 };
 
+/**
+ * Doesn't provide deep resolve
+ */
+struct lle::NoResolve
+{
+   llvm::Instruction* operator()(llvm::Value*){ return NULL;}
+};
+
+/**
+ * Use llvm User and Use to provide deep resolve
+ */
 struct lle::UseOnlyResolve
 {
    llvm::Instruction* operator()(llvm::Value*);
 };
 
+/**
+ * Use llvm MemoryDependencyAnalysis to provide deep resolve
+ */
 struct lle::MDAResolve
 {
 };
@@ -50,7 +65,7 @@ class lle::ResolverBase
       ResolveResult resolve(llvm::Value* V, std::function<void(llvm::Value*)>);
 };
 
-template<typename Impl>
+template<typename Impl = lle::NoResolve>
 class lle::Resolver: public lle::ResolverBase
 {
    Impl impl;

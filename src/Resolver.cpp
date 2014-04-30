@@ -22,8 +22,10 @@ Instruction* UseOnlyResolve::operator()(Value* V)
    SmallVector<CallInst*, 8> CallCandidate;
    while( (Target = Target->getNext()) ){
       //seems all things who use target is after target
-      if(isa<StoreInst>(Target->getUser())) return dyn_cast<Instruction>(Target->getUser());
-      if(CallInst* CI = dyn_cast<CallInst>(Target->getUser())) 
+      auto U = Target->getUser();
+      if(isa<StoreInst>(U) && U->getOperand(1) == Target->get())
+         return dyn_cast<Instruction>(U);
+      if(CallInst* CI = dyn_cast<CallInst>(U)) 
          CallCandidate.push_back(CI);
    }
    if(CallCandidate.size() == 1)

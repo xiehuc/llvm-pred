@@ -23,9 +23,16 @@
 //but comment may be delete sometimes
 #define DISABLE(expr) 
 
-#define RET_ON_FAIL(cond) if(!(cond)){outs()<<"Failed at:"<<__LINE__<<"\n";return NULL;}
 #define VERBOSE(expr,verb) (expr || (outs()<<"<<HERE>>:"<<*verb<<"\n",0))
 
+#define Assert(expr, value) assert(  expr || (outs()<<"\n>>>"<<value<<"<<<\n",0) )
+
+
+// ==========================================
+//                 Duplicated
+// ==========================================
+
+#define RET_ON_FAIL(cond) if(!(cond)){outs()<<"Failed at:"<<__LINE__<<"\n";return NULL;}
 
 #ifdef ENABLE_DEBUG
 //used for return void
