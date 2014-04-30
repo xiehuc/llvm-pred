@@ -2,6 +2,7 @@
 #define RESOLVER_H_H
 
 #include <list>
+#include <tuple>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
@@ -11,16 +12,15 @@
 namespace lle{
    struct UseOnlyResolve;
    struct MDAResolve;
-   struct ResolveResult;
    class ResolverBase;
    template<typename Impl>
    class Resolver;
-};
-
-struct ResolveResult
-{
-   std::vector<llvm::Value*> resolved;
-   std::list<llvm::Value*> unresolved;
+   typedef std::tuple<
+      std::unordered_set<llvm::Value*>, // all resolved value
+      std::list<llvm::Value*>, // all unresolved value
+      std::unordered_map<llvm::Value*, llvm::Instruction*> // some part deep_resolve map
+         >
+      ResolveResult;
 };
 
 struct lle::UseOnlyResolve
@@ -44,7 +44,7 @@ class lle::ResolverBase
    std::unordered_map<llvm::Value*, llvm::Instruction*> PartCache;
 
    public:
-      void resolve(llvm::Value* V);
+      ResolveResult resolve(llvm::Value* V);
 };
 
 template<typename Impl>
@@ -62,5 +62,7 @@ class lle::Resolver: public lle::ResolverBase
       return Ret;
    }
 };
+
+
 
 #endif

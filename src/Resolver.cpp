@@ -1,5 +1,6 @@
 #include "Resolver.h"
 
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/raw_ostream.h>
 
@@ -9,29 +10,28 @@ using namespace llvm;
 
 Instruction* UseOnlyResolve::operator()(Value* V)
 {
-   Use* Target = NULL;
+   Use* Target = NULL, *Keep = NULL;
    if(LoadInst* LI = dyn_cast<LoadInst>(V)){
-      Target = &LI->getOperandUse(0);
+      Keep = Target = &LI->getOperandUse(0);
+   }else if(CastInst* CI = dyn_cast<CastInst>(V)){
+      Keep = Target = &CI->getOperandUse(0);
    }else{
       outs()<<__LINE__<<*V<<"\n";
       return NULL;
    }
+   SmallVector<CallInst*, 8> CallCandidate;
    while( (Target = Target->getNext()) ){
       //seems all things who use target is after target
       if(isa<StoreInst>(Target->getUser())) return dyn_cast<Instruction>(Target->getUser());
+      if(CallInst* CI = dyn_cast<CallInst>(Target->getUser())) 
+         CallCandidate.push_back(CI);
    }
-#if 0
-   for(auto U = Target->get()->use_begin(), E = Target->get()->use_end(); U != E; ++U){
-      /*if(!isa<StoreInst>(*U) && !isa<CallInst>(*U))
-         continue;
-      Instruction* I = dyn_cast<Instruction>(*U);
-      if(I->getParent()->getParend() != VI-*/
-      outs()<<"xxx"<<**U<<"\n";
-      //if(&U.getUse() == Target) break;
-
+   if(CallCandidate.size() == 1)
+      return CallCandidate[0];
+   if(ConstantExpr* CE = dyn_cast<ConstantExpr>(Keep->get())){
+      Instruction* TI = CE->getAsInstruction();
+      return (*this)(TI);
    }
-   assert(0);
-#endif
 
    return NULL;
 }
@@ -62,12 +62,13 @@ list<Value*> ResolverBase::direct_resolve( Value* V, unordered_set<Value*>& reso
 }
 
 
-void ResolverBase::resolve(llvm::Value* V)
+ResolveResult ResolverBase::resolve(llvm::Value* V)
 {
    using namespace llvm;
    //bool changed = false;
    std::unordered_set<Value*> resolved;
    std::list<Value*> unsolved;
+   std::unordered_map<Value*, Instruction*> partial;
 
    unsolved.push_back(NULL); // always make sure Ite wouldn't point to end();
 
@@ -92,8 +93,8 @@ void ResolverBase::resolve(llvm::Value* V)
          continue;
       }
 
-      outs()<<__LINE__<<*I<<"\n";
       Instruction* res = deep_resolve(I);
+      partial.insert(make_pair(I,res));
       if(!res){
          ++Ite;
          continue;
@@ -114,5 +115,7 @@ void ResolverBase::resolve(llvm::Value* V)
    OS<<"::unresolved\n";
    for(auto i : unsolved)
       OS<<"  "<<*i<<"\n";
+
+   return make_tuple(resolved, unsolved, partial);
 }
 
