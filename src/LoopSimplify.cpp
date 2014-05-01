@@ -23,65 +23,6 @@ static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simpl
 
 cl::opt<bool> ValueProfiling("insert-value-trap", cl::desc("insert value profiling trap for loop cycle"));
 
-#if 0
-static void tryResolve(Value* V,const Pass* P,raw_ostream& OS = outs())
-{
-	bool changed = false;
-	string Tab(3,' ');
-	vector<Value*> resolved;
-	list<Value*> unsolved;
-	unsolved = lle::resolve(V, resolved);
-	list<Value*>::iterator I = unsolved.begin();
-	while(I != unsolved.end()){
-		changed = false;
-		if(!isa<Instruction>(*I)){
-			++I;
-			continue;
-		}
-		Instruction* II = dyn_cast<Instruction>(*I);
-		SmallVector<lle::FindedDependenciesType,64> Result;
-		lle::find_dependencies(II, P, Result);
-		for(auto f : Result){
-			Instruction* DI = f.first.getInst(); //Dependend Instruction
-			if(f.first.isNonLocal()) continue;
-			if(f.first.isClobber()){
-				if(!HIDE_CLOBBER)
-					OS<<Tab<<f.first<<" : "<<*DI<<" in '"<<f.second->getName()<<"'\n";
-				continue;
-			}
-			if(f.first.isNonFuncLocal()){
-				resolved.push_back(II);
-				list<Value*> temp = lle::resolve(II->getOperand(0), resolved);
-				unsolved.insert(unsolved.end(),temp.begin(),temp.end());
-				changed = true;
-				break;
-			}
-			if(DI == II) continue;
-			if(isa<StoreInst>(DI)){
-				resolved.push_back(II);
-				resolved.push_back(DI);
-				list<Value*> temp = lle::resolve(DI->getOperand(0),resolved);
-				unsolved.insert(unsolved.end(), temp.begin(), temp.end());
-				changed = true;
-				break;
-			}
-         /*else{
-           ASSERT(0, DI, "unknow Dependence Instruction Type");
-           }*/
-		}
-		if(changed) I = unsolved.erase(I);
-		else ++I;
-	}
-
-	OS<<"::resolved list\n";
-	for(auto i : resolved)
-		OS<<Tab<<*i<<"\n";
-	OS<<"::unresolved\n";
-	for(auto i : unsolved)
-		OS<<Tab<<*i<<"\n";
-}
-#endif
-
 void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
 	AU.setPreservesAll();

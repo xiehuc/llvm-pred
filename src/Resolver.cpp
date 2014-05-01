@@ -4,6 +4,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include "util.h"
 #include "debug.h"
 
 using namespace std;
@@ -57,6 +58,142 @@ Instruction* UseOnlyResolve::operator()(Value* V)
    return NULL;
 }
 
+/**
+ * access whether a Instruction is reference global variable. 
+ * if is, return the global variable
+ * else return NULL
+ */
+static Value* access_global_variable(Instruction *I)
+{
+	Value* Address = NULL, *Test = NULL;
+	if(isa<LoadInst>(I) || isa<StoreInst>(I))
+		Test = Address = I->getOperand(0);
+	else return NULL;
+	while(ConstantExpr* CE = dyn_cast<ConstantExpr>(Address)){
+		Test = CE->getAsInstruction();
+		if(isa<CastInst>(Test))
+			Test = Address = castoff(Test);
+		else break;
+	}
+	if(GetElementPtrInst* GEP = dyn_cast<GetElementPtrInst>(Test))
+		Test = GEP->getPointerOperand();
+	if(isa<GlobalVariable>(Test)) return Address;
+	return NULL;
+}
+/**
+ * find where store to a global variable. 
+ * require there a only store inst on this global variable.
+ * NOTE!! this should replaced with UseOnlyResolve to provide a more correct
+ * implement
+ */
+static void find_global_dependencies(const Value* GV,SmallVectorImpl<FindedDependenciesType>& Result)
+{
+	for(auto U = GV->use_begin(),E = GV->use_end();U!=E;++U){
+		Instruction* I = const_cast<Instruction*>(dyn_cast<Instruction>(*U));
+		if(!I){
+			find_global_dependencies(*U, Result);
+			continue;
+		}
+		if(isa<StoreInst>(I)){
+			Result.push_back(make_pair(MemDepResult::getDef(I),I->getParent()));
+		}
+	}
+}
+
+void MDAResolve::find_dependencies( Instruction* I, const Pass* P,
+      SmallVectorImpl<FindedDependenciesType>& Result, NonLocalDepResult* NLDR)
+{
+   MemDepResult d;
+   BasicBlock* SearchPos;
+   Instruction* ScanPos;
+   MemoryDependenceAnalysis& MDA = P->getAnalysis<MemoryDependenceAnalysis>();
+   AliasAnalysis& AA = P->getAnalysis<AliasAnalysis>();
+
+   if(Value* GV = access_global_variable(I)){
+      find_global_dependencies(GV, Result);
+      return;
+   }
+
+   AliasAnalysis::Location Loc;
+   if(LoadInst* LI = dyn_cast<LoadInst>(I)){
+      Loc = AA.getLocation(LI);
+   }else if(StoreInst* SI = dyn_cast<StoreInst>(I))
+      Loc = AA.getLocation(SI);
+   else
+      assert(0);
+
+   if(!NLDR){
+      SearchPos = I->getParent();
+      d = MDA.getPointerDependencyFrom(Loc, isa<LoadInst>(I), I, SearchPos, I);
+      ScanPos = d.getInst();
+   }else{
+      ScanPos = NLDR->getResult().getInst();
+      SearchPos = NLDR->getBB();
+      d = NLDR->getResult();
+      //we have already visit this BB;
+      if(find_if(Result.begin(),Result.end(),[&SearchPos](FindedDependenciesType& f){
+               return f.second == SearchPos;}
+               ) != Result.end()){
+         return;
+      }
+   }
+
+   while(ScanPos){
+      //if isDef, that's what we want
+      //if isNonLocal, record BasicBlock to avoid visit twice
+      if(d.isDef()||d.isNonLocal())
+         Result.push_back(make_pair(d,SearchPos));
+      if(d.isDef() && isa<StoreInst>(d.getInst()) )
+         return;
+
+      d = MDA.getPointerDependencyFrom(Loc, isa<LoadInst>(I), ScanPos, SearchPos, I);
+      ScanPos = d.getInst();
+   }
+
+   //if local analysis result is nonLocal 
+   //we didn't found a good result, so we continue search
+   if(d.isNonLocal()){
+      //we didn't record in last time
+      Result.push_back(make_pair(d,SearchPos));
+
+      SmallVector<NonLocalDepResult,32> NonLocals;
+
+      MDA.getNonLocalPointerDependency(Loc, isa<LoadInst>(I), SearchPos, NonLocals);
+      for(auto r : NonLocals){
+         find_dependencies(I, P, Result, &r);
+      }
+   }else if(d.isNonFuncLocal()){
+      //doing some thing here
+      Resolver<NoResolve> R;
+      bool has_argument = R.resolve_if(I->getOperand(0), [](Value* V){
+               return isa<Argument>(V);
+            });
+      if(has_argument)
+         Result.push_back(make_pair(d,SearchPos));
+   }
+}
+
+Instruction* MDAResolve::operator()(llvm::Value * V)
+{
+   assert(pass || "Not initial with pass");
+
+   SmallVector<FindedDependenciesType, 64> Result;
+   Instruction* I = dyn_cast<Instruction>(V);
+
+   if(!I) return NULL;
+
+   find_dependencies(I, pass, Result);
+
+   for(auto R : Result){
+      Instruction* Ret = R.first.getInst();
+      if(R.first.isDef() && Ret != I)
+         return Ret;
+      if(R.first.isNonFuncLocal())
+         return NULL;
+   }
+   return NULL;
+}
+
 
 list<Value*> ResolverBase::direct_resolve( Value* V, unordered_set<Value*>& resolved, function<void(Value*)> lambda)
 {
@@ -100,6 +237,7 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
    Value* next = V; // wait to next resolved;
 
    while(next || *Ite != NULL){
+      if(stop_resolve) break;
       if(next){
          list<Value*> mid = direct_resolve(next, resolved, lambda);
          unsolved.insert(--unsolved.end(),mid.begin(),mid.end()); 
@@ -144,3 +282,17 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
    return make_tuple(resolved, unsolved, partial);
 }
 
+bool ResolverBase::resolve_if(Value *V, function<bool (Value *)> lambda)
+{
+   stop_resolve = false;
+   bool ret = false;
+
+   resolve(V,[&lambda, &ret, this](Value* v){
+            if(lambda(v)){
+               this->stop_resolve = true;
+               ret = true;
+            }
+         });
+   stop_resolve = false;
+   return ret;
+}
