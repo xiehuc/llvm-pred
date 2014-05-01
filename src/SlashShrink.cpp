@@ -38,44 +38,53 @@ void MarkPreserve::mark(Instruction* Inst)
    Inst->setMetadata(MarkNode, N);
 }
 
-void MarkPreserve::mark_all(Value* V, ResolverBase& R)
+list<Value*> MarkPreserve::mark_all(Value* V, ResolverBase& R)
 {
-   if(!V) return;
+   list<Value*> empty;
+   if(!V) return empty;
    Instruction* I = NULL;
    if(ConstantExpr* CE = dyn_cast<ConstantExpr>(V))
       I = CE->getAsInstruction();
    else I = dyn_cast<Instruction>(V);
-   if(!I) return;
+   if(!I) return empty;
 
    mark(I);
-   R.resolve(I, [](Value* V){
+   ResolveResult Res = R.resolve(I, [](Value* V){
          if(Instruction* Inst = dyn_cast<Instruction>(V))
             mark(Inst);
          });
+
+   return get<1>(Res);
 }
 
 bool SlashShrink::runOnFunction(Function &F)
 {
    // mask all br inst to keep structure
    for(auto BB = F.begin(), E = F.end(); BB != E; ++BB){
-      MarkPreserve::mark_all<UseOnlyResolve>(BB->getTerminator());
+      list<Value*> unsolved, left;
+      unsolved = MarkPreserve::mark_all<UseOnlyResolve>(BB->getTerminator());
+      for(auto I : unsolved){
+         MarkPreserve::mark_all<NoResolve>(I);
+      }
+      for(auto I = BB->begin(), E = BB->end(); I != E; ++I){
+         if(MarkPreserve::is_marked(I))
+            MarkPreserve::mark_all<NoResolve>(I);
+      }
    }
 
    for(auto BB = F.begin(), E = F.end(); BB != E; ++BB){
       auto I = BB->begin();
       while(I != BB->end()){
-         if(!MarkPreserve::is_marked(I))
-            (I++)->eraseFromParent();
-         else
+         if(!MarkPreserve::is_marked(I)){
+            for(uint i=0;i<I->getNumOperands();++i)
+               I->setOperand(i, NULL); /* destroy instruction need clean holds
+                                          reference */
+            (I++)->removeFromParent(); /* use erase from would cause crash let
+                                          it freed by Context */
+         }else
             ++I;
-
       }
    }
-
-   /*
-   if(verifyFunction(F))
-      exit(-1);
-   */
 
    return true;
 }

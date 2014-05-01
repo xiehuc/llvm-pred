@@ -25,11 +25,11 @@ namespace lle{
 };
 
 /**
- * Doesn't provide deep resolve
+ * provide a stright forward deep resolve
  */
 struct lle::NoResolve
 {
-   llvm::Instruction* operator()(llvm::Value*){ return NULL;}
+   llvm::Instruction* operator()(llvm::Value*);
 };
 
 /**

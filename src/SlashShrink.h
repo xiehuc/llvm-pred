@@ -18,10 +18,10 @@ struct lle::MarkPreserve
    //mark a single instuction
    static void mark(llvm::Instruction* Inst);
    //mark recusively instructions
-   static void mark_all(llvm::Value* V, ResolverBase& R);
+   static std::list<llvm::Value*> mark_all(llvm::Value* V, ResolverBase& R);
    //a helper to use mark_all with a resolver
    template<typename T>
-   static void mark_all(llvm::Value* V);
+   static std::list<llvm::Value*> mark_all(llvm::Value* V);
    static bool is_marked(llvm::Instruction* Inst)
    {
       llvm::MDNode* MD = Inst->getMetadata(MarkNode);
@@ -31,10 +31,11 @@ struct lle::MarkPreserve
 };
 
 template<typename T>
-void lle::MarkPreserve::mark_all(llvm::Value* V)
+std::list<llvm::Value*> 
+lle::MarkPreserve::mark_all(llvm::Value* V)
 {
    lle::Resolver<T> R;
-   mark_all(V, R);
+   return mark_all(V, R);
 }
 
 class lle::SlashShrink: public llvm::FunctionPass

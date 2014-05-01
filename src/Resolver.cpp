@@ -4,9 +4,25 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include "debug.h"
+
 using namespace std;
 using namespace lle;
 using namespace llvm;
+
+Instruction* NoResolve::operator()(Value* V)
+{
+   Instruction* I = dyn_cast<Instruction>(V);
+   Assert(I,*I);
+   if(!I) return NULL;
+   if(isa<LoadInst>(I) || isa<StoreInst>(I))
+      //return dyn_cast<Instruction>(I->getOperand(0));
+      return I;
+   else if(isa<CallInst>(I))
+      return NULL; // not correct
+   else
+      Assert(0,*I);
+}
 
 Instruction* UseOnlyResolve::operator()(Value* V)
 {
@@ -15,8 +31,11 @@ Instruction* UseOnlyResolve::operator()(Value* V)
       Keep = Target = &LI->getOperandUse(0);
    }else if(CastInst* CI = dyn_cast<CastInst>(V)){
       Keep = Target = &CI->getOperandUse(0);
+   }else if(GetElementPtrInst* GEP = dyn_cast<GetElementPtrInst>(V)) {
+      Keep = Target = &GEP->getOperandUse(0); /* FIXME this is not good because
+                                                GEP has many operands*/
    }else{
-      outs()<<__LINE__<<*V<<"\n";
+      Assert(0,*V);
       return NULL;
    }
    SmallVector<CallInst*, 8> CallCandidate;
@@ -51,7 +70,7 @@ list<Value*> ResolverBase::direct_resolve( Value* V, unordered_set<Value*>& reso
       lambda(V);
    }
    if(Instruction* I = dyn_cast<Instruction>(V)){
-      if(isa<LoadInst>(I) || isa<StoreInst>(I) || isa<CallInst>(I)){
+      if(isa<LoadInst>(I) || isa<StoreInst>(I) ){
          unresolved.push_back(I);
       }else{
          resolved.insert(I);
@@ -105,23 +124,22 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
          continue;
       }
 
-      resolved.insert(*Ite);
+      resolved.insert(*Ite); // original is resolved;
       lambda(*Ite);
       Ite = unsolved.erase(Ite);
-      if(isa<StoreInst>(res)){
+      if(isa<StoreInst>(res) || isa<LoadInst>(res)){
          resolved.insert(res);
          lambda(res);
          next = res->getOperand(0);
+      }else if(isa<CallInst>(res)){
+         // FIXME : wait implement
+         // special call inst process
+         // in this case, a def is depend on call's param
+         // means we need go into called function and mark
+         next = res;
       }else
          next = res;
    }
-   auto& OS = outs();
-   OS<<"::resolved list\n";
-   for(auto i : resolved)
-      OS<<"  "<<*i<<"\n";
-   OS<<"::unresolved\n";
-   for(auto i : unsolved)
-      OS<<"  "<<*i<<"\n";
 
    return make_tuple(resolved, unsolved, partial);
 }
