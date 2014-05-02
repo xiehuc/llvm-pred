@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unordered_set>
 
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
@@ -72,6 +73,16 @@ bool SlashShrink::runOnFunction(Function &F)
       for(auto I = BB->begin(), E = BB->end(); I != E; ++I){
          if(MarkPreserve::is_marked(I))
             MarkPreserve::mark_all<NoResolve>(I);
+
+         if(CallInst* CI = dyn_cast<CallInst>(I)){
+            Function* Func = CI->getCalledFunction();
+            if(!Func) continue;
+            if(Func->empty()) continue; /* a func's body is empty, means it is
+                                           not a native function */
+
+            MarkPreserve::mark_all<NoResolve>(CI);
+         }
+
       }
    }
 
