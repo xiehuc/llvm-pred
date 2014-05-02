@@ -74,6 +74,13 @@ bool SlashShrink::runOnFunction(Function &F)
          if(MarkPreserve::is_marked(I))
             MarkPreserve::mark_all<NoResolve>(I);
 
+         if(StoreInst* SI = dyn_cast<StoreInst>(I)){
+            Instruction* LHS = dyn_cast<Instruction>(SI->getOperand(0));
+            Instruction* RHS = dyn_cast<Instruction>(SI->getOperand(1));
+            if(LHS && RHS && MarkPreserve::is_marked(LHS) && MarkPreserve::is_marked(RHS))
+               MarkPreserve::mark(SI);
+         }
+
          if(CallInst* CI = dyn_cast<CallInst>(I)){
             Function* Func = CI->getCalledFunction();
             if(!Func) continue;
