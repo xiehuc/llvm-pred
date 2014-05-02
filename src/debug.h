@@ -25,7 +25,15 @@
 
 #define VERBOSE(expr,verb) (expr || (outs()<<"<<HERE>>:"<<*verb<<"\n",0))
 
+// a assert with output llvm values
 #define Assert(expr, value) assert(  expr || (outs()<<"\n>>>"<<value<<"<<<\n",0) )
+
+// a assert which always need check
+#define runtime_assert(expr) if( !(expr) ){ \
+   outs()<<"Assert Failed:"<<__FILE__<<":"<<__LINE__<<"\n"; \
+   assert(0);\
+   exit(-1);\
+}
 
 
 // ==========================================

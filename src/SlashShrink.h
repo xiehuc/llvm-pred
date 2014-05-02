@@ -38,6 +38,13 @@ lle::MarkPreserve::mark_all(llvm::Value* V)
    return mark_all(V, R);
 }
 
+/**
+ * Slash and Shrink code to generate a mini core.
+ * require mark the instructions need preserve
+ * a environment SHRINK_LEVEL would control the shrink option
+ * SHRINK_LEVEL : 0 --- do not write changes actually
+ *                1 --- keep structure (default)
+ */
 class lle::SlashShrink: public llvm::FunctionPass
 {
    public:

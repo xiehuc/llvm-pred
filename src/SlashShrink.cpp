@@ -1,6 +1,7 @@
 #include "Resolver.h"
 #include "SlashShrink.h"
 
+#include <stdlib.h>
 #include <unordered_set>
 
 #include <llvm/IR/Function.h>
@@ -59,6 +60,8 @@ list<Value*> MarkPreserve::mark_all(Value* V, ResolverBase& R)
 
 bool SlashShrink::runOnFunction(Function &F)
 {
+   int ShrinkLevel = atoi(getenv("SHRINK_LEVEL")?:"1");
+   runtime_assert(ShrinkLevel>=0 && ShrinkLevel <=3);
    // mask all br inst to keep structure
    for(auto BB = F.begin(), E = F.end(); BB != E; ++BB){
       list<Value*> unsolved, left;
@@ -71,6 +74,8 @@ bool SlashShrink::runOnFunction(Function &F)
             MarkPreserve::mark_all<NoResolve>(I);
       }
    }
+
+   if(ShrinkLevel == 0) return false;
 
    for(auto BB = F.begin(), E = F.end(); BB != E; ++BB){
       auto I = BB->begin();
