@@ -21,7 +21,7 @@ char LoopCycleSimplify::ID = 0;
 
 static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simplify Pass",false,false);
 
-cl::opt<bool> ValueProfiling("Value-trap", cl::desc("insert value profiling trap for loop cycle"));
+cl::opt<bool> ValueProfiling("Value-Trap", cl::desc("insert value profiling trap for loop cycle"));
 
 void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {

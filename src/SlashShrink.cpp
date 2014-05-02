@@ -11,6 +11,8 @@
 #include <llvm/Analysis/Verifier.h>
 #include <llvm/Support/CommandLine.h>
 
+#include <ValueProfiling.h>
+
 #include "debug.h"
 
 using namespace std;
@@ -18,6 +20,8 @@ using namespace lle;
 using namespace llvm;
 
 cl::opt<bool> markd("Mark", cl::desc("Enable Mark some code on IR"));
+cl::opt<bool> ExecuteTrap("ExecutePath-Trap", 
+      cl::desc("Trap Execute Path to get know how IR Executed, Implement based on value-profiling"));
 
 StringRef MarkPreserve::MarkNode = "lle.mark";
 
@@ -61,12 +65,20 @@ list<Value*> MarkPreserve::mark_all(Value* V, ResolverBase& R)
 
 bool SlashShrink::runOnFunction(Function &F)
 {
+   LLVMContext& C = F.getContext();
    int ShrinkLevel = atoi(getenv("SHRINK_LEVEL")?:"1");
    runtime_assert(ShrinkLevel>=0 && ShrinkLevel <=3);
+   Constant* Zero = ConstantInt::get(Type::getInt32Ty(C), 0);
    // mask all br inst to keep structure
    for(auto BB = F.begin(), E = F.end(); BB != E; ++BB){
       list<Value*> unsolved, left;
       unsolved = MarkPreserve::mark_all<UseOnlyResolve>(BB->getTerminator());
+      if(ExecuteTrap){
+         Instruction* Prof = ValueProfiler::insertValueTrap(
+               Zero, BB->getTerminator());
+         MarkPreserve::mark(Prof);
+      }
+
       for(auto I : unsolved){
          MarkPreserve::mark_all<NoResolve>(I);
       }
@@ -94,6 +106,11 @@ bool SlashShrink::runOnFunction(Function &F)
    }
 
    if(ShrinkLevel == 0) return false;
+
+   if(F.getName() == "main") return false; /* some initial and import code are
+      in main function. so we don't shrink it. this is triggy. and the best way
+      is to automatic indentify which a function or a part of function is
+      important*/
 
    for(auto BB = F.begin(), E = F.end(); BB != E; ++BB){
       auto I = BB->begin();
