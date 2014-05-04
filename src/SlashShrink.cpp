@@ -20,8 +20,10 @@ using namespace lle;
 using namespace llvm;
 
 cl::opt<bool> markd("Mark", cl::desc("Enable Mark some code on IR"));
-cl::opt<bool> ExecuteTrap("ExecutePath-Trap", 
-      cl::desc("Trap Execute Path to get know how IR Executed, Implement based on value-profiling"));
+cl::opt<bool> ExecuteTrap("ExecutePath-Trap", cl::desc("Trap Execute Path to"
+         "get know how IR Executed, Implement based on value-profiling"));/*
+         may be duplicated with EdgeProfiling's implement effect, need be
+         delete*/
 
 StringRef MarkPreserve::MarkNode = "lle.mark";
 
@@ -34,17 +36,17 @@ bool MarkPreserve::enabled()
    return ::markd;
 }
 
-void MarkPreserve::mark(Instruction* Inst)
+void MarkPreserve::mark(Instruction* Inst, StringRef origin)
 {
    if(!Inst) return;
    if(is_marked(Inst)) return;
 
    LLVMContext& C = Inst->getContext();
-   MDNode* N = MDNode::get(C, MDString::get(C, "mark"));
+   MDNode* N = MDNode::get(C, MDString::get(C, origin));
    Inst->setMetadata(MarkNode, N);
 }
 
-list<Value*> MarkPreserve::mark_all(Value* V, ResolverBase& R)
+list<Value*> MarkPreserve::mark_all(Value* V, ResolverBase& R, StringRef origin)
 {
    list<Value*> empty;
    if(!V) return empty;
@@ -54,10 +56,10 @@ list<Value*> MarkPreserve::mark_all(Value* V, ResolverBase& R)
    else I = dyn_cast<Instruction>(V);
    if(!I) return empty;
 
-   mark(I);
-   ResolveResult Res = R.resolve(I, [](Value* V){
+   mark(I, origin);
+   ResolveResult Res = R.resolve(I, [origin](Value* V){
          if(Instruction* Inst = dyn_cast<Instruction>(V))
-            mark(Inst);
+            mark(Inst, origin);
          });
 
    return get<1>(Res);
@@ -72,25 +74,23 @@ bool SlashShrink::runOnFunction(Function &F)
    // mask all br inst to keep structure
    for(auto BB = F.begin(), E = F.end(); BB != E; ++BB){
       list<Value*> unsolved, left;
-      unsolved = MarkPreserve::mark_all<UseOnlyResolve>(BB->getTerminator());
       if(ExecuteTrap){
          Instruction* Prof = ValueProfiler::insertValueTrap(
                Zero, BB->getTerminator());
          MarkPreserve::mark(Prof);
       }
 
+      unsolved = MarkPreserve::mark_all<UseOnlyResolve>(BB->getTerminator(), "terminal");
       for(auto I : unsolved){
-         MarkPreserve::mark_all<NoResolve>(I);
+         MarkPreserve::mark_all<NoResolve>(I, "terminal");
       }
-      for(auto I = BB->begin(), E = BB->end(); I != E; ++I){
-         if(MarkPreserve::is_marked(I))
-            MarkPreserve::mark_all<NoResolve>(I);
 
+      for(auto I = BB->begin(), E = BB->end(); I != E; ++I){
          if(StoreInst* SI = dyn_cast<StoreInst>(I)){
             Instruction* LHS = dyn_cast<Instruction>(SI->getOperand(0));
             Instruction* RHS = dyn_cast<Instruction>(SI->getOperand(1));
             if(LHS && RHS && MarkPreserve::is_marked(LHS) && MarkPreserve::is_marked(RHS))
-               MarkPreserve::mark(SI);
+               MarkPreserve::mark(SI, "store");
          }
 
          if(CallInst* CI = dyn_cast<CallInst>(I)){
@@ -99,9 +99,15 @@ bool SlashShrink::runOnFunction(Function &F)
             if(Func->empty()) continue; /* a func's body is empty, means it is
                                            not a native function */
 
-            MarkPreserve::mark_all<NoResolve>(CI);
+            MarkPreserve::mark_all<NoResolve>(CI, "callgraph");
          }
+      }
+   }
 
+   for(auto BB = F.begin(), E = F.end(); BB !=E; ++BB){
+      for(auto I = BB->begin(), E = BB->end(); I != E; ++I){
+         if(MarkPreserve::is_marked(I))
+            MarkPreserve::mark_all<NoResolve>(I, "closure");
       }
    }
 

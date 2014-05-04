@@ -16,12 +16,12 @@ struct lle::MarkPreserve
    static llvm::StringRef MarkNode;
    static bool enabled();
    //mark a single instuction
-   static void mark(llvm::Instruction* Inst);
+   static void mark(llvm::Instruction* Inst, llvm::StringRef origin = "");
    //mark recusively instructions
-   static std::list<llvm::Value*> mark_all(llvm::Value* V, ResolverBase& R);
+   static std::list<llvm::Value*> mark_all(llvm::Value* V, ResolverBase& R, llvm::StringRef origin = "");
    //a helper to use mark_all with a resolver
    template<typename T>
-   static std::list<llvm::Value*> mark_all(llvm::Value* V);
+   static std::list<llvm::Value*> mark_all(llvm::Value* V, llvm::StringRef origin = "");
    static bool is_marked(llvm::Instruction* Inst)
    {
       llvm::MDNode* MD = Inst->getMetadata(MarkNode);
@@ -32,10 +32,10 @@ struct lle::MarkPreserve
 
 template<typename T>
 std::list<llvm::Value*> 
-lle::MarkPreserve::mark_all(llvm::Value* V)
+lle::MarkPreserve::mark_all(llvm::Value* V, llvm::StringRef origin)
 {
    lle::Resolver<T> R;
-   return mark_all(V, R);
+   return mark_all(V, R, origin);
 }
 
 /**

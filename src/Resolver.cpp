@@ -48,7 +48,9 @@ Instruction* UseOnlyResolve::operator()(Value* V)
       if(CallInst* CI = dyn_cast<CallInst>(U)) 
          CallCandidate.push_back(CI);
    }
-   if(CallCandidate.size() == 1)
+   if(CallCandidate.size() == 1) /* if no store inst and only one call inst, we
+      consider this is the anwser (but this is not so good, we should use
+      function argument's attribute)*/
       return CallCandidate[0];
    if(ConstantExpr* CE = dyn_cast<ConstantExpr>(Keep->get())){
       Instruction* TI = CE->getAsInstruction();
@@ -262,8 +264,8 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
          continue;
       }
 
-      resolved.insert(*Ite); // original is resolved;
-      lambda(*Ite);
+      resolved.insert(I); // original is resolved;
+      lambda(I);
       Ite = unsolved.erase(Ite);
       if(isa<StoreInst>(res) || isa<LoadInst>(res)){
          resolved.insert(res);

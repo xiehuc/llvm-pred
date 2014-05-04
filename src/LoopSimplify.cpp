@@ -50,12 +50,11 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
    lle::Resolver<UseOnlyResolve> R;
    ResolveResult RR = R.resolve(CC, [](Value* V){
          if(Instruction* I = dyn_cast<Instruction>(V))
-            MarkPreserve::mark(I);
+            MarkPreserve::mark(I, "loop");
          });
    for(auto V : get<1>(RR)){
-      MarkPreserve::mark_all<NoResolve>(V);
+      MarkPreserve::mark_all<NoResolve>(V, "loop");
    }
-
 
 	return changed;
 }
