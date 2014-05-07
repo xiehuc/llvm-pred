@@ -49,7 +49,8 @@ class lle::SlashShrink: public llvm::FunctionPass
 {
    public:
       static char ID;
-      SlashShrink():FunctionPass(ID) {}
+      SlashShrink():FunctionPass(ID) {};
+      void getAnalysisUsage(llvm::AnalysisUsage& AU) const;
 
       bool runOnFunction(llvm::Function& F);
 };

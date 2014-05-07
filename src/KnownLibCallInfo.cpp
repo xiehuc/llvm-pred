@@ -2,6 +2,11 @@
 #include <llvm/Analysis/AliasAnalysis.h>
 #include <llvm/Analysis/LibCallAliasAnalysis.h>
 
+#include <fstream>
+
+#include "debug.h"
+
+using namespace std;
 using namespace lle;
 using namespace llvm;
 
@@ -14,7 +19,7 @@ class KnownLCAA:public LibCallAliasAnalysis
 	public:
 	static char ID;
 	explicit KnownLCAA() : LibCallAliasAnalysis(ID,NULL){
-		this->LCI = new KnownLibCall();
+		this->LCI = new LibCallFromFile();
 		//initializeKnownLCAAPass(*PassRegistry::getPassRegistry());
 	}
 	virtual bool runOnFunction(Function& F)
@@ -44,14 +49,56 @@ static RegisterPass<KnownLCAA> X("klc-aa","KnowLibCall Alias Analysis",false,tru
 //   计是靠构造函数来区分两种语义的,也不知道下面的用法是不是不被认可了.
 static RegisterAnalysisGroup<AliasAnalysis> Y(X);
 
-const LibCallFunctionInfo* KnownLibCall::getFunctionInfoArray() const
+LibCallFromFile::LibCallFromFile()
 {
-	static LibCallFunctionInfo Array[] = {
-		{"llvm.memcpy.p0i8.p0i8.i64" , AliasAnalysis::ModRefResult::NoModRef} , 
-		{"llvm.lifetime.end"         , AliasAnalysis::ModRefResult::NoModRef} , 
-		{"_gfortran_st_write_done"   , AliasAnalysis::ModRefResult::NoModRef} , 
-		{"_gfortran_st_write"        , AliasAnalysis::ModRefResult::NoModRef} , 
-		{"free"                      , AliasAnalysis::ModRefResult::NoModRef} , 
+   string word, funcname;
+   AliasAnalysis::ModRefResult modref;
+
+	Array = {
+		{strdup("llvm.memcpy.p0i8.p0i8.i64") , AliasAnalysis::ModRefResult::ModRef}   , 
+		{strdup("llvm.lifetime.end")         , AliasAnalysis::ModRefResult::NoModRef} , 
+		{strdup("free")                      , AliasAnalysis::ModRefResult::NoModRef} , 
 	};
-	return Array;
+
+   const char* filepath = getenv("LIBCALL_FILE");
+   if(!filepath){
+      Array.push_back({NULL});
+      return;
+   }
+
+   ifstream F(filepath);
+   if(!F.is_open()){
+      perror("Unable Open Libcall File");
+      exit(-1);
+   }
+
+   while(F>>word){
+      if(word[0]=='#'){
+         getline(F, word); /* eat the whole comment line */
+         continue;
+      }
+      if(funcname==""){
+         funcname = word;
+         continue;
+      }
+
+      if(word == "NoModRef") modref = AliasAnalysis::ModRefResult::NoModRef;
+      else if(word == "Ref") modref = AliasAnalysis::ModRefResult::Ref;
+      else if(word == "Mod") modref = AliasAnalysis::ModRefResult::Mod;
+      else if(word == "ModRef") modref = AliasAnalysis::ModRefResult::ModRef;
+      else runtime_assert(0);
+
+      Array.push_back({strdup(funcname.c_str()), modref});
+
+      funcname = "";
+
+   }
+   Array.push_back({NULL});
+}
+
+LibCallFromFile::~LibCallFromFile() 
+{
+   for( auto Item : Array){
+      free((char*)Item.Name);
+   }
 }

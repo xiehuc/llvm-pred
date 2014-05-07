@@ -1,5 +1,6 @@
 #include "Resolver.h"
 #include "SlashShrink.h"
+#include "KnownLibCallInfo.h"
 
 #include <stdlib.h>
 #include <unordered_set>
@@ -10,6 +11,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/Analysis/Verifier.h>
 #include <llvm/Support/CommandLine.h>
+#include <llvm/Analysis/LibCallAliasAnalysis.h>
 
 #include <ValueProfiling.h>
 
@@ -65,8 +67,16 @@ list<Value*> MarkPreserve::mark_all(Value* V, ResolverBase& R, StringRef origin)
    return get<1>(Res);
 }
 
+void SlashShrink::getAnalysisUsage(AnalysisUsage& AU) const
+{
+   AU.addRequired<LibCallAliasAnalysis>();
+}
+
 bool SlashShrink::runOnFunction(Function &F)
 {
+   LibCallAliasAnalysis& LibCall = getAnalysis<LibCallAliasAnalysis>();
+   if(LibCall.LCI == NULL) LibCall.LCI = new LibCallFromFile(); /* use LibCall
+                                                               to cache LCI */
    LLVMContext& C = F.getContext();
    int ShrinkLevel = atoi(getenv("SHRINK_LEVEL")?:"1");
    runtime_assert(ShrinkLevel>=0 && ShrinkLevel <=3);
@@ -96,10 +106,19 @@ bool SlashShrink::runOnFunction(Function &F)
          if(CallInst* CI = dyn_cast<CallInst>(I)){
             Function* Func = CI->getCalledFunction();
             if(!Func) continue;
-            if(Func->empty()) continue; /* a func's body is empty, means it is
-                                           not a native function */
-
-            MarkPreserve::mark_all<NoResolve>(CI, "callgraph");
+            if(!Func->empty()){  /* a func's body is empty, means it is not a
+                                    native function */
+               MarkPreserve::mark_all<NoResolve>(CI, "callgraph");
+            }else{  /* to make sure whether this is an *important* function, we
+                       need lookup a dictionary, in there, we use a libcall to
+                       do it */
+               auto FuncInfo = LibCall.LCI->getFunctionInfo(Func);
+               if(FuncInfo && FuncInfo->UniversalBehavior &
+                     AliasAnalysis::ModRefResult::Mod){ /* the function writes
+                                                           memory */
+                  MarkPreserve::mark_all<NoResolve>(CI, "callgraph");
+               }
+            }
          }
       }
    }
