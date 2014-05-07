@@ -2,3 +2,27 @@
 _gfortran_stop_string      Mod      # this function stops the whole program
 _gfortran_st_write_done    NoModRef 
 _gfortran_st_write         NoModRef
+
+#mpi part
+mpi_bcast_         Mod
+mpi_barrier_       Mod
+mpi_abort_         Mod
+mpi_finalize_      Mod
+mpi_comm_size_     Mod
+mpi_init_          Mod
+mpi_comm_rank_     Mod
+mpi_allreduce_     Mod
+mpi_irecv_         Mod
+mpi_error_string_  Mod
+mpi_isend_         Mod
+mpi_waitall_       Mod
+mpi_win_create_    Mod
+mpi_win_fence_     Mod
+mpi_get_           Mod
+mpi_put_           Mod
+mpi_comm_group_    Mod
+mpi_group_incl_    Mod
+mpi_win_post_      Mod
+mpi_win_start_     Mod
+mpi_win_complete_  Mod
+mpi_win_wait_      Mod

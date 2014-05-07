@@ -2,6 +2,7 @@
 #include "SlashShrink.h"
 #include "KnownLibCallInfo.h"
 
+#include <fstream>
 #include <stdlib.h>
 #include <unordered_set>
 
@@ -65,6 +66,23 @@ list<Value*> MarkPreserve::mark_all(Value* V, ResolverBase& R, StringRef origin)
          });
 
    return get<1>(Res);
+}
+
+SlashShrink::SlashShrink():FunctionPass(ID)
+{
+   const char* filepath = getenv("IGNOREFUNC_FILE");
+   if(!filepath) return;
+
+   ifstream F(filepath);
+   if(!F.is_open()){
+      perror("Unable Open IgnoreFunc File");
+      exit(-1);
+   }
+
+   string word;
+   while(F>>word){
+      IgnoreFunc.insert(word);
+   }
 }
 
 void SlashShrink::getAnalysisUsage(AnalysisUsage& AU) const
@@ -132,10 +150,10 @@ bool SlashShrink::runOnFunction(Function &F)
 
    if(ShrinkLevel == 0) return false;
 
-   if(F.getName() == "main") return false; /* some initial and import code are
-      in main function. so we don't shrink it. this is triggy. and the best way
-      is to automatic indentify which a function or a part of function is
-      important*/
+   if(IgnoreFunc.count(F.getName())) return false; /* some initial and import
+      code are in main function which is in IgnoreFunc file. so we don't shrink
+      it. this is triggy. and the best way is to automatic indentify which a
+      function or a part of function is important*/
 
    for(auto BB = F.begin(), E = F.end(); BB != E; ++BB){
       auto I = BB->begin();

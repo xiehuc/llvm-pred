@@ -1,0 +1,2 @@
+main
+__simple_domain_MOD_init_domain_blocks

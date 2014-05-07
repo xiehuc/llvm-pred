@@ -1,6 +1,7 @@
 #ifndef SLASHSHRINK_H_H
 #define SLASHSHRINK_H_H
 #include <llvm/IR/Instruction.h>
+#include <llvm/ADT/SmallSet.h>
 #include <llvm/IR/Metadata.h>
 #include <llvm/Pass.h>
 
@@ -47,9 +48,10 @@ lle::MarkPreserve::mark_all(llvm::Value* V, llvm::StringRef origin)
  */
 class lle::SlashShrink: public llvm::FunctionPass
 {
+   llvm::SmallSet<std::string, 8> IgnoreFunc;
    public:
       static char ID;
-      SlashShrink():FunctionPass(ID) {};
+      SlashShrink();
       void getAnalysisUsage(llvm::AnalysisUsage& AU) const;
 
       bool runOnFunction(llvm::Function& F);
