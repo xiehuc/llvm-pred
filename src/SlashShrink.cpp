@@ -16,6 +16,7 @@
 
 #include <ValueProfiling.h>
 
+#include "util.h"
 #include "debug.h"
 
 using namespace std;
@@ -122,7 +123,7 @@ bool SlashShrink::runOnFunction(Function &F)
          }
 
          if(CallInst* CI = dyn_cast<CallInst>(I)){
-            Function* Func = CI->getCalledFunction();
+            Function* Func = dyn_cast<Function>(castoff(CI->getCalledValue()));
             if(!Func) continue;
             if(!Func->empty()){  /* a func's body is empty, means it is not a
                                     native function */

@@ -224,6 +224,8 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 
 Value* lle::castoff(Value* v)
 {
+   if(ConstantExpr* CE = dyn_cast<ConstantExpr>(v))
+      v = CE->getAsInstruction();
 	if(CastInst* CI = dyn_cast<CastInst>(v)){
 		return castoff(CI->getOperand(0));
 	}else
