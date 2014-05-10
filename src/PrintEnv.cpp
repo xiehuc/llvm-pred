@@ -21,7 +21,7 @@ class lle::PrintEnv: public ModulePass
 
 char PrintEnv::ID = 0;
 
-static RegisterPass<PrintEnv> X("print-env","print environment params");
+static RegisterPass<PrintEnv> X("Env","print environment params");
 
 bool PrintEnv::runOnModule(Module& M)
 {

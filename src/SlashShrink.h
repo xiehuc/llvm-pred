@@ -49,6 +49,7 @@ lle::MarkPreserve::mark_all(llvm::Value* V, llvm::StringRef origin)
 class lle::SlashShrink: public llvm::FunctionPass
 {
    llvm::SmallSet<std::string, 8> IgnoreFunc;
+   int ShrinkLevel;
    public:
       static char ID;
       SlashShrink();

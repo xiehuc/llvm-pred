@@ -72,18 +72,24 @@ list<Value*> MarkPreserve::mark_all(Value* V, ResolverBase& R, StringRef origin)
 SlashShrink::SlashShrink():FunctionPass(ID)
 {
    const char* filepath = getenv("IGNOREFUNC_FILE");
-   if(!filepath) return;
+   if(filepath){
+      ifstream F(filepath);
+      if(!F.is_open()){
+         perror("Unable Open IgnoreFunc File");
+         exit(-1);
+      }
 
-   ifstream F(filepath);
-   if(!F.is_open()){
-      perror("Unable Open IgnoreFunc File");
-      exit(-1);
+      string word;
+      while(F>>word){
+         IgnoreFunc.insert(word);
+      }
+
+      F.close();
    }
 
-   string word;
-   while(F>>word){
-      IgnoreFunc.insert(word);
-   }
+   ShrinkLevel = atoi(getenv("SHRINK_LEVEL")?:"1");
+   runtime_assert(ShrinkLevel>=0 && ShrinkLevel <=3);
+
 }
 
 void SlashShrink::getAnalysisUsage(AnalysisUsage& AU) const
@@ -97,8 +103,6 @@ bool SlashShrink::runOnFunction(Function &F)
    if(LibCall.LCI == NULL) LibCall.LCI = new LibCallFromFile(); /* use LibCall
                                                                to cache LCI */
    LLVMContext& C = F.getContext();
-   int ShrinkLevel = atoi(getenv("SHRINK_LEVEL")?:"1");
-   runtime_assert(ShrinkLevel>=0 && ShrinkLevel <=3);
    Constant* Zero = ConstantInt::get(Type::getInt32Ty(C), 0);
    // mask all br inst to keep structure
    for(auto BB = F.begin(), E = F.end(); BB != E; ++BB){
@@ -151,7 +155,8 @@ bool SlashShrink::runOnFunction(Function &F)
 
    if(ShrinkLevel == 0) return false;
 
-   if(IgnoreFunc.count(F.getName())) return false; /* some initial and import
+   if((IgnoreFunc.count(F.getName())) ^ // when ShrinkLevel == 2, Reverse, only process IgnoredFunc
+         (ShrinkLevel==2)) return false; /* some initial and import
       code are in main function which is in IgnoreFunc file. so we don't shrink
       it. this is triggy. and the best way is to automatic indentify which a
       function or a part of function is important*/
