@@ -24,9 +24,6 @@ static RegisterPass<LoopCycle> X("loop-cycle","Loop Cycle Pass",false,true);
 
 STATISTIC(NumUnfoundCycle, "Number of unfound loop cycle");
 
-//cl::opt<bool> PrettyPrint("pretty-print", cl::desc("pretty print loop cycle"));
-
-
 //find start value fron induction variable
 static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
 {
@@ -68,8 +65,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	/** whats difference on use of predecessor and preheader??*/
 	//RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPreheader());
 	//assert(self->getLoopLatch() && self->getLoopPreheader() && "need loop simplify form" );
-	RET_ON_FAIL(L->getLoopLatch());
-	assert(L->getLoopLatch() && "need loop simplify form" );
+	ret_null_fail(L->getLoopLatch(), "need loop simplify form");
 
 	BasicBlock* TE = NULL;//True Exit
 	SmallVector<BasicBlock*,4> Exits;
@@ -91,19 +87,17 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	}
 
 	//process true exit
-	RET_ON_FAIL(TE);
-	assert(TE && "need have a true exit");
+	ret_null_fail(TE, "need have a true exit");
 
 	Instruction* IndOrNext = NULL;
 	Value* END = NULL;
 
 	if(isa<BranchInst>(TE->getTerminator())){
 		const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
-		RET_ON_FAIL(EBR->isConditional());
+		ret_null_fail(EBR->isConditional(),"");
 		assert(EBR->isConditional());
 		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
-		RET_ON_FAIL(EC->getPredicate() == EC->ICMP_EQ || EC->getPredicate() == EC->ICMP_SGT);
-		assert(VERBOSE(EC->getPredicate() == EC->ICMP_EQ || EC->getPredicate() == EC->ICMP_SGT,EC) && "why end condition is not ==");
+		ret_null_fail(EC->getPredicate() == EC->ICMP_EQ || EC->getPredicate() == EC->ICMP_SGT, "why end condition is not ==");
 		if(EC->getPredicate() == EC->ICMP_SGT) OneStep += 1;
 		IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));
 		END = EC->getOperand(1);
@@ -113,20 +107,17 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 		IndOrNext = dyn_cast<Instruction>(castoff(ESW->getCondition()));
 		for(auto I = ESW->case_begin(),E = ESW->case_end();I!=E;++I){
 			if(!L->contains(I.getCaseSuccessor())){
-				RET_ON_FAIL(!END);
+				ret_null_fail(!END,"");
 				assert(!END && "shouldn't have two ends");
 				END = I.getCaseValue();
 			}
 		}
 		DEBUG(outs()<<"end   value:"<<*ESW<<"\n");
 	}else{
-		RET_ON_FAIL(0);
 		assert(0 && "unknow terminator type");
 	}
 
-	RET_ON_FAIL(L->isLoopInvariant(END));
-	assert(L->isLoopInvariant(END) && "end value should be loop invariant");
-
+	ret_null_fail(L->isLoopInvariant(END), "end value should be loop invariant");
 
 	Value* start = NULL;
 	Value* ind = NULL;
@@ -157,8 +148,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 			}
 
 		}
-		RET_ON_FAIL(SICount[0]==1 && SICount[1]==1);
-		assert(SICount[0]==1 && SICount[1]==1);
+		Assert(SICount[0]==1 && SICount[1]==1, "");
 		ind = IndOrNext;
 	}else{
 		if(isa<PHINode>(IndOrNext)){
@@ -171,8 +161,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 			next = IndOrNext;
 			addfirst = true;
 		}else{
-			RET_ON_FAIL(0);
-			assert(0 && "unknow how to analysis");
+			Assert(0 ,"unknow how to analysis");
 		}
 
 		for(auto I = H->begin();isa<PHINode>(I);++I){
@@ -190,8 +179,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	}
 
 
-	RET_ON_FAIL(start);
-	assert(start && "couldn't find a start value");
+	Assert(start ,"couldn't find a start value");
 	//process complex loops later
 	//DEBUG(if(L->getLoopDepth()>1 || !L->getSubLoops().empty()) return NULL);
 	DEBUG(outs()<<"start value:"<<*start<<"\n");
@@ -206,21 +194,17 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	do{
 		if(next_phi) {
 			next = dyn_cast<Instruction>(next_phi->getIncomingValue(next_phi_idx));
-			RET_ON_FAIL(next);
+			ret_null_fail(next, "");
 			DEBUG(outs()<<"next phi "<<next_phi_idx<<":"<<*next<<"\n");
 			if(Step&&PrevStep){
-				RET_ON_FAIL(Step->getSExtValue() == PrevStep->getSExtValue());
-				assert(Step->getSExtValue() == PrevStep->getSExtValue());
+				Assert(Step->getSExtValue() == PrevStep->getSExtValue(),"");
 			}
 			PrevStep = Step;
 		}
-		RET_ON_FAIL(next->getOpcode() == Instruction::Add);
-		assert(next->getOpcode() == Instruction::Add && "why induction increment is not Add");
-		RET_ON_FAIL(next->getOperand(0) == ind);
-		assert(next->getOperand(0) == ind && "why induction increment is not add it self");
+		Assert(next->getOpcode() == Instruction::Add , "why induction increment is not Add");
+		Assert(next->getOperand(0) == ind ,"why induction increment is not add it self");
 		Step = dyn_cast<ConstantInt>(next->getOperand(1));
-		RET_ON_FAIL(Step);
-		assert(Step);
+		Assert(Step,"");
 	}while(next_phi && ++next_phi_idx<next_phi->getNumIncomingValues());
 	//RET_ON_FAIL(Step->equalsInt(1));
 	//assert(VERBOSE(Step->equalsInt(1),Step) && "why induction increment number is not 1");

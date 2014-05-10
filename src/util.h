@@ -10,7 +10,6 @@
 
 namespace lle
 {
-
 	void pretty_print(llvm::Value* v,llvm::raw_ostream& o = llvm::outs());
 
 	//remove cast instruction for a value

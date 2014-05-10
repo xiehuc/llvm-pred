@@ -35,12 +35,12 @@
    exit(-1);\
 }
 
+#define ret_on_failed(expr,msg,ret) if(!(expr)){outs()<<"Failed at "<<__LINE__<<":"<<msg<<"\n"; return ret;}
+#define ret_null_fail(expr,msg) ret_on_failed(expr,msg,NULL);
 
 // ==========================================
 //                 Duplicated
 // ==========================================
-
-#define RET_ON_FAIL(cond) if(!(cond)){outs()<<"Failed at:"<<__LINE__<<"\n";return NULL;}
 
 #ifdef ENABLE_DEBUG
 //used for return void

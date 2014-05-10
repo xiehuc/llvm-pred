@@ -23,6 +23,7 @@ Instruction* NoResolve::operator()(Value* V)
       return NULL; // not correct
    else
       Assert(0,*I);
+   return NULL;
 }
 
 Instruction* UseOnlyResolve::operator()(Value* V)
