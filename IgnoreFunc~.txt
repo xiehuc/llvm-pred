@@ -1,2 +1,8 @@
 __mpi1s_single_push_halo_MOD_mpi1s_single_push_update_1d_dbl
 __reductions_MOD_global_sum_vector_dbl
+
+__exit_mod_MOD_exit_pop
+__timers_MOD_timer_print
+__timers_MOD_timer_print_all
+__timers_MOD_timer_start
+__timers_MOD_timer_stop

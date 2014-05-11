@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(LLVM_RECOMMAND_VERSION "" CACHE STRING "Switch the llvm version")
-set_property(CACHE LLVM_RECOMMAND_VERSION PROPERTY STRINGS "" "3.3" "3.4")
+set_property(CACHE LLVM_RECOMMAND_VERSION PROPERTY STRINGS "" "3.4")
 find_package(LLVM)
 
 option(DYNAMIC_LINK "Link Dynamic LLVM Libraries" ${LLVM_DYNAMIC_LIBRARY_FOUND})

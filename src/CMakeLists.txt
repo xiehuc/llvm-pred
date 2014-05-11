@@ -32,7 +32,7 @@ add_library(LLVMPred SHARED
    LoopSimplify.cpp
    SlashShrink.cpp
    Resolver.cpp
-   PrintEnv.cpp
+   Print.cpp
 	loop.cpp
 	util.cpp
 	)
