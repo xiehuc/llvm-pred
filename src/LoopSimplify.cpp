@@ -1,7 +1,6 @@
 #include "LoopSimplify.h"
 
 #include <llvm/Support/CommandLine.h>
-#include <llvm/Transforms/Utils/LoopUtils.h>
 
 #include <ValueProfiling.h>
 
@@ -12,6 +11,8 @@
 #include "config.h"
 #include "Resolver.h"
 #include "SlashShrink.h"
+
+#include "debug.h"
 
 using namespace std;
 using namespace lle;
@@ -35,14 +36,9 @@ void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 {
 	CurL = L;
-	bool changed = false;
 	lle::LoopCycle& LC = getAnalysis<lle::LoopCycle>();
-	if(L->getLoopPreheader()==NULL){
-		InsertPreheaderForLoop(L, this);
-		changed = true;
-	}
 	Value* CC = LC.getLoopCycle(L);
-	if(!CC) return changed;
+	if(!CC) return false;
 
    if(ValueProfiling)
       CC = ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
@@ -52,17 +48,11 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
          if(Instruction* I = dyn_cast<Instruction>(V))
             MarkPreserve::mark(I, "loop");
          });
-   for(auto V : get<1>(RR)){
+   for( auto V : get<1>(RR) )
       MarkPreserve::mark_all<NoResolve>(V, "loop");
-   }
 
-	return changed;
-}
-
-/*bool lle::LoopCycleSimplify::runOnModule(llvm::Module& M)
-{
 	return false;
-}*/
+}
 
 void lle::LoopCycleSimplify::print(llvm::raw_ostream &OS, const llvm::Module *) const
 {

@@ -9,6 +9,7 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/ADT/Statistic.h>
+#include <llvm/Transforms/Utils/LoopUtils.h>
 
 #include <map>
 #include <vector>
@@ -20,7 +21,7 @@ using namespace llvm;
 
 char lle::LoopCycle::ID = 0;
 
-static RegisterPass<LoopCycle> X("loop-cycle","Loop Cycle Pass",false,true);
+static RegisterPass<LoopCycle> X("loop-cycle","Loop Cycle Pass", false, false);
 
 STATISTIC(NumUnfoundCycle, "Number of unfound loop cycle");
 
@@ -60,6 +61,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	BasicBlock* startBB = NULL;//which basicblock stores start value
 	int OneStep = 0;// the extra add or plus step for calc
 
+   Assert(LoopPred, "Require Loop has a Pred");
 	DEBUG(outs()<<"loop simplify:"<<L->isLoopSimplifyForm()<<"\n");
 	DEBUG(outs()<<"loop  depth:"<<L->getLoopDepth()<<"\n");
 	/** whats difference on use of predecessor and preheader??*/
@@ -212,8 +214,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 
 	Value* RES = NULL;
 	//if there are no predecessor, we can insert code into start value basicblock
-	BasicBlock* insertBB = LoopPred?:startBB;
-	IRBuilder<> Builder(insertBB->getTerminator());
+	IRBuilder<> Builder(LoopPred->getTerminator());
 	assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() && " why increment is not integer type");
 	if(start->getType() != END->getType()){
 		start = Builder.CreateCast(CastInst::getCastOpcode(start, false,
@@ -238,17 +239,19 @@ bool lle::LoopCycle::runOnLoop(llvm::Loop* L,llvm::LPPassManager&)
 {
 	CurL = L;
 	Function* CurF = L->getHeader()->getParent();
+
+	if(L->getLoopPreheader()==NULL)
+		InsertPreheaderForLoop(L, this);
+
 	Value* CC = insertLoopCycle(L);
 	if(!CC){
+      CycleMap[L] = CC;
 		++NumUnfoundCycle;
 		++::NumUnfoundCycle;
 		unfound<<"Function:"<<CurF->getName()<<"\n";
 		unfound<<"\t"<<*L<<"\n";
-		return false;
 	}
 
-	if(isa<Constant>(CC)) 
-		return false;
 	return true;
 }
 
