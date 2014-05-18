@@ -15,15 +15,20 @@
 
 #include <llvm/IR/Instructions.h>
 #include <llvm/Analysis/LoopInfo.h>
-#include <llvm/Transforms/Utils/LoopUtils.h>
+#include <llvm/Analysis/AliasAnalysis.h>
+#include <llvm/Analysis/MemoryDependenceAnalysis.h>
 
 #include <ValueProfiling.h>
 
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#include "LoopSimplify.h"
 #include "loop.h"
+#include "util.h"
+#include "debug.h"
 
+using namespace std;
 using namespace llvm;
 
 namespace {
@@ -33,76 +38,7 @@ namespace {
 	cl::opt<std::string>
 		WriteFile(cl::Positional,cl::desc("<write bitcode file>"),
 				cl::Optional);
-	cl::opt<bool>
-		ValueProfiling("insert-value-profiling", cl::desc("insert value profiling for loop cycle"));
 };
-
-static ValueProfiler* VProf = NULL;
-
-class LoopPrintPass:public FunctionPass 
-{
-	static char ID;
-	std::string delay_str;
-	raw_string_ostream delay;
-	unsigned unresolvedNum;
-	const Function* curFunc;
-	public:
-	explicit LoopPrintPass(): 
-		FunctionPass(ID),delay(delay_str)
-	{
-		unresolvedNum = 0;
-	}
-	void getAnalysisUsage(AnalysisUsage &AU) const 
-	{
-		//AU.setPreservesAll();
-		AU.addRequired<LoopInfo>();
-	}
-	void printUnresolved(raw_ostream& out)
-	{
-		if(unresolvedNum){
-			outs()<<std::string(73,'*')<<"\n";
-			outs()<<"\tNote!! there are "<<unresolvedNum<<" loop cycles unresolved:\n";
-			outs()<<delay.str();
-		}
-	}
-	void runOnLoop(Loop* l)
-	{
-		lle::Loop L(l);
-		if(L->getLoopPreheader()==NULL)
-			InsertPreheaderForLoop(l, this);
-		Value* CC = L.insertLoopCycle();
-		if(CC){
-			outs()<<*l<<"\n";
-			outs()<<"cycles:"<<*L.getLoopCycle()<<"\n";
-			if(ValueProfiling)
-				VProf->insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
-		}else{
-			++unresolvedNum;
-			delay<<"Function:"<<curFunc->getName()<<"\n";
-			delay<<"\t"<<*l<<"\n";
-			//outs()<<"cycles:unknow\n";
-		}
-		if(!L->getSubLoops().empty()){
-			for(auto I = L->getSubLoops().begin(),E = L->getSubLoops().end();I!=E;I++)
-				runOnLoop(*I);
-		}
-	}
-	bool runOnFunction(Function& F)
-	{
-		curFunc = &F;
-		StringRef func_name = F.getName();
-		outs()<<"------------------------\n";
-		outs()<<"Function:"<<func_name<<"\n";
-		outs()<<"------------------------\n";
-		LoopInfo& LI = getAnalysis<LoopInfo>();
-		for(auto ite = LI.begin(), end = LI.end();ite!=end;ite++){
-			runOnLoop(*ite);
-		}
-		return true;
-	}
-};
-
-char LoopPrintPass::ID = 0;
 
 int main(int argc, char **argv) {
 	// Print a stack trace if we signal out.
@@ -134,19 +70,21 @@ int main(int argc, char **argv) {
 	// access to additional information not exposed via the ProfileInfo
 	// interface.
 
-	VProf = new ValueProfiler();
-	LoopPrintPass* LPP = new LoopPrintPass();
-	FunctionPassManager f_pass_mgr(M);
-	f_pass_mgr.add(new LoopInfo());
-	f_pass_mgr.add(LPP);
+	lle::LoopCycleSimplify* LPP = new lle::LoopCycleSimplify();
+	PassManager pass_mgr;
+	pass_mgr.add(createBasicAliasAnalysisPass());
+	pass_mgr.add(createGlobalsModRefPass());
+	pass_mgr.add(createScalarEvolutionAliasAnalysisPass());
+	pass_mgr.add(new MemoryDependenceAnalysis());
+	//pass_mgr.add(new LoopInfo());
+	pass_mgr.add(LPP);
 
-	for( auto& func : *M ){
-		f_pass_mgr.run(func);
-	}
 	if(ValueProfiling)
-		VProf->runOnModule(*M);
+		pass_mgr.add(new ValueProfiler());
 
-	LPP->printUnresolved(outs());
+	pass_mgr.run(*M);
+
+	//LPP->printUnresolved(outs());
 
 	if(!WriteFile.empty()){
 		std::string error;

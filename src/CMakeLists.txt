@@ -6,8 +6,9 @@ include_directories(
 	)
 link_directories(${LLVM_LIBRARY_DIRS})
 add_definitions(-fno-rtti)
-add_definitions(${LLVM_DEFINITIONS} -Wall --std=c++11)
-
+add_definitions(-Wall --std=c++11)
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${LLVM_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${LLVM_CPP_FLAGS}")
 
 llvm_map_components_to_libraries(LLVM_PRED_LIBRARY bitreader analysis)
 
@@ -26,19 +27,41 @@ else()
 	llvm_map_components_to_libraries(LLVM_LOOP_LIBRARY bitreader analysis bitwriter)
 endif()
 
-add_executable(llvm-loop
-    llvm-loop.cpp
+add_library(LLVMPred SHARED
+	KnownLibCallInfo.cpp
+   LoopSimplify.cpp
+   SlashShrink.cpp
+   Resolver.cpp
+   Print.cpp
 	loop.cpp
-    )
+	util.cpp
+	)
 
-target_link_libraries(llvm-loop
+target_link_libraries(LLVMPred
+	${LLVM_DYNAMIC_LIBRARY}
 	${LLVM_PROF_LIBRARIES}
-	${LLVM_LOOP_LIBRARY}
-    ${LLVM_LIBRARIES}
-    )
+	)
 
 add_executable(edge-merge
 	edge-merge.cpp
 	)
 
-install(TARGETS llvm-loop DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+add_executable(lle-llc
+   MyAsmPrinter.cpp
+   llc.cpp
+   )
+
+target_link_libraries(lle-llc
+   ${LLVM_DYNAMIC_LIBRARY}
+   )
+
+#add_executable(llvm-loop
+#	llvm-loop.cpp
+#	)
+#
+#target_link_libraries(llvm-loop
+#	${LLVM_LIBRARIES}
+#	LLVMPred
+#	)
+
+#install(TARGETS llvm-loop DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)

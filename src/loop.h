@@ -1,36 +1,51 @@
+#ifndef LLE_LOOP_H_H
+#define LLE_LOOP_H_H
+
 #include <llvm/Analysis/LoopInfo.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Analysis/LoopPass.h>
 
 #include <iostream>
+#include <map>
 #include <stdlib.h>
 
 namespace lle
 {
-	class Loop{
-		llvm::Value* cycle;
-		llvm::Loop* loop;
-		Loop& self;
-		// 为了能够直接转型(cast),使用体外储存,未来需要改为使用ValueMap
-		public:
-			Loop(llvm::Loop* l):self(*this){
-				loop = l;
-				cycle = NULL;
-			}
-			llvm::Loop* operator->(){ return loop; }
-			/**
-			 * trying to find loop cycle, if it is a variable, because it is a
-			 * sub instruction, first insert it into source then we can get it.
-			 * if it is a constant, we couldn't simply insert a constant into
-			 * source, so we directly return it. caller can make a cast
-			 * instruction and insert it by hand.
-			 */
-			llvm::Value* insertLoopCycle();
-			llvm::Value* getLoopCycle(){ return cycle; }
-	};
+	class LoopCycle:public llvm::LoopPass
+	{
+		//statistics variable:{
+		std::string unfound_str;
+		llvm::raw_string_ostream unfound;
+		unsigned NumUnfoundCycle;
+		//}
 
-	void pretty_print(llvm::Value* v);
-	/** unfinished yet **/
-	void latex_print(llvm::Value* v);
+		std::map<llvm::Loop*,llvm::Value*> CycleMap;
+		llvm::Loop* CurL;
+		public:
+		static char ID;
+		explicit LoopCycle():LoopPass(ID),unfound(unfound_str){
+			NumUnfoundCycle = 0;
+		}
+		virtual ~LoopCycle();
+		void getAnalysisUsage(llvm::AnalysisUsage&) const;
+		bool runOnLoop(llvm::Loop* L,llvm::LPPassManager&);
+		void print(llvm::raw_ostream&,const llvm::Module*) const;
+		/**
+		 * trying to find loop cycle, if it is a variable, because it is a
+		 * sub instruction, first insert it into source then we can get it.
+		 * if it is a constant, we couldn't simply insert a constant into
+		 * source, so we directly return it. caller can make a cast
+		 * instruction and insert it by hand.
+		 */
+		llvm::Value* insertLoopCycle(llvm::Loop* l);
+		llvm::Value* getLoopCycle(llvm::Loop* l) const
+		{ 
+			auto ite = CycleMap.find(l);
+			return ite!=CycleMap.end()?ite->second:NULL;
+		}
+	};
 }
+
+#endif
