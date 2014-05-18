@@ -46,6 +46,15 @@ add_executable(edge-merge
 	edge-merge.cpp
 	)
 
+add_executable(lle-llc
+   MyAsmPrinter.cpp
+   llc.cpp
+   )
+
+target_link_libraries(lle-llc
+   ${LLVM_DYNAMIC_LIBRARY}
+   )
+
 #add_executable(llvm-loop
 #	llvm-loop.cpp
 #	)
