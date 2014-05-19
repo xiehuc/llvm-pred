@@ -71,7 +71,7 @@ int retrive_data(int argc, char *argv[],int base_file,MType &freq_ave_map)
 	}
 	in_file.close();	
 	cout << "what's the fuck" << endl;
-	for(i=7; i>=0; i--)
+	for(i=6; i>=0; i--)
 	{
 		cout << i << endl;
 		if(file_num[i]>=base_file) continue;
