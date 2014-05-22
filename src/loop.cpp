@@ -62,8 +62,8 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	int OneStep = 0;// the extra add or plus step for calc
 
    Assert(LoopPred, "Require Loop has a Pred");
-	DEBUG(outs()<<"loop simplify:"<<L->isLoopSimplifyForm()<<"\n");
-	DEBUG(outs()<<"loop  depth:"<<L->getLoopDepth()<<"\n");
+	DEBUG(errs()<<"loop simplify:"<<L->isLoopSimplifyForm()<<"\n");
+	DEBUG(errs()<<"loop  depth:"<<L->getLoopDepth()<<"\n");
 	/** whats difference on use of predecessor and preheader??*/
 	//RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPreheader());
 	//assert(self->getLoopLatch() && self->getLoopPreheader() && "need loop simplify form" );
@@ -103,7 +103,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 		if(EC->getPredicate() == EC->ICMP_SGT) OneStep += 1;
 		IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));
 		END = EC->getOperand(1);
-		DEBUG(outs()<<"end   value:"<<*EC<<"\n");
+		DEBUG(errs()<<"end   value:"<<*EC<<"\n");
 	}else if(isa<SwitchInst>(TE->getTerminator())){
 		SwitchInst* ESW = const_cast<SwitchInst*>(cast<SwitchInst>(TE->getTerminator()));
 		IndOrNext = dyn_cast<Instruction>(castoff(ESW->getCondition()));
@@ -114,7 +114,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 				END = I.getCaseValue();
 			}
 		}
-		DEBUG(outs()<<"end   value:"<<*ESW<<"\n");
+		DEBUG(errs()<<"end   value:"<<*ESW<<"\n");
 	}else{
 		assert(0 && "unknow terminator type");
 	}
@@ -126,14 +126,14 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	Instruction* next = NULL;
 	bool addfirst = false;//add before icmp ed
 
-	DISABLE(outs()<<*IndOrNext<<"\n");
+	DISABLE(errs()<<*IndOrNext<<"\n");
 	if(isa<LoadInst>(IndOrNext)){
 		//memory depend analysis
 		Value* PSi = IndOrNext->getOperand(0);//point type Step.i
 
 		int SICount[2] = {0};//store in predecessor count,store in loop body count
 		for( auto I = PSi->use_begin(),E = PSi->use_end();I!=E;++I){
-			DISABLE(outs()<<**I<<"\n");
+			DISABLE(errs()<<**I<<"\n");
 			StoreInst* SI = dyn_cast<StoreInst>(*I);
 			if(!SI || SI->getOperand(1) != PSi) continue;
 			if(!start&&L->isLoopInvariant(SI->getOperand(0))) {
@@ -184,9 +184,9 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	Assert(start ,"couldn't find a start value");
 	//process complex loops later
 	//DEBUG(if(L->getLoopDepth()>1 || !L->getSubLoops().empty()) return NULL);
-	DEBUG(outs()<<"start value:"<<*start<<"\n");
-	DEBUG(outs()<<"ind   value:"<<*ind<<"\n");
-	DEBUG(outs()<<"next  value:"<<*next<<"\n");
+	DEBUG(errs()<<"start value:"<<*start<<"\n");
+	DEBUG(errs()<<"ind   value:"<<*ind<<"\n");
+	DEBUG(errs()<<"next  value:"<<*next<<"\n");
 
 
 	//process non add later
@@ -197,7 +197,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 		if(next_phi) {
 			next = dyn_cast<Instruction>(next_phi->getIncomingValue(next_phi_idx));
 			ret_null_fail(next, "");
-			DEBUG(outs()<<"next phi "<<next_phi_idx<<":"<<*next<<"\n");
+			DEBUG(errs()<<"next phi "<<next_phi_idx<<":"<<*next<<"\n");
 			if(Step&&PrevStep){
 				Assert(Step->getSExtValue() == PrevStep->getSExtValue(),"");
 			}
@@ -215,11 +215,17 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	Value* RES = NULL;
 	//if there are no predecessor, we can insert code into start value basicblock
 	IRBuilder<> Builder(LoopPred->getTerminator());
-	assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() && " why increment is not integer type");
+	Assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() , " why increment is not integer type");
 	if(start->getType() != END->getType()){
 		start = Builder.CreateCast(CastInst::getCastOpcode(start, false,
 					END->getType(), false),start,END->getType());
 	}
+   if(Step->getType() != END->getType()){
+      //Because Step is a Constant, so it casted is constant
+		Step = dyn_cast<ConstantInt>(Builder.CreateCast(CastInst::getCastOpcode(Step, false,
+					END->getType(), false),Step,END->getType()));
+      AssertRuntime(Step);
+   }
 	if(Step->isMinusOne())
 		RES = Builder.CreateSub(start,END);
 	else//Step Couldn't be zero

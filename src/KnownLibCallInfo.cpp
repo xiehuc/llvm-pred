@@ -86,7 +86,7 @@ LibCallFromFile::LibCallFromFile()
       else if(word == "Ref") modref = AliasAnalysis::ModRefResult::Ref;
       else if(word == "Mod") modref = AliasAnalysis::ModRefResult::Mod;
       else if(word == "ModRef") modref = AliasAnalysis::ModRefResult::ModRef;
-      else runtime_assert(0);
+      else AssertRuntime(0);
 
       Array.push_back({strdup(funcname.c_str()), modref});
 

@@ -60,10 +60,10 @@ void lle::LoopCycleSimplify::print(llvm::raw_ostream &OS, const llvm::Module *) 
 	Value* CC = LC.getLoopCycle(CurL);
 	if(CC){
 		OS<<"in Function:\t"<<CurL->getHeader()->getParent()->getName()<<"\n";
-		OS<<*CurL<<"\n";
+		OS<<*CurL;
 		OS<<"Cycles:";
 		lle::pretty_print(CC, OS);
-		OS<<"\n";
+		OS<<"\n\n";
 #if 0
 		tryResolve(CC, this, OS);
 		OS<<"\n";

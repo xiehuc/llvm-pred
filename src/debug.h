@@ -23,19 +23,19 @@
 //but comment may be delete sometimes
 #define DISABLE(expr) 
 
-#define VERBOSE(expr,verb) (expr || (outs()<<"<<HERE>>:"<<*verb<<"\n",0))
+#define VERBOSE(expr,verb) (expr || (errs()<<"<<HERE>>:"<<*verb<<"\n",0))
 
 // a assert with output llvm values
-#define Assert(expr, value) assert(  expr || (outs()<<"\n>>>"<<value<<"<<<\n",0) )
+#define Assert(expr, value) assert(  expr || (errs()<<"\n>>>"<<value<<"<<<\n",0) )
 
 // a assert which always need check
-#define runtime_assert(expr) if( !(expr) ){ \
-   outs()<<"Assert Failed:"<<__FILE__<<":"<<__LINE__<<"\n"; \
+#define AssertRuntime(expr) if( !(expr) ){ \
+   errs()<<"Assert Failed:"<<__FILE__<<":"<<__LINE__<<"\n"; \
    assert(0);\
    exit(-1);\
 }
 
-#define ret_on_failed(expr,msg,ret) if(!(expr)){outs()<<"Failed at "<<__LINE__<<":"<<msg<<"\n"; return ret;}
+#define ret_on_failed(expr,msg,ret) if(!(expr)){errs()<<"Failed at "<<__LINE__<<":"<<msg<<"\n"; return ret;}
 #define ret_null_fail(expr,msg) ret_on_failed(expr,msg,NULL);
 
 // ==========================================
@@ -44,11 +44,11 @@
 
 #ifdef ENABLE_DEBUG
 //used for return void
-#define ASSERT(expr,value,desc) if(!(expr)){outs()<<"\t"<<desc<<"\n"<<"\tFailed at:"<<__LINE__<<"\n"<<"\t"<<value<<"\n";return ;}
+#define ASSERT(expr,value,desc) if(!(expr)){errs()<<"\t"<<desc<<"\n"<<"\tFailed at:"<<__LINE__<<"\n"<<"\t"<<value<<"\n";return ;}
 //used for return null
-#define ASSERET(expr,value,desc) if(!(expr)){outs()<<"\t"<<desc<<"\n"<<"\tFailed at:"<<__LINE__<<"\n"<<"\t"<<value<<"\n";return NULL;}
+#define ASSERET(expr,value,desc) if(!(expr)){errs()<<"\t"<<desc<<"\n"<<"\tFailed at:"<<__LINE__<<"\n"<<"\t"<<value<<"\n";return NULL;}
 #else
-#define ASSERT(expr,value,desc) assert((expr ||(outs()<<__LINE__<<":"<<value<<"\n",0)) && desc)
+#define ASSERT(expr,value,desc) assert((expr ||(errs()<<__LINE__<<":"<<value<<"\n",0)) && desc)
 #define ASSERET(expr,value,desc) ASSERT(expr,value,desc)
 #endif
 
