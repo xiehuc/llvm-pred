@@ -22,8 +22,6 @@ char LoopCycleSimplify::ID = 0;
 
 static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simplify Pass",false,false);
 
-cl::opt<bool> ValueProfiling("Value-Trap", cl::desc("insert value profiling trap for loop cycle"));
-
 void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
 	AU.setPreservesAll();
@@ -40,8 +38,8 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 	Value* CC = LC.getLoopCycle(L);
 	if(!CC) return false;
 
-   if(ValueProfiling)
-      CC = ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
+   // auto insert value trap when used -insert-value-profiling
+   CC = ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 
    lle::Resolver<UseOnlyResolve> R;
    ResolveResult RR = R.resolve(CC, [](Value* V){
