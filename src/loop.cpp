@@ -3,7 +3,6 @@
 #include "loop.h"
 #include "util.h"
 #include "config.h"
-#include "debug.h"
 
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Constants.h>
@@ -14,6 +13,8 @@
 #include <map>
 #include <vector>
 #include <algorithm>
+
+#include "debug.h"
 
 using namespace std;
 using namespace lle;
@@ -62,7 +63,6 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	int OneStep = 0;// the extra add or plus step for calc
 
    Assert(LoopPred, "Require Loop has a Pred");
-	DEBUG(errs()<<"loop simplify:"<<L->isLoopSimplifyForm()<<"\n");
 	DEBUG(errs()<<"loop  depth:"<<L->getLoopDepth()<<"\n");
 	/** whats difference on use of predecessor and preheader??*/
 	//RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPreheader());
@@ -96,11 +96,18 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 
 	if(isa<BranchInst>(TE->getTerminator())){
 		const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
-		ret_null_fail(EBR->isConditional(),"");
-		assert(EBR->isConditional());
+		Assert(EBR->isConditional(), "end branch is not conditional");
 		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
-		ret_null_fail(EC->getPredicate() == EC->ICMP_EQ || EC->getPredicate() == EC->ICMP_SGT, "why end condition is not ==");
-		if(EC->getPredicate() == EC->ICMP_SGT) OneStep += 1;
+		if(EC->getPredicate() == EC->ICMP_SGT){
+         Assert(!L->contains(EBR->getSuccessor(0)), *EBR<<":abnormal exit with great than");
+         OneStep += 1;
+      } else if(EC->getPredicate() == EC->ICMP_EQ)
+         Assert(!L->contains(EBR->getSuccessor(0)), *EBR<<":abnormal exit with great than");
+      else if(EC->getPredicate() == EC->ICMP_SLT) {
+         ret_null_fail(!L->contains(EBR->getSuccessor(1)), *EBR<<":abnormal exit with less than");
+      } else {
+         ret_null_fail(0, *EC<<" unknow combination of end condition");
+      }
 		IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));
 		END = EC->getOperand(1);
 		DEBUG(errs()<<"end   value:"<<*EC<<"\n");

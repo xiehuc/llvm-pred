@@ -23,10 +23,8 @@
 //but comment may be delete sometimes
 #define DISABLE(expr) 
 
-#define VERBOSE(expr,verb) (expr || (errs()<<"<<HERE>>:"<<*verb<<"\n",0))
-
 // a assert with output llvm values
-#define Assert(expr, value) assert(  expr || (errs()<<"\n>>>"<<value<<"<<<\n",0) )
+#define Assert(expr, value) assert( (expr) || (errs()<<"\n>>>"<<value<<"<<<\n",0) )
 
 // a assert which always need check
 #define AssertRuntime(expr) if( !(expr) ){ \
@@ -35,12 +33,14 @@
    exit(-1);\
 }
 
-#define ret_on_failed(expr,msg,ret) if(!(expr)){errs()<<"Failed at "<<__LINE__<<":"<<msg<<"\n"; return ret;}
+#define ret_on_failed(expr,msg,ret) { if(!(expr)){errs()<<"Failed at "<<__LINE__<<":"<<msg<<"\n"; return ret;} }
 #define ret_null_fail(expr,msg) ret_on_failed(expr,msg,NULL);
 
 // ==========================================
 //                 Duplicated
 // ==========================================
+
+#define VERBOSE(expr,verb) ( (expr) || (errs()<<"<<HERE>>:"<<*verb<<"\n",0))
 
 #ifdef ENABLE_DEBUG
 //used for return void
