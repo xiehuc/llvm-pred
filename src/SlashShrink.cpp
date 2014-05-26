@@ -108,9 +108,9 @@ bool SlashShrink::runOnFunction(Function &F)
    for(auto BB = F.begin(), E = F.end(); BB != E; ++BB){
       list<Value*> unsolved, left;
       if(ExecuteTrap){
-         Instruction* Prof = ValueProfiler::insertValueTrap(
+         Value* Prof = ValueProfiler::insertValueTrap(
                Zero, BB->getTerminator());
-         MarkPreserve::mark(Prof);
+         MarkPreserve::mark(dyn_cast<Instruction>(Prof));
       }
 
       unsolved = MarkPreserve::mark_all<UseOnlyResolve>(BB->getTerminator(), "terminal");

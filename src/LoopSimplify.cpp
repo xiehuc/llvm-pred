@@ -61,10 +61,17 @@ void lle::LoopCycleSimplify::print(llvm::raw_ostream &OS, const llvm::Module *) 
 		OS<<*CurL;
 		OS<<"Cycles:";
 		lle::pretty_print(CC, OS);
+      OS<<"\n";
+      lle::Resolver<UseOnlyResolve> R;
+      OS<<"resolved:\n";
+      lle::ResolveResult RR = R.resolve(CC, [&OS](Value* V){
+            if(isa<Function>(V)) return;
+            OS<<*V<<"\n";
+            });
+      OS<<"unresolved:\n";
+      for( auto V : get<1>(RR) ){
+         OS<<*V<<"\n";
+      }
 		OS<<"\n\n";
-#if 0
-		tryResolve(CC, this, OS);
-		OS<<"\n";
-#endif
 	}
 }

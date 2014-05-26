@@ -87,13 +87,15 @@ class lle::ResolverBase
    std::unordered_map<llvm::Value*, llvm::Instruction*> PartCache;
 
    public:
+   static void _empty_handler(llvm::Value*);
    
    // walk through V's dependent tree and callback
-   ResolveResult resolve(llvm::Value* V, std::function<void(llvm::Value*)>);
+   ResolveResult resolve(llvm::Value* V, std::function<void(llvm::Value*)> = _empty_handler);
    // walk though V's dependent tree and callback
    // if lambda return true, immediately stop resolve
    // and return true
    bool resolve_if(llvm::Value* V, std::function<bool(llvm::Value*)> lambda);
+
 };
 
 template<typename Impl = lle::NoResolve>

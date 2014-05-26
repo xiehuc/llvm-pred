@@ -225,6 +225,9 @@ list<Value*> ResolverBase::direct_resolve( Value* V, unordered_set<Value*>& reso
    return unresolved;
 }
 
+void ResolverBase::_empty_handler(llvm::Value *)
+{
+}
 
 ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> lambda)
 {
