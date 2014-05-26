@@ -22,7 +22,7 @@ namespace lle{
    typedef std::tuple<
       std::unordered_set<llvm::Value*>, // all resolved value
       std::list<llvm::Value*>, // all unresolved value
-      std::unordered_map<llvm::Value*, llvm::Instruction*> // some part deep_resolve map
+      std::unordered_map<llvm::Value*, llvm::Use*> // some part deep_resolve map
          >
       ResolveResult;
 	typedef std::pair<llvm::MemDepResult,llvm::BasicBlock*> FindedDependenciesType;
@@ -33,7 +33,7 @@ namespace lle{
  */
 struct lle::NoResolve
 {
-   llvm::Instruction* operator()(llvm::Value*);
+   llvm::Use* operator()(llvm::Value*);
 };
 
 /**
@@ -41,7 +41,7 @@ struct lle::NoResolve
  */
 struct lle::UseOnlyResolve
 {
-   llvm::Instruction* operator()(llvm::Value*);
+   llvm::Use* operator()(llvm::Value*);
 };
 
 /**
@@ -59,7 +59,7 @@ class lle::MDAResolve
    public:
    MDAResolve(){pass = NULL;}
    void initial(llvm::Pass* pass){ this->pass = pass;}
-   llvm::Instruction* operator()(llvm::Value*);
+   llvm::Use* operator()(llvm::Value*);
 
    /** use this to find a possible dep results.
     * which may clobber, def, nonlocal, nonfunclocal
@@ -80,11 +80,11 @@ class lle::ResolverBase
          std::function<void(llvm::Value*)>
          );
 
-   virtual llvm::Instruction* deep_resolve(llvm::Instruction* I) = 0;
+   virtual llvm::Use* deep_resolve(llvm::Instruction* I) = 0;
 
    protected:
    // hash map, provide quick search Value* ---> Value*
-   std::unordered_map<llvm::Value*, llvm::Instruction*> PartCache;
+   std::unordered_map<llvm::Value*, llvm::Use*> PartCache;
 
    public:
    static void _empty_handler(llvm::Value*);
@@ -102,9 +102,9 @@ template<typename Impl = lle::NoResolve>
 class lle::Resolver: public lle::ResolverBase
 {
    Impl impl;
-   llvm::Instruction* deep_resolve(llvm::Instruction* I)
+   llvm::Use* deep_resolve(llvm::Instruction* I)
    {
-      llvm::Instruction* Ret = NULL;
+      llvm::Use* Ret = NULL;
       auto Ite = PartCache.find(I);
       if(Ite != PartCache.end())
          return Ite->second;

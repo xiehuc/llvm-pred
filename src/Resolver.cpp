@@ -1,5 +1,6 @@
 #include "Resolver.h"
 
+#include <llvm/IR/Function.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/raw_ostream.h>
@@ -11,22 +12,48 @@ using namespace std;
 using namespace lle;
 using namespace llvm;
 
-Instruction* NoResolve::operator()(Value* V)
+static Argument* findCallInstArgument(CallInst* CI,Value* v)
+{
+   uint idx = find(CI->op_begin(), CI->op_end(), 
+         v) - CI->op_begin(); //find argument position FIXME 这里有问题
+   Assert(idx != CI->getNumOperands(), "");
+   Function* CF = dyn_cast<Function>(castoff(CI->getCalledValue()));
+   Assert(CF," called function should not be null");
+   if(CF->getArgumentList().size() <= idx) // there are no enough argument
+      // FIXME: 通常，调用的外部函数是(...)格式，也就是说不知道会不会写入！
+      return NULL;
+   auto ite = CF->getArgumentList().begin();
+   advance(ite,idx); /* get function argument */
+   return &*ite;
+}
+static Instruction* argumentResolve(Argument* arg)
+{
+   StoreInst* res = NULL;
+   for(auto Ite = arg->use_begin(), End = arg->use_end();Ite != End;++Ite){
+      if(StoreInst* SI = dyn_cast<StoreInst>(*Ite)){
+         Assert(!res,"shouldn't have two store");
+         res = SI;
+      }
+   }
+   return res;
+}
+
+Use* NoResolve::operator()(Value* V)
 {
    Instruction* I = dyn_cast<Instruction>(V);
    Assert(I,*I);
    if(!I) return NULL;
    if(isa<LoadInst>(I) || isa<StoreInst>(I))
+      return &I->getOperandUse(0);
       //return dyn_cast<Instruction>(I->getOperand(0));
-      return I;
    else if(isa<CallInst>(I))
-      return NULL; // not correct
+      return NULL; // FIXME:not correct
    else
       Assert(0,*I);
    return NULL;
 }
 
-Instruction* UseOnlyResolve::operator()(Value* V)
+Use* UseOnlyResolve::operator()(Value* V)
 {
    Use* Target = NULL, *Keep = NULL;
    if(LoadInst* LI = dyn_cast<LoadInst>(V)){
@@ -40,19 +67,18 @@ Instruction* UseOnlyResolve::operator()(Value* V)
       Assert(0,*V);
       return NULL;
    }
-   SmallVector<CallInst*, 8> CallCandidate;
    while( (Target = Target->getNext()) ){
       //seems all things who use target is after target
       auto U = Target->getUser();
       if(isa<StoreInst>(U) && U->getOperand(1) == Target->get())
-         return dyn_cast<Instruction>(U);
-      if(CallInst* CI = dyn_cast<CallInst>(U)) 
-         CallCandidate.push_back(CI);
+         return Target;
+      if(CallInst* CI = dyn_cast<CallInst>(U)){
+         Argument* arg = findCallInstArgument(CI, Target->get());
+         if(arg && !arg->hasNoCaptureAttr() && !arg->onlyReadsMemory()) // adjust attribute
+            //if no nocapture and readonly, it means could write into this addr
+            return Target;
+      }
    }
-   if(CallCandidate.size() == 1) /* if no store inst and only one call inst, we
-      consider this is the anwser (but this is not so good, we should use
-      function argument's attribute)*/
-      return CallCandidate[0];
    if(ConstantExpr* CE = dyn_cast<ConstantExpr>(Keep->get())){
       Instruction* TI = CE->getAsInstruction();
       return (*this)(TI);
@@ -176,9 +202,9 @@ void MDAResolve::find_dependencies( Instruction* I, const Pass* P,
    }
 }
 
-Instruction* MDAResolve::operator()(llvm::Value * V)
+Use* MDAResolve::operator()(llvm::Value * V)
 {
-   assert(pass || "Not initial with pass");
+   Assert(pass,"Not initial with pass");
 
    SmallVector<FindedDependenciesType, 64> Result;
    Instruction* I = dyn_cast<Instruction>(V);
@@ -190,13 +216,12 @@ Instruction* MDAResolve::operator()(llvm::Value * V)
    for(auto R : Result){
       Instruction* Ret = R.first.getInst();
       if(R.first.isDef() && Ret != I)
-         return Ret;
+         return &R.first.getInst()->getOperandUse(0); //FIXME: 应该寻找使用的是哪个参数,而不是直接认为是0
       if(R.first.isNonFuncLocal())
          return NULL;
    }
    return NULL;
 }
-
 
 list<Value*> ResolverBase::direct_resolve( Value* V, unordered_set<Value*>& resolved, function<void(Value*)> lambda)
 {
@@ -210,12 +235,14 @@ list<Value*> ResolverBase::direct_resolve( Value* V, unordered_set<Value*>& reso
       lambda(V);
    }
    if(Instruction* I = dyn_cast<Instruction>(V)){
-      if(isa<LoadInst>(I) || isa<StoreInst>(I) ){
+      if(isa<LoadInst>(I)){
          unresolved.push_back(I);
       }else{
          resolved.insert(I);
          lambda(I);
-         for(unsigned int i=0;i<I->getNumOperands();i++){
+         uint N = isa<StoreInst>(I)?1:I->getNumOperands();/*if isa store inst,
+                                                         we only solve arg 0*/
+         for(uint i=0;i<N;i++){
             Value* R = I->getOperand(i);
             auto rhs = direct_resolve(R, resolved, lambda);
             unresolved.insert(unresolved.end(), rhs.begin(), rhs.end());
@@ -235,7 +262,7 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
    //bool changed = false;
    std::unordered_set<Value*> resolved;
    std::list<Value*> unsolved;
-   std::unordered_map<Value*, Instruction*> partial;
+   std::unordered_map<Value*, Use*> partial;
 
    unsolved.push_back(NULL); // always make sure Ite wouldn't point to end();
 
@@ -255,34 +282,40 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
          continue;
       }
 
+      Use* res = NULL;
       Instruction* I = dyn_cast<Instruction>(*Ite);
       if(!I){
          ++Ite;
          continue;
       }
 
-      Instruction* res = deep_resolve(I);
+      res = deep_resolve(I);
       partial.insert(make_pair(I,res));
       if(!res){
          ++Ite;
          continue;
       }
+      User* U = res->getUser();
 
       resolved.insert(I); // original is resolved;
       lambda(I);
       Ite = unsolved.erase(Ite);
-      if(isa<StoreInst>(res) || isa<LoadInst>(res)){
-         resolved.insert(res);
-         lambda(res);
-         next = res->getOperand(0);
-      }else if(isa<CallInst>(res)){
-         // FIXME : wait implement
-         // special call inst process
-         // in this case, a def is depend on call's param
-         // means we need go into called function and mark
-         next = res;
+      if(isa<StoreInst>(U) || isa<LoadInst>(U)){
+         resolved.insert(U);
+         lambda(U);
+         next = res->get();
+      }else if(CallInst* CI = dyn_cast<CallInst>(U)){
+         Argument* arg = findCallInstArgument(CI, res->get());
+         if(arg && arg->getNumUses()>0){
+            resolved.insert(CI);
+            lambda(CI);
+            next = arg->use_back();
+         }else{
+            unsolved.push_back(CI);
+            next = NULL;
+         }
       }else
-         next = res;
+         next = U;
    }
 
    return make_tuple(resolved, unsolved, partial);
