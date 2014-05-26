@@ -13,3 +13,10 @@ if gcc doesn't support c++11 ,can use clang
     $ make
 
 use `LLVM_RECOMMAND_VERSION` to change llvm version directly
+
+script
+-------
+
+drawline.py : used to draw lines from value profiling
+dirdiff.sh  : compare two dir's llvmprof.out file and report whether they are
+same
