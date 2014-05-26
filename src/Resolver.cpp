@@ -264,7 +264,9 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
    std::list<Value*> unsolved;
    std::unordered_map<Value*, Use*> partial;
 
-   unsolved.push_back(NULL); // always make sure Ite wouldn't point to end();
+   unsolved.push_back(NULL); /* always make sure Ite wouldn't point to end();
+      因为在一开始的时候,如果没有这句,Ite指向end(),然后又在end后追加数据,造成
+      Ite失效.  */
 
    auto Ite = unsolved.begin();
    Value* next = V; // wait to next resolved;
@@ -276,9 +278,8 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
          unsolved.insert(--unsolved.end(),mid.begin(),mid.end()); 
             // insert before NULL, makes NULL always be tail
          next = NULL;
-         if(*Ite == NULL) advance(Ite, -mid.size()); // *Ite == NULL means *Ite points 
-            //tail, and we insert before it, we should put forware what we
-            //inserted 
+         if(*Ite == NULL) advance(Ite, -mid.size()); /* *Ite == NULL means *Ite points 
+            tail, and we insert before it, we should put forware what we inserted */
          continue;
       }
 
@@ -311,13 +312,14 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
             lambda(CI);
             next = arg->use_back();
          }else{
-            unsolved.push_back(CI);
+            unsolved.insert(--unsolved.end(), CI);//insert before tail
             next = NULL;
          }
       }else
          next = U;
    }
 
+   unsolved.pop_back(); // remove last NULL
    return make_tuple(resolved, unsolved, partial);
 }
 
