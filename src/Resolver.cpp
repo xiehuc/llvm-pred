@@ -300,18 +300,12 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
       }
       User* U = res->getUser();
 
-      resolved.insert(I); // original is resolved;
-      lambda(I);
       bool dont_erase = false;
       if(isa<StoreInst>(U) || isa<LoadInst>(U)){
-         resolved.insert(U);
-         lambda(U);
          next = res->get();
       }else if(CallInst* CI = dyn_cast<CallInst>(U)){
          Argument* arg = findCallInstArgument(CI, res->get());
          if(arg && arg->getNumUses()>0){
-            resolved.insert(CI);
-            lambda(CI);
             next = arg->use_back();
          }else{
             dont_erase = true;
@@ -320,7 +314,14 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
       }else
          next = U;
 
-      dont_erase?++Ite:Ite = unsolved.erase(Ite);
+      if(!dont_erase){
+         resolved.insert(I); // original is resolved;
+         lambda(I);
+         resolved.insert(U);
+         lambda(U);
+         Ite = unsolved.erase(Ite);
+      }else
+         ++Ite;
    }
 
    unsolved.pop_back(); // remove last NULL
