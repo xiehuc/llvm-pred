@@ -18,6 +18,7 @@ namespace lle{
    class ResolverBase;
    template<typename Impl>
    class Resolver;
+   class ResolverPass;
 
    typedef std::tuple<
       std::unordered_set<llvm::Value*>, // all resolved value
@@ -87,6 +88,7 @@ class lle::ResolverBase
    std::unordered_map<llvm::Value*, llvm::Use*> PartCache;
 
    public:
+   virtual ~ResolverBase(){};
    static void _empty_handler(llvm::Value*);
    
    // walk through V's dependent tree and callback
@@ -113,7 +115,27 @@ class lle::Resolver: public lle::ResolverBase
       return Ret;
    }
    public:
+   static char ID;
    Impl& get_impl(){ return impl;}
+};
+
+template<typename T>
+char lle::Resolver<T>::ID = 0;
+
+class lle::ResolverPass: public llvm::FunctionPass
+{
+   std::map<void*, ResolverBase*> impls;
+   public:
+   static char ID;
+   explicit ResolverPass():FunctionPass(ID){
+   }
+   ~ResolverPass();
+   template<typename R>
+   ResolverBase* getResolver(){
+      return impls[&R::ID]?:(impls[&R::ID]=new lle::Resolver<R>());
+   }
+   bool runOnFunction(llvm::Function& F) {return false;}
+
 };
 
 

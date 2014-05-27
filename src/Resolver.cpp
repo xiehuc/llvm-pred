@@ -12,6 +12,9 @@ using namespace std;
 using namespace lle;
 using namespace llvm;
 
+char ResolverPass::ID = 0;
+static RegisterPass<ResolverPass> Y("-","A Pass used to cache Resolver Result",false,false);
+
 static Argument* findCallInstArgument(CallInst* CI,Value* v)
 {
    uint idx = find(CI->op_begin(), CI->op_end(), 
@@ -26,17 +29,15 @@ static Argument* findCallInstArgument(CallInst* CI,Value* v)
    advance(ite,idx); /* get function argument */
    return &*ite;
 }
-static Instruction* argumentResolve(Argument* arg)
+
+#ifdef ENABLE_DEBUG
+static void debug_print_resolved(unordered_set<Value*>& resolved)
 {
-   StoreInst* res = NULL;
-   for(auto Ite = arg->use_begin(), End = arg->use_end();Ite != End;++Ite){
-      if(StoreInst* SI = dyn_cast<StoreInst>(*Ite)){
-         Assert(!res,"shouldn't have two store");
-         res = SI;
-      }
+   for ( auto V : resolved){
+      outs()<<*V<<"\n";
    }
-   return res;
 }
+#endif
 
 Use* NoResolve::operator()(Value* V)
 {
@@ -79,6 +80,7 @@ Use* UseOnlyResolve::operator()(Value* V)
             return Target;
       }
    }
+   //if no use found, we consider this is a constant expr
    if(ConstantExpr* CE = dyn_cast<ConstantExpr>(Keep->get())){
       Instruction* TI = CE->getAsInstruction();
       return (*this)(TI);
@@ -226,15 +228,15 @@ Use* MDAResolve::operator()(llvm::Value * V)
 list<Value*> ResolverBase::direct_resolve( Value* V, unordered_set<Value*>& resolved, function<void(Value*)> lambda)
 {
    std::list<llvm::Value*> unresolved;
+
    if(resolved.find(V) != resolved.end())
       return unresolved;
-   if(llvm::isa<Argument>(V))
+   if(isa<Argument>(V)){
       unresolved.push_back(V);
-   if(isa<Constant>(V)){
+   } else if(isa<Constant>(V)){
       resolved.insert(V);
       lambda(V);
-   }
-   if(Instruction* I = dyn_cast<Instruction>(V)){
+   }else if(Instruction* I = dyn_cast<Instruction>(V)){
       if(isa<LoadInst>(I)){
          unresolved.push_back(I);
       }else{
@@ -300,7 +302,7 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
 
       resolved.insert(I); // original is resolved;
       lambda(I);
-      Ite = unsolved.erase(Ite);
+      bool dont_erase = false;
       if(isa<StoreInst>(U) || isa<LoadInst>(U)){
          resolved.insert(U);
          lambda(U);
@@ -312,11 +314,13 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
             lambda(CI);
             next = arg->use_back();
          }else{
-            unsolved.insert(--unsolved.end(), CI);//insert before tail
+            dont_erase = true;
             next = NULL;
          }
       }else
          next = U;
+
+      dont_erase?++Ite:Ite = unsolved.erase(Ite);
    }
 
    unsolved.pop_back(); // remove last NULL
@@ -336,4 +340,10 @@ bool ResolverBase::resolve_if(Value *V, function<bool (Value *)> lambda)
          });
    stop_resolve = false;
    return ret;
+}
+
+
+ResolverPass::~ResolverPass(){
+   for(auto I : impls)
+      delete I.second;
 }

@@ -28,7 +28,8 @@ void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 	AU.addRequired<LoopInfo>();
 	AU.addRequired<AliasAnalysis>();
 	AU.addRequired<MemoryDependenceAnalysis>();
-	AU.addRequired<lle::LoopCycle>();
+	AU.addRequired<LoopCycle>();
+   AU.addRequired<ResolverPass>();
 }
 
 bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
