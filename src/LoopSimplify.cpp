@@ -1,11 +1,13 @@
 #include "LoopSimplify.h"
 
 #include <llvm/Support/CommandLine.h>
+#include <llvm/Support/GraphWriter.h>
 
 #include <ValueProfiling.h>
 
 #include <list>
 
+#include "ddg.h"
 #include "loop.h"
 #include "util.h"
 #include "config.h"
@@ -50,6 +52,8 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
    for( auto V : get<1>(RR) )
       MarkPreserve::mark_all<NoResolve>(V, "loop");
 
+   DDG d(get<0>(RR), get<1>(RR), get<2>(RR));
+   WriteGraph(&d, "test.dot");
 	return false;
 }
 

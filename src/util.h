@@ -4,6 +4,7 @@
 #include <list>
 #include <vector>
 #include <llvm/IR/Value.h>
+#include <llvm/ADT/GraphTraits.h>
 #include <llvm/Support/raw_ostream.h>
 
 #define WALK_THROUGH_DEPTH 10

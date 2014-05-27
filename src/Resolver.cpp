@@ -314,14 +314,15 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
       }else
          next = U;
 
-      if(!dont_erase){
+      if(dont_erase){
+         ++Ite;
+      }else{
          resolved.insert(I); // original is resolved;
          lambda(I);
          resolved.insert(U);
          lambda(U);
          Ite = unsolved.erase(Ite);
-      }else
-         ++Ite;
+      }
    }
 
    unsolved.pop_back(); // remove last NULL

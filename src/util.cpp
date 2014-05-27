@@ -219,7 +219,6 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 	else{
 		ASSERT(0,*inst,"not defined instruction print");
 	}
-
 }
 
 Value* lle::castoff(Value* v)
@@ -231,88 +230,3 @@ Value* lle::castoff(Value* v)
 	}else
 		return v;
 }
-#if 0
-static void latex_print(BinaryOperator* bin)
-{
-	static const std::map<int,StringRef> symbols = {
-		{Instruction::Add,"+"},
-		{Instruction::FAdd,"+"},
-		{Instruction::Sub,"-"},
-		{Instruction::FSub,"-"},
-		{Instruction::Mul,"*"},
-		{Instruction::FMul,"*"},
-		{Instruction::UDiv,"/"},
-		{Instruction::SDiv,"/"},
-		{Instruction::FDiv,"/"},
-		{Instruction::URem,"%"},
-		{Instruction::SRem,"%"},
-		{Instruction::FRem,"%"},
-
-		{Instruction::Shl,"<<"},
-		{Instruction::LShr,">>"},
-		{Instruction::AShr,">>"},
-
-		{Instruction::And,"&"},
-		{Instruction::Or,"|"},
-		{Instruction::Xor,"^"}
-	};
-	if(bin->getOpcode()==Instruction::UDiv || bin->getOpcode() == Instruction::SDiv || bin->getOpcode()==Instruction::FDiv){
-		outs()<<"\\frac {";
-		latex_print(bin->getOperand(0));
-		outs()<<"} {";
-		latex_print(bin->getOperand(1));
-		outs()<<"} ";
-		return ;
-	}
-	lle::pretty_print(bin->getOperand(0));
-	if(symbols.at(bin->getOpcode())==""){
-		errs()<<"unknow operator"<<"\n";
-	}
-	outs()<<symbols.at(bin->getOpcode());
-
-	lle::pretty_print(bin->getOperand(1));
-}
-void latex_print(Value* v)
-{
-	if(isa<Constant>(v)){
-		pretty_print(cast<Constant>(v));
-		return;
-	}
-	Instruction* inst = dyn_cast<Instruction>(v);
-	if(!inst) return;
-	if(inst->isBinaryOp())
-		latex_print(cast<BinaryOperator>(inst));
-	else if(isa<CmpInst>(inst))
-		pretty_print(cast<CmpInst>(inst));
-	else if(isa<LoadInst>(inst)||isa<StoreInst>(inst))
-		outs()<<inst->getOperand(0)->getName();
-	else if(isa<SelectInst>(inst)){
-		outs()<<"(";
-		latex_print(inst->getOperand(0));
-		outs()<<") ? ";
-		latex_print(inst->getOperand(1));
-		outs()<<" : ";
-		latex_print(inst->getOperand(2));
-	}
-	else if(isa<CastInst>(inst)){
-		CastInst* c = cast<CastInst>(inst);
-		outs()<<"(";
-		c->getDestTy()->print(outs());
-		outs()<<")";
-		pretty_print(c->getOperand(0));
-	}
-	else if(isa<GetElementPtrInst>(inst)){
-		pretty_print(inst->getOperand(0));
-		for(unsigned i=1;i<inst->getNumOperands();i++){
-			outs()<<"[";
-			pretty_print(inst->getOperand(i));
-			outs()<<"]";
-		}
-	}
-	else{
-		inst->print(outs());outs()<<"\n";
-		assert(0 && "not defined instruction print" );
-	}
-
-}
-#endif

@@ -35,6 +35,7 @@ add_library(LLVMPred SHARED
    Print.cpp
 	loop.cpp
 	util.cpp
+   ddg.cpp
 	)
 
 target_link_libraries(LLVMPred
