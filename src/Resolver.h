@@ -130,10 +130,12 @@ class lle::ResolverPass: public llvm::FunctionPass
    explicit ResolverPass():FunctionPass(ID){
    }
    ~ResolverPass();
-   template<typename R>
-   ResolverBase* getResolver(){
-      return impls[&R::ID]?:(impls[&R::ID]=new lle::Resolver<R>());
+   template<typename T>
+   ResolverBase& getResolver(){
+      typedef lle::Resolver<T> R;
+      return impls[&R::ID]?*impls[&R::ID]:*(impls[&R::ID]=new R());
    }
+   void getAnalysisUsage(llvm::AnalysisUsage& AU) const;
    bool runOnFunction(llvm::Function& F) {return false;}
 
 };

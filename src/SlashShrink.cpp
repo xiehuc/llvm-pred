@@ -95,11 +95,13 @@ SlashShrink::SlashShrink():FunctionPass(ID)
 void SlashShrink::getAnalysisUsage(AnalysisUsage& AU) const
 {
    AU.addRequired<LibCallAliasAnalysis>();
+   AU.addRequired<ResolverPass>();
 }
 
 bool SlashShrink::runOnFunction(Function &F)
 {
    LibCallAliasAnalysis& LibCall = getAnalysis<LibCallAliasAnalysis>();
+   ResolverPass& RP = getAnalysis<ResolverPass>();
    if(LibCall.LCI == NULL) LibCall.LCI = new LibCallFromFile(); /* use LibCall
                                                                to cache LCI */
    LLVMContext& C = F.getContext();
@@ -113,9 +115,9 @@ bool SlashShrink::runOnFunction(Function &F)
          MarkPreserve::mark(dyn_cast<Instruction>(Prof));
       }
 
-      unsolved = MarkPreserve::mark_all<UseOnlyResolve>(BB->getTerminator(), "terminal");
+      unsolved = MarkPreserve::mark_all(BB->getTerminator(), RP.getResolver<UseOnlyResolve>(), "terminal");
       for(auto I : unsolved){
-         MarkPreserve::mark_all<NoResolve>(I, "terminal");
+         MarkPreserve::mark_all(I, RP.getResolver<NoResolve>(), "terminal");
       }
 
       for(auto I = BB->begin(), E = BB->end(); I != E; ++I){
@@ -131,7 +133,7 @@ bool SlashShrink::runOnFunction(Function &F)
             if(!Func) continue;
             if(!Func->empty()){  /* a func's body is empty, means it is not a
                                     native function */
-               MarkPreserve::mark_all<NoResolve>(CI, "callgraph");
+               MarkPreserve::mark_all(CI, RP.getResolver<NoResolve>(), "callgraph");
             }else{  /* to make sure whether this is an *important* function, we
                        need lookup a dictionary, in there, we use a libcall to
                        do it */
@@ -139,7 +141,7 @@ bool SlashShrink::runOnFunction(Function &F)
                if(FuncInfo && FuncInfo->UniversalBehavior &
                      AliasAnalysis::ModRefResult::Mod){ /* the function writes
                                                            memory */
-                  MarkPreserve::mark_all<NoResolve>(CI, "callgraph");
+                  MarkPreserve::mark_all(CI, RP.getResolver<NoResolve>(), "callgraph");
                }
             }
          }
@@ -149,7 +151,7 @@ bool SlashShrink::runOnFunction(Function &F)
    for(auto BB = F.begin(), E = F.end(); BB !=E; ++BB){
       for(auto I = BB->begin(), E = BB->end(); I != E; ++I){
          if(MarkPreserve::is_marked(I))
-            MarkPreserve::mark_all<NoResolve>(I, "closure");
+            MarkPreserve::mark_all(I, RP.getResolver<NoResolve>(), "closure");
       }
    }
 

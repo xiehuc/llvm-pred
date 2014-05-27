@@ -13,7 +13,7 @@ using namespace lle;
 using namespace llvm;
 
 char ResolverPass::ID = 0;
-static RegisterPass<ResolverPass> Y("-","A Pass used to cache Resolver Result",false,false);
+static RegisterPass<ResolverPass> Y("-Resolver","A Pass used to cache Resolver Result",false,false);
 
 static Argument* findCallInstArgument(CallInst* CI,Value* v)
 {
@@ -31,7 +31,7 @@ static Argument* findCallInstArgument(CallInst* CI,Value* v)
 }
 
 #ifdef ENABLE_DEBUG
-static void debug_print_resolved(unordered_set<Value*>& resolved)
+void debug_print_resolved(unordered_set<Value*>& resolved)
 {
    for ( auto V : resolved){
       outs()<<*V<<"\n";
@@ -342,6 +342,10 @@ bool ResolverBase::resolve_if(Value *V, function<bool (Value *)> lambda)
    return ret;
 }
 
+void ResolverPass::getAnalysisUsage(llvm::AnalysisUsage &AU) const
+{
+   AU.setPreservesAll();
+}
 
 ResolverPass::~ResolverPass(){
    for(auto I : impls)

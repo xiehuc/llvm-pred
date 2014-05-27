@@ -25,24 +25,24 @@ static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simpl
 void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
 	AU.setPreservesAll();
-	AU.addRequired<LoopInfo>();
 	AU.addRequired<AliasAnalysis>();
 	AU.addRequired<MemoryDependenceAnalysis>();
-	AU.addRequired<LoopCycle>();
    AU.addRequired<ResolverPass>();
+	AU.addRequired<LoopCycle>();
 }
 
 bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 {
 	CurL = L;
-	lle::LoopCycle& LC = getAnalysis<lle::LoopCycle>();
+	LoopCycle& LC = getAnalysis<LoopCycle>();
+   ResolverPass& RP = getAnalysis<ResolverPass>();
 	Value* CC = LC.getLoopCycle(L);
 	if(!CC) return false;
 
    // auto insert value trap when used -insert-value-profiling
    CC = ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 
-   lle::Resolver<UseOnlyResolve> R;
+   auto& R = RP.getResolver<UseOnlyResolve>();
    ResolveResult RR = R.resolve(CC, [](Value* V){
          if(Instruction* I = dyn_cast<Instruction>(V))
             MarkPreserve::mark(I, "loop");
@@ -63,7 +63,8 @@ void lle::LoopCycleSimplify::print(llvm::raw_ostream &OS, const llvm::Module *) 
 		OS<<"Cycles:";
 		lle::pretty_print(CC, OS);
       OS<<"\n";
-      lle::Resolver<UseOnlyResolve> R;
+      lle::Resolver<UseOnlyResolve> R; /* print is not a part of normal process
+         . so don't make it modify resolver cache*/
       OS<<"resolved:\n";
       lle::ResolveResult RR = R.resolve(CC, [&OS](Value* V){
             if(isa<Function>(V)) return;
