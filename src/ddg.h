@@ -11,6 +11,8 @@
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/GraphTraits.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/DOTGraphTraits.h>
 
 namespace lle{
    struct DDGraph;
@@ -19,6 +21,7 @@ namespace lle{
 namespace llvm{
    template<> struct GraphTraits<lle::DDGraph*>;
    template<> struct GraphTraits<lle::DDGNode*>;
+   template<> struct DOTGraphTraits<lle::DDGraph*>;
 }
 
 struct lle::DDGNode: public llvm::DenseMap<llvm::Value*, std::vector<lle::DDGNode*> >::value_type
@@ -94,6 +97,23 @@ struct llvm::GraphTraits<lle::DDGraph*>:public llvm::GraphTraits<lle::DDGNode*>
       return static_cast<NodeType*>(&V);
    }
 
+};
+
+template<>
+struct llvm::DOTGraphTraits<lle::DDGraph*> : public llvm::DefaultDOTGraphTraits
+{
+   DOTGraphTraits(bool isSimple = false) : DefaultDOTGraphTraits(isSimple) {}
+
+   static std::string getGraphName(lle::DDGraph* G){ 
+      return "Data Dependencies Graph";
+   }
+
+   std::string getNodeLabel(lle::DDGNode* N,lle::DDGraph* G){
+      std::string ret;
+      llvm::raw_string_ostream os(ret);
+      N->first->print(os);
+      return ret;
+   }
 };
 
 #endif
