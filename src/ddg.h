@@ -14,9 +14,12 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/DOTGraphTraits.h>
 
+#include "Resolver.h"
+
 namespace lle{
    struct DDGraph;
    struct DDGNode;
+   typedef llvm::DenseMap<llvm::Value*, std::pair<ulong, std::vector<DDGNode*> > > DDGValueType;
 }
 namespace llvm{
    template<> struct GraphTraits<lle::DDGraph*>;
@@ -25,23 +28,26 @@ namespace llvm{
 }
 
 struct lle::DDGNode: 
-   public llvm::DenseMap<llvm::Value*, std::vector<lle::DDGNode*> >::value_type
+   public DDGValueType::value_type
 {
-   typedef llvm::DenseMap<llvm::Value*, std::vector<lle::DDGNode*> > Container;
+   typedef DDGValueType Container;
+   typedef std::vector<lle::DDGNode*> Edges;
    typedef std::vector<lle::DDGNode*>::iterator iterator;
+   enum Flags{
+      NORMAL = 0,
+      UNSOLVED = 1,
+      IMPLICITY = 2,
+   };
 
-   DDGNode(llvm::Value* node){
+   DDGNode(llvm::Value* node, Flags flag){
       this->first = node;
+      this->second.first = flag;
    }
 
-   iterator begin(){
-      return this->second.begin();
-   }
-
-   iterator end(){
-      return this->second.end();
-   }
-
+   Flags& flags(){ return (Flags&)this->second.first; }
+   iterator begin(){ return this->second.second.begin(); }
+   iterator end(){ return this->second.second.end(); }
+   Edges& edges(){ return this->second.second;}
 };
 
 
@@ -49,15 +55,10 @@ struct lle::DDGNode:
  *  never tring copy it
  */
 struct lle::DDGraph : 
-   public lle::DDGNode::Container
+   public lle::DDGValueType
 {
-   typedef std::unordered_set<llvm::Value*> ResolvedListParam;
-   typedef std::list<llvm::Value*> UnsolvedList;
-   typedef std::unordered_map<llvm::Value*, llvm::Use*> ImplicityLinkType;
-
-   UnsolvedList unsolved;
    DDGNode* root;
-   DDGraph(ResolvedListParam& r,UnsolvedList& u,ImplicityLinkType& c,llvm::Value* root);
+   DDGraph(lle::ResolveResult& RR, llvm::Value* root);
 };
 
 template<>
@@ -112,6 +113,18 @@ struct llvm::DOTGraphTraits<lle::DDGraph*> : public llvm::DefaultDOTGraphTraits
    static std::string getGraphName(lle::DDGraph* G){ 
       return "Data Dependencies Graph";
    }
+
+   static std::string getNodeAttributes(lle::DDGNode* N,lle::DDGraph* G){
+      if(N->flags() == lle::DDGNode::UNSOLVED) return "style=dotted";
+      else return "";
+   }
+
+   static std::string getEdgeAttributes(lle::DDGNode* S,lle::DDGNode::iterator T,lle::DDGraph* G){
+      if(S->flags() == lle::DDGNode::IMPLICITY) return "color=red";
+      else return "";
+   }
+
+   static bool renderGraphFromBottomUp(){ return true;}
 
    std::string getNodeLabel(lle::DDGNode* N,lle::DDGraph* G){
       std::string ret;

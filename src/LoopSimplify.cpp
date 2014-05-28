@@ -62,8 +62,8 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 
       StringRef func_name = L->getHeader()->getParent()->getName();
 
-      DDGraph d(get<0>(RR), get<1>(RR), get<2>(RR), CC);
-      WriteGraph(&d, func_name+"-ddg", false, loop_name);
+      DDGraph d(RR, CC);
+      WriteGraph(&d, func_name+"-ddg", false, os.str());
    }
 	return false;
 }
