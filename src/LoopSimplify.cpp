@@ -1,5 +1,6 @@
 #include "LoopSimplify.h"
 
+#include <llvm/IR/Module.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/GraphWriter.h>
 
@@ -22,6 +23,7 @@ using namespace llvm;
 
 char LoopCycleSimplify::ID = 0;
 
+static cl::opt<bool> Ddg("Ddg", cl::desc("Draw Data Dependencies Graph"));
 static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simplify Pass",false,false);
 
 void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
@@ -39,6 +41,7 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 	LoopCycle& LC = getAnalysis<LoopCycle>();
    ResolverPass& RP = getAnalysis<ResolverPass>();
 	Value* CC = LC.getLoopCycle(L);
+
 	if(!CC) return false;
 
    // auto insert value trap when used -insert-value-profiling
@@ -52,12 +55,20 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
    for( auto V : get<1>(RR) )
       MarkPreserve::mark_all<NoResolve>(V, "loop");
 
-   DDGraph d(get<0>(RR), get<1>(RR), get<2>(RR), CC);
-   WriteGraph(&d, "test.dot");
+   if(Ddg && get<0>(RR).size()>1){
+      string loop_name;
+      raw_string_ostream os(loop_name);
+      L->print(os);
+
+      StringRef func_name = L->getHeader()->getParent()->getName();
+
+      DDGraph d(get<0>(RR), get<1>(RR), get<2>(RR), CC);
+      WriteGraph(&d, func_name+"-ddg", false, loop_name);
+   }
 	return false;
 }
 
-void lle::LoopCycleSimplify::print(llvm::raw_ostream &OS, const llvm::Module *) const
+void lle::LoopCycleSimplify::print(llvm::raw_ostream &OS, const llvm::Module *M) const
 {
 	auto& LC = getAnalysis<lle::LoopCycle>();
 	Value* CC = LC.getLoopCycle(CurL);

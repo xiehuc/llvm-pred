@@ -24,7 +24,8 @@ namespace llvm{
    template<> struct DOTGraphTraits<lle::DDGraph*>;
 }
 
-struct lle::DDGNode: public llvm::DenseMap<llvm::Value*, std::vector<lle::DDGNode*> >::value_type
+struct lle::DDGNode: 
+   public llvm::DenseMap<llvm::Value*, std::vector<lle::DDGNode*> >::value_type
 {
    typedef llvm::DenseMap<llvm::Value*, std::vector<lle::DDGNode*> > Container;
    typedef std::vector<lle::DDGNode*>::iterator iterator;
@@ -44,7 +45,11 @@ struct lle::DDGNode: public llvm::DenseMap<llvm::Value*, std::vector<lle::DDGNod
 };
 
 
-struct lle::DDGraph : public lle::DDGNode::Container
+/** never tring modify the data content
+ *  never tring copy it
+ */
+struct lle::DDGraph : 
+   public lle::DDGNode::Container
 {
    typedef std::unordered_set<llvm::Value*> ResolvedListParam;
    typedef std::list<llvm::Value*> UnsolvedList;
