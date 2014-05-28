@@ -72,7 +72,7 @@ Use* UseOnlyResolve::operator()(Value* V)
       //seems all things who use target is after target
       auto U = Target->getUser();
       if(isa<StoreInst>(U) && U->getOperand(1) == Target->get())
-         return Target;
+         return &U->getOperandUse(0);
       if(CallInst* CI = dyn_cast<CallInst>(U)){
          Argument* arg = findCallInstArgument(CI, Target->get());
          if(arg && !arg->hasNoCaptureAttr() && !arg->onlyReadsMemory()) // adjust attribute
