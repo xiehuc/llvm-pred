@@ -52,7 +52,7 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
    for( auto V : get<1>(RR) )
       MarkPreserve::mark_all<NoResolve>(V, "loop");
 
-   DDG d(get<0>(RR), get<1>(RR), get<2>(RR));
+   DDGraph d(get<0>(RR), get<1>(RR), get<2>(RR), CC);
    WriteGraph(&d, "test.dot");
 	return false;
 }

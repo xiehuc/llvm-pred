@@ -13,17 +13,17 @@
 #include <llvm/ADT/GraphTraits.h>
 
 namespace lle{
-   struct DDG;
+   struct DDGraph;
    struct DDGNode;
 }
 namespace llvm{
-   template<> struct GraphTraits<lle::DDG*>;
+   template<> struct GraphTraits<lle::DDGraph*>;
    template<> struct GraphTraits<lle::DDGNode*>;
 }
 
 struct lle::DDGNode: public llvm::DenseMap<llvm::Value*, std::vector<lle::DDGNode*> >::value_type
 {
-   typedef llvm::DenseMap<llvm::Value*, std::vector<lle::DDGNode*> > Super;
+   typedef llvm::DenseMap<llvm::Value*, std::vector<lle::DDGNode*> > Container;
    typedef std::vector<lle::DDGNode*>::iterator iterator;
 
    DDGNode(llvm::Value* node){
@@ -40,21 +40,16 @@ struct lle::DDGNode: public llvm::DenseMap<llvm::Value*, std::vector<lle::DDGNod
 
 };
 
-struct lle::DDG {
+
+struct lle::DDGraph : public lle::DDGNode::Container
+{
    typedef std::unordered_set<llvm::Value*> ResolvedListParam;
-   typedef llvm::DenseMap<llvm::Value*, std::vector<lle::DDGNode*> > ResolvedList;
    typedef std::list<llvm::Value*> UnsolvedList;
    typedef std::unordered_map<llvm::Value*, llvm::Use*> ImplicityLinkType;
 
-   ResolvedList resolved;
    UnsolvedList unsolved;
    DDGNode* root;
-   DDG(ResolvedListParam& r,UnsolvedList& u,ImplicityLinkType& c);
-   typedef ResolvedList::iterator iterator;
-
-   iterator begin() { return resolved.begin(); }
-   iterator end() { return resolved.end(); }
-
+   DDGraph(ResolvedListParam& r,UnsolvedList& u,ImplicityLinkType& c,llvm::Value* root);
 };
 
 template<>
@@ -72,27 +67,27 @@ struct llvm::GraphTraits<lle::DDGNode*>
 };
 
 template<>
-struct llvm::GraphTraits<lle::DDG*>:public llvm::GraphTraits<lle::DDGNode*>
+struct llvm::GraphTraits<lle::DDGraph*>:public llvm::GraphTraits<lle::DDGNode*>
 {
    typedef lle::DDGNode NodeType;
 
-   static NodeType* getEntryNode(lle::DDG* G){
+   static NodeType* getEntryNode(lle::DDGraph* G){
       return G->root;
    }
 
-   typedef lle::DDG::ResolvedList::value_type ValuePairTy;
+   typedef lle::DDGraph::value_type ValuePairTy;
    typedef std::pointer_to_unary_function<ValuePairTy&, NodeType*>
       DerefFun;
-   typedef llvm::mapped_iterator<lle::DDG::iterator, DerefFun> nodes_iterator;
+   typedef llvm::mapped_iterator<lle::DDGraph::iterator, DerefFun> nodes_iterator;
 
-   static nodes_iterator nodes_begin(lle::DDG* G){
+   static nodes_iterator nodes_begin(lle::DDGraph* G){
       return llvm::map_iterator(G->begin(), DerefFun(Deref));
    }
-   static nodes_iterator nodes_end(lle::DDG* G){
+   static nodes_iterator nodes_end(lle::DDGraph* G){
       return llvm::map_iterator(G->end(), DerefFun(Deref));
    }
-   static unsigned size(lle::DDG* G){
-      return G->resolved.size();
+   static unsigned size(lle::DDGraph* G){
+      return G->size();
    }
 
    static NodeType* Deref(ValuePairTy& V){
