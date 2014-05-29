@@ -1,4 +1,5 @@
 #include "ddg.h"
+#include "util.h"
 #include <llvm/IR/Instruction.h>
 
 using namespace std;
@@ -23,8 +24,18 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
       if(node->flags() & DDGNode::UNSOLVED) continue;
       Use* implicity = (found == c.end())?nullptr:found->second;
       if(implicity){
-         node->edges().push_back(static_cast<DDGNode*>(&*this->find(implicity->getUser())));
+         DDGNode* to = static_cast<DDGNode*>(&*this->find(implicity->getUser()));
+         node->edges().push_back(to);
          node->flags() = DDGNode::IMPLICITY;
+         if(isa<CallInst>(implicity->getUser())){
+            Argument* arg = findCallInstArgument(implicity);
+            auto found = c.find(cast<Value>(arg));
+            Use* link = (found==c.end())?nullptr:found->second;
+            if(link){
+               to->edges().push_back(static_cast<DDGNode*>(&*this->find(link->getUser())));
+               to->flags() = DDGNode::IMPLICITY;
+            }
+         }
       }else{
          Instruction* Inst = dyn_cast<llvm::Instruction>(N.first);
          if(!Inst) continue;

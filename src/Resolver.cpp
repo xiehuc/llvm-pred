@@ -15,21 +15,6 @@ using namespace llvm;
 char ResolverPass::ID = 0;
 static RegisterPass<ResolverPass> Y("-Resolver","A Pass used to cache Resolver Result",false,false);
 
-static Argument* findCallInstArgument(CallInst* CI,Value* v)
-{
-   uint idx = find(CI->op_begin(), CI->op_end(), 
-         v) - CI->op_begin(); //find argument position FIXME 这里有问题
-   Assert(idx != CI->getNumOperands(), "");
-   Function* CF = dyn_cast<Function>(castoff(CI->getCalledValue()));
-   Assert(CF," called function should not be null");
-   if(CF->getArgumentList().size() <= idx) // there are no enough argument
-      // FIXME: 通常，调用的外部函数是(...)格式，也就是说不知道会不会写入！
-      return NULL;
-   auto ite = CF->getArgumentList().begin();
-   advance(ite,idx); /* get function argument */
-   return &*ite;
-}
-
 #ifdef ENABLE_DEBUG
 void debug_print_resolved(unordered_set<Value*>& resolved)
 {
@@ -73,8 +58,8 @@ Use* UseOnlyResolve::operator()(Value* V)
       auto U = Target->getUser();
       if(isa<StoreInst>(U) && U->getOperand(1) == Target->get())
          return &U->getOperandUse(0);
-      if(CallInst* CI = dyn_cast<CallInst>(U)){
-         Argument* arg = findCallInstArgument(CI, Target->get());
+      if(isa<CallInst>(U)){
+         Argument* arg = findCallInstArgument(Target);
          if(arg && !arg->hasNoCaptureAttr() && !arg->onlyReadsMemory()) // adjust attribute
             //if no nocapture and readonly, it means could write into this addr
             return Target;
@@ -287,13 +272,14 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
 
       Use* res = NULL;
       Instruction* I = dyn_cast<Instruction>(*Ite);
+      //FIXME: may be we should directly drop A to deep_resolve(A)
       if(!I){
          ++Ite;
          continue;
       }
 
       res = deep_resolve(I);
-      partial.insert(make_pair(I,res));
+      partial.insert(make_pair(*Ite,res));
       if(!res){
          ++Ite;
          continue;
@@ -303,10 +289,25 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
       bool dont_erase = false;
       if(isa<StoreInst>(U) || isa<LoadInst>(U)){
          next = res->get();
-      }else if(CallInst* CI = dyn_cast<CallInst>(U)){
-         Argument* arg = findCallInstArgument(CI, res->get());
+      }else if(isa<CallInst>(U)){
+         Argument* arg = findCallInstArgument(res);
          if(arg && arg->getNumUses()>0){
+#if 0
+            auto back = arg->use_back();
+            Use* link = NULL;
+            if(isa<StoreInst>(back)){
+               link = &back->getOperandUse(0);
+            }else{
+               link = UseOnlyResolve()(back);
+            }
+            partial.insert(make_pair(arg,link));
+#endif
+            Assert(isa<StoreInst>(arg->use_back()), 
+                  "now we only process arg use_back is storeinst");
+            if(isa<StoreInst>(arg->use_back())){
+            partial.insert(make_pair(arg,&arg->use_back()->getOperandUse(0)));
             next = arg->use_back();
+            }
          }else{
             dont_erase = true;
             next = NULL;

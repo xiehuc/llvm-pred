@@ -10,6 +10,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/STLExtras.h>
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/GraphTraits.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/DOTGraphTraits.h>
@@ -19,7 +20,8 @@
 namespace lle{
    struct DDGraph;
    struct DDGNode;
-   typedef llvm::DenseMap<llvm::Value*, std::pair<ulong, std::vector<DDGNode*> > > DDGValueType;
+   typedef llvm::SmallVector<DDGNode*, 3> DDGNodeValueType;
+   typedef llvm::DenseMap<llvm::Value*, std::pair<ulong, DDGNodeValueType > > DDGValueType;
 }
 namespace llvm{
    template<> struct GraphTraits<lle::DDGraph*>;
@@ -31,8 +33,8 @@ struct lle::DDGNode:
    public DDGValueType::value_type
 {
    typedef DDGValueType Container;
-   typedef std::vector<lle::DDGNode*> Edges;
-   typedef std::vector<lle::DDGNode*>::iterator iterator;
+   typedef DDGNodeValueType Edges;
+   typedef DDGNodeValueType::iterator iterator;
    enum Flags{
       NORMAL = 0,
       UNSOLVED = 1,

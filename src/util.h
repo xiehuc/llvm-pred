@@ -17,7 +17,7 @@ namespace lle
 	//because cast means the original value and the returned value is
 	//semanticly equal
 	llvm::Value* castoff(llvm::Value* v);
-
+   llvm::Argument* findCallInstArgument(llvm::Use* use);
 }
 
 #endif
