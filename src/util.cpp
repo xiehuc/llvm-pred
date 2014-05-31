@@ -26,9 +26,9 @@ using namespace llvm;
 
 static SmallVector<int,16> op_precd((unsigned)1,16); // operator precedence with 1 element 16 back
 
-static void pretty_print(BinaryOperator* bin,raw_ostream& o)
+const pair<const char*, int>& lle::lookup_sym(BinaryOperator* BO)
 {
-	static const std::map<int,std::pair<StringRef,int> > symbols = {
+	static const std::map<int,std::pair<const char*,int> > symbols = {
 		{Instruction::Add,{"+",5}},
 		{Instruction::FAdd,{"+",5}},
 		{Instruction::Sub,{"-",5}},
@@ -50,11 +50,17 @@ static void pretty_print(BinaryOperator* bin,raw_ostream& o)
 		{Instruction::Or,{"|",11}},
 		{Instruction::Xor,{"^",10}}
 	};
-	int precd = symbols.at(bin->getOpcode()).second;
+
+   return symbols.at(BO->getOpcode());
+}
+
+static void pretty_print(BinaryOperator* bin,raw_ostream& o)
+{
+	int precd = lookup_sym(bin).second;
 	PUSH_BRACKETS(precd);
 
 	pretty_print(bin->getOperand(0),o);
-	if(symbols.at(bin->getOpcode()).first==""){
+	if(lookup_sym(bin).first==NULL){
 		errs()<<"unknow operator"<<"\n";
 	}
 	//if operand 1 is negative ,should ignore + symbol (+-1)-> (-1)
@@ -66,15 +72,15 @@ static void pretty_print(BinaryOperator* bin,raw_ostream& o)
 		if(CFP && CFP->isNegative()) ignore = true;
 	}
 	if(!ignore)
-		o<<" "<<symbols.at(bin->getOpcode()).first<<" ";
+		o<<" "<<lookup_sym(bin).first<<" ";
 	pretty_print(bin->getOperand(1),o);
 
 	POP_BRACKETS(precd);
 }
 
-static void pretty_print(CmpInst* cmp,raw_ostream& o)
+const pair<const char*, int>& lle::lookup_sym(CmpInst* CI)
 {
-	static const std::map<int,std::pair<StringRef,int> > symbols = {
+	static const std::map<int,std::pair<const char*,int> > symbols = {
 		{CmpInst::FCMP_FALSE,{"false",1}},
 		{CmpInst::FCMP_OEQ,{"==",8}},
 		{CmpInst::FCMP_OGT,{">",7}},
@@ -102,11 +108,17 @@ static void pretty_print(CmpInst* cmp,raw_ostream& o)
 		{CmpInst::ICMP_SLT,{"<",7}},
 		{CmpInst::ICMP_SLE,{"<=",7}},
 	};
-	int precd = symbols.at(cmp->getPredicate()).second;
+
+   return symbols.at(CI->getPredicate());
+}
+
+static void pretty_print(CmpInst* cmp,raw_ostream& o)
+{
+	int precd = lookup_sym(cmp).second;
 	PUSH_BRACKETS(precd);
 
 	pretty_print(cmp->getOperand(0),o);
-	o<<" "<<symbols.at(cmp->getPredicate()).first<<" ";
+	o<<" "<<lookup_sym(cmp).first<<" ";
 	pretty_print(cmp->getOperand(1),o);
 
 	POP_BRACKETS(precd);
@@ -114,19 +126,17 @@ static void pretty_print(CmpInst* cmp,raw_ostream& o)
 
 static void pretty_print(Constant* c,raw_ostream& o)
 {
-	if(isa<ConstantInt>(c))
-		cast<ConstantInt>(c)->getValue().print(o, true);
-	else if(isa<ConstantFP>(c))
-		o<< cast<ConstantFP>(c)->getValueAPF().convertToDouble();
+	if(auto CI = dyn_cast<ConstantInt>(c))
+		CI->getValue().print(o, true);
+	else if(auto CFP = dyn_cast<ConstantFP>(c))
+		o<< CFP->getValueAPF().convertToDouble();
 	else if(isa<GlobalValue>(c))
 		o<<"@"<<c->getName();
-	else if(isa<ConstantExpr>(c)){
-		ConstantExpr* CExp = cast<ConstantExpr>(c);
-		lle::pretty_print(CExp->getAsInstruction(),o);
-	}else{
+	else if(auto CE = dyn_cast<ConstantExpr>(c))
+		lle::pretty_print(CE->getAsInstruction(),o);
+	else
 		o<<*c;
 		//ASSERT(0,*c,"not defined Constant print");
-	}
 }
 
 static void pretty_print(PHINode* PH,raw_ostream& o)
@@ -165,8 +175,8 @@ static void pretty_print(PHINode* PH,raw_ostream& o)
 
 void lle::pretty_print(Value* v,raw_ostream& o)
 {
-	if(isa<Constant>(v)){
-		::pretty_print(cast<Constant>(v),o);
+	if(auto C = dyn_cast<Constant>(v)){
+		::pretty_print(C,o);
 		return;
 	}
 	if(isa<Argument>(v))
@@ -218,9 +228,10 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 		}
 	}
 	else{
-		ASSERT(0,*inst,"not defined instruction print");
+		Assert(0,*inst<<"not defined instruction print");
 	}
 }
+
 
 Value* lle::castoff(Value* v)
 {

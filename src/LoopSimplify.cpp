@@ -64,6 +64,8 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 
       DDGraph d(RR, CC);
       WriteGraph(&d, func_name+"-ddg", false, os.str());
+      errs()<<"Cycles: "<<d.expr()<<"\n";
+
    }
 	return false;
 }

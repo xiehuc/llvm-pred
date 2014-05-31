@@ -4,6 +4,7 @@
 #include <list>
 #include <vector>
 #include <llvm/IR/Value.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/ADT/GraphTraits.h>
 #include <llvm/Support/raw_ostream.h>
 
@@ -11,6 +12,8 @@
 
 namespace lle
 {
+   const std::pair<const char*, int>& lookup_sym(llvm::CmpInst* CI);
+   const std::pair<const char*, int>& lookup_sym(llvm::BinaryOperator* BO);
 	void pretty_print(llvm::Value* v,llvm::raw_ostream& o = llvm::outs());
 
 	//remove cast instruction for a value

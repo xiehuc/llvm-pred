@@ -42,34 +42,19 @@ class lle::DDGNode{
    friend class DDGraph;
    DDGNodeImpl childs_;
    ushort depth_;
+   ushort ref_num_;
    Flags flags_;
+   llvm::Twine expr_;
+
    public:
+   std::string expr_buf;
    Flags flags(){return flags_;}
    ushort depth(){return depth_;}
+   llvm::Twine expr(){return expr_;}
    iterator begin(){return childs_.begin();}
    iterator end(){return childs_.end();}
    DDGNodeImpl& impl(){return childs_;}
 };
-
-/*struct lle::DDGNode: 
-   public DDGValueType::value_type
-{
-   typedef DDGValueType Container;
-   typedef DDGNodeValueType Edges;
-   typedef DDGNodeValueType::iterator iterator;
-   typedef DDGValueImpl::Flags Flags;
-
-   DDGNode(llvm::Value* node, Flags flag){
-      this->first = node;
-      this->second.flags = flag;
-   }
-
-   Flags& flags(){ return (Flags&)this->second.first; }
-   iterator begin(){ return this->second.second.begin(); }
-   iterator end(){ return this->second.second.end(); }
-   Edges& edges(){ return this->second.second;}
-};*/
-
 
 /** never tring modify the data content
  *  never tring copy it
@@ -77,10 +62,11 @@ class lle::DDGNode{
 struct lle::DDGraph : 
    public lle::DDGraphImpl
 {
-   static DDGValue make_value(llvm::Value* root, DDGNode::Flags flags);
+   DDGValue make_value(llvm::Value* root, DDGNode::Flags flags);
 
    DDGValue* root;
    DDGraph(lle::ResolveResult& RR, llvm::Value* root);
+   llvm::Twine expr();
 };
 
 template<>
