@@ -31,9 +31,8 @@ Use* NoResolve::operator()(Value* V)
    if(!I) return NULL;
    if(isa<LoadInst>(I) || isa<StoreInst>(I))
       return &I->getOperandUse(0);
-      //return dyn_cast<Instruction>(I->getOperand(0));
-   else if(isa<CallInst>(I))
-      return NULL; // FIXME:not correct
+   //else if(isa<CallInst>(I))
+   //   return NULL; // FIXME:not correct, first Assert, then watch which promot a call inst situation
    else
       Assert(0,*I);
    return NULL;
@@ -59,8 +58,8 @@ Use* UseOnlyResolve::operator()(Value* V)
       if(isa<StoreInst>(U) && U->getOperand(1) == Target->get())
          return &U->getOperandUse(0);
       if(isa<CallInst>(U)){
-         Argument* arg = findCallInstArgument(Target);
-         if(arg && !arg->hasNoCaptureAttr() && !arg->onlyReadsMemory()) // adjust attribute
+         Argument* arg = findCallInstArgument(Target); // adjust attribute
+         if(arg && !arg->hasNoCaptureAttr() && !arg->onlyReadsMemory()) 
             //if no nocapture and readonly, it means could write into this addr
             return Target;
       }
@@ -291,23 +290,10 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
          next = res->get();
       }else if(isa<CallInst>(U)){
          Argument* arg = findCallInstArgument(res);
-         if(arg && arg->getNumUses()>0){
-#if 0
-            auto back = arg->use_back();
-            Use* link = NULL;
-            if(isa<StoreInst>(back)){
-               link = &back->getOperandUse(0);
-            }else{
-               link = UseOnlyResolve()(back);
-            }
-            partial.insert(make_pair(arg,link));
-#endif
-            Assert(isa<StoreInst>(arg->use_back()), 
-                  "now we only process arg use_back is storeinst");
-            if(isa<StoreInst>(arg->use_back())){
+         if(arg && arg->getNumUses()>0 && isa<StoreInst>(arg->use_back())){
+            // FIXME: when the last inst is not store, we consider this is unsolved
             partial.insert(make_pair(arg,&arg->use_back()->getOperandUse(0)));
             next = arg->use_back();
-            }
          }else{
             dont_erase = true;
             next = NULL;
