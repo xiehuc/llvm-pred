@@ -18,69 +18,89 @@
 #include "Resolver.h"
 
 namespace lle{
-   struct DDGraph;
    struct DDGNode;
-   typedef llvm::SmallVector<DDGNode*, 3> DDGNodeValueType;
-   typedef llvm::DenseMap<llvm::Value*, std::pair<ulong, DDGNodeValueType > > DDGValueType;
+   typedef llvm::DenseMap<llvm::Value*, DDGNode > DDGraphImpl;
+   typedef DDGraphImpl::value_type DDGValue;
+   struct DDGraph;
 }
 namespace llvm{
    template<> struct GraphTraits<lle::DDGraph*>;
-   template<> struct GraphTraits<lle::DDGNode*>;
+   template<> struct GraphTraits<lle::DDGValue*>;
    template<> struct DOTGraphTraits<lle::DDGraph*>;
 }
 
-struct lle::DDGNode: 
-   public DDGValueType::value_type
-{
-   typedef DDGValueType Container;
-   typedef DDGNodeValueType Edges;
-   typedef DDGNodeValueType::iterator iterator;
+class lle::DDGNode{
+   public:
+   typedef llvm::SmallVector<DDGValue*, 3> DDGNodeImpl;
+   typedef DDGNodeImpl::iterator iterator;
    enum Flags{
       NORMAL = 0,
       UNSOLVED = 1,
       IMPLICITY = 2,
    };
+   private:
+   friend class DDGraph;
+   DDGNodeImpl childs_;
+   ushort depth_;
+   Flags flags_;
+   public:
+   Flags flags(){return flags_;}
+   ushort depth(){return depth_;}
+   iterator begin(){return childs_.begin();}
+   iterator end(){return childs_.end();}
+   DDGNodeImpl& impl(){return childs_;}
+};
+
+/*struct lle::DDGNode: 
+   public DDGValueType::value_type
+{
+   typedef DDGValueType Container;
+   typedef DDGNodeValueType Edges;
+   typedef DDGNodeValueType::iterator iterator;
+   typedef DDGValueImpl::Flags Flags;
 
    DDGNode(llvm::Value* node, Flags flag){
       this->first = node;
-      this->second.first = flag;
+      this->second.flags = flag;
    }
 
    Flags& flags(){ return (Flags&)this->second.first; }
    iterator begin(){ return this->second.second.begin(); }
    iterator end(){ return this->second.second.end(); }
    Edges& edges(){ return this->second.second;}
-};
+};*/
 
 
 /** never tring modify the data content
  *  never tring copy it
  */
 struct lle::DDGraph : 
-   public lle::DDGValueType
+   public lle::DDGraphImpl
 {
-   DDGNode* root;
+   static DDGValue make_value(llvm::Value* root, DDGNode::Flags flags);
+
+   DDGValue* root;
    DDGraph(lle::ResolveResult& RR, llvm::Value* root);
 };
 
 template<>
-struct llvm::GraphTraits<lle::DDGNode*>
+struct llvm::GraphTraits<lle::DDGValue*>
 {
    typedef lle::DDGNode::iterator ChildIteratorType;
 
-   static ChildIteratorType child_begin(lle::DDGNode* N){
-      return N->begin();
+   static ChildIteratorType child_begin(lle::DDGValue* N){
+      return N->second.begin();
    }
 
-   static ChildIteratorType child_end(lle::DDGNode* N){
-      return N->end();
+   static ChildIteratorType child_end(lle::DDGValue* N){
+      return N->second.end();
    }
 };
 
 template<>
-struct llvm::GraphTraits<lle::DDGraph*>:public llvm::GraphTraits<lle::DDGNode*>
+struct llvm::GraphTraits<lle::DDGraph*>:public llvm::GraphTraits<lle::DDGValue*>
 {
-   typedef lle::DDGNode NodeType;
+   typedef lle::DDGValue NodeType;
 
    static NodeType* getEntryNode(lle::DDGraph* G){
       return G->root;
@@ -116,19 +136,19 @@ struct llvm::DOTGraphTraits<lle::DDGraph*> : public llvm::DefaultDOTGraphTraits
       return "Data Dependencies Graph";
    }
 
-   static std::string getNodeAttributes(lle::DDGNode* N,lle::DDGraph* G){
-      if(N->flags() == lle::DDGNode::UNSOLVED) return "style=dotted";
+   static std::string getNodeAttributes(lle::DDGValue* N,lle::DDGraph* G){
+      if(N->second.flags() == lle::DDGNode::UNSOLVED) return "style=dotted";
       else return "";
    }
 
-   static std::string getEdgeAttributes(lle::DDGNode* S,lle::DDGNode::iterator T,lle::DDGraph* G){
-      if(S->flags() == lle::DDGNode::IMPLICITY) return "color=red";
+   static std::string getEdgeAttributes(lle::DDGValue* S,lle::DDGNode::iterator T,lle::DDGraph* G){
+      if(S->second.flags() == lle::DDGNode::IMPLICITY) return "color=red";
       else return "";
    }
 
    static bool renderGraphFromBottomUp(){ return true;}
 
-   std::string getNodeLabel(lle::DDGNode* N,lle::DDGraph* G){
+   std::string getNodeLabel(lle::DDGValue* N,lle::DDGraph* G){
       std::string ret;
       llvm::raw_string_ostream os(ret);
       N->first->print(os);
