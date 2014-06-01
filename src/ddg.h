@@ -41,14 +41,16 @@ class lle::DDGNode{
    private:
    friend class DDGraph;
    DDGNodeImpl childs_;
-   ushort ref_num_;
+   ulong ref_num_;
    Flags flags_;
-   llvm::Twine expr_;
+   llvm::Twine lhs,rhs,root,lbk,bk;
    DDGValue* load_tg_;
 
    public:
+   DDGNode();
    std::string expr_buf;
-   llvm::Twine expr();
+   void set_expr(llvm::Twine lhs,llvm::Twine rhs);
+   llvm::Twine& expr();
    std::string ref(int R);
    Flags flags(){return flags_;}
    iterator begin(){return childs_.begin();}

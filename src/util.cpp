@@ -178,7 +178,9 @@ static void pretty_print(LoadInst* LI, raw_ostream& O, bool E)
       string S;
       raw_string_ostream SS(S);
       LI->getOperand(0)->print(SS);
-      S = SS.str().substr(2,SS.str().find(" =")-2);
+      int beg = SS.str().find_first_not_of(" ");
+      int end = SS.str().find(" =");
+      S = SS.str().substr(beg,end-beg);
       O<<S;
    }
 }
