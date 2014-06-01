@@ -33,13 +33,12 @@ void DDGNode::set_expr(Twine lhs, Twine rhs, int prio)
    this->bk=lbk+")";
    this->prio = prio;
 }
-string DDGNode::ref(int R)
+void DDGNode::ref(int R)
 {
-   string str;
-   raw_string_ostream SS(str);
    ref_num_ = R;
-   SS<<PHINODE_CIRCLE;
-   return SS.str();
+   prio = 16;
+   lbk=Twine(ref_num_);
+   bk="#"+lbk;
 }
 
 DDGValue DDGraph::make_value(Value *root, DDGNode::Flags flags)
@@ -48,6 +47,7 @@ DDGValue DDGraph::make_value(Value *root, DDGNode::Flags flags)
    n.flags_ = flags;
    n.load_tg_ = nullptr;
    n.ref_num_ = 0;
+   n.ref_count = 0;
    n.root="";
    return make_pair(root,n);
 }
@@ -72,6 +72,7 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
          DDGValue& v = *this->find(implicity->getUser());
          DDGNode& to = v.second;
          node.impl().push_back(&v);
+         ++v.second.ref_count;
          node.flags_ = DDGNode::IMPLICITY;
          if(isa<CallInst>(implicity->getUser())){
             Argument* arg = findCallInstArgument(implicity);
@@ -79,6 +80,7 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
             Use* link = (found==c.end())?nullptr:found->second;
             if(link){
                node.load_tg_ = &*this->find(link->getUser());
+               ++node.load_tg_->second.ref_count;
                to.impl().push_back(node.load_inst());
                to.flags_ = DDGNode::IMPLICITY;
             }
@@ -88,8 +90,11 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
          if(!Inst) continue;
          for(auto O = Inst->op_begin(),E=Inst->op_end();O!=E;++O){
             auto Target = this->find(*O);
-            if(Target != this->end())
-               node.impl().push_back(&*this->find(*O));
+            if(Target != this->end()){
+               auto v = &*this->find(*O);
+               ++v->second.ref_count;
+               node.impl().push_back(v);
+            }
          }
       }
    }
@@ -126,11 +131,11 @@ static void to_expr(Constant* C, DDGNode* N, int& R)
 static void to_expr(PHINode* PHI, DDGNode* N, int& R)
 {
    auto& node1 = LHS(N);
-   if(node1.expr().isTriviallyEmpty()) N->expr_buf = node1.ref(++R);
+   if(node1.expr().isTriviallyEmpty()) N->expr_buf = PHINODE_CIRCLE;
    else N->expr_buf = node1.expr(6).str();
    for(auto I = N->impl().begin()+1, E = N->impl().end(); I!=E; ++I){
       auto& node = (*I)->second;
-      if(node.expr().isTriviallyEmpty()) N->expr_buf += "||"+node.ref(++R);
+      if(node.expr().isTriviallyEmpty()) N->expr_buf += "||" PHINODE_CIRCLE;
       else N->expr_buf += ("||"+(*I)->second.expr(6)).str();
    }
    N->set_expr(N->expr_buf,"",14);
@@ -170,9 +175,6 @@ static void to_expr(Value* V, DDGNode* N, int& ref_num)
    }else if(isa<SelectInst>(V)){
       Assert(N->impl().size()==3,"");
       raw_string_ostream SS(N->expr_buf);
-      errs()<<"1:"<<LHS(N).expr()<<"\n";
-      errs()<<"2:"<<N->impl()[1]->second.expr()<<"\n";
-      errs()<<"3:"<<RHS(N).expr()<<"\n";
       SS<<"("<<LHS(N).expr()<<")?";
       N->set_expr(SS.str()+N->impl()[1]->second.expr(),":"+RHS(N).expr());
    }else if(isa<ExtractElementInst>(V)){
@@ -197,9 +199,22 @@ static void to_expr(Value* V, DDGNode* N, int& ref_num)
 Twine DDGraph::expr()
 {
    int ref_num = 0;
-   errs()<<this->size()<<"\n";
+   vector<DDGNode*> refs;
    for(auto I = po_begin(this), E = po_end(this); I!=E; ++I){
       to_expr(I->first,&I->second,ref_num);
+#ifdef EXPR_ENABLE_REF
+      if(I->second.ref_count>2 && !isa<Constant>(I->first)){
+         I->second.ref(++ref_num);
+         refs.push_back(&I->second);
+      }
+#endif
+   }
+   if(!refs.empty()){
+      root->second.expr_buf = (root->second.expr()+" aka {").str();
+      for(auto I : refs)
+         root->second.expr_buf += (I->expr()+":"+I->root+"; ").str();
+      root->second.expr_buf += "}";
+      root->second.root = root->second.expr_buf;
    }
    return root->second.expr();
 }

@@ -42,7 +42,8 @@ class lle::DDGNode{
    friend class DDGraph;
    DDGNodeImpl childs_;
    unsigned char prio;
-   ulong ref_num_;
+   unsigned char ref_count;
+   uint ref_num_;
    Flags flags_;
    llvm::Twine lhs,rhs,root,lbk,bk;
    DDGValue* load_tg_;
@@ -51,7 +52,7 @@ class lle::DDGNode{
    std::string expr_buf;
    void set_expr(llvm::Twine lhs,llvm::Twine rhs, int prio = 0);
    llvm::Twine& expr(int prio = 14);
-   std::string ref(int R);
+   void ref(int R);
    Flags flags(){return flags_;}
    iterator begin(){return childs_.begin();}
    iterator end(){return childs_.end();}

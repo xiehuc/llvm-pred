@@ -7,5 +7,6 @@
 
 //hide clobber result when doing memory analysis dependencies
 #define HIDE_CLOBBER 1
+#define EXPR_ENABLE_REF 
 
 #endif
