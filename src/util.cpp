@@ -60,9 +60,7 @@ static void pretty_print(BinaryOperator* bin,raw_ostream& o)
 	PUSH_BRACKETS(precd);
 
 	pretty_print(bin->getOperand(0),o);
-	if(lookup_sym(bin).first==NULL){
-		errs()<<"unknow operator"<<"\n";
-	}
+   Assert(lookup_sym(bin).first, "unknow operator");
 	//if operand 1 is negative ,should ignore + symbol (+-1)-> (-1)
 	bool ignore = false;
 	if(bin->getOpcode()==Instruction::Add){
@@ -136,7 +134,6 @@ static void pretty_print(Constant* c,raw_ostream& o)
 		lle::pretty_print(CE->getAsInstruction(),o);
 	else
 		o<<*c;
-		//ASSERT(0,*c,"not defined Constant print");
 }
 
 static void pretty_print(PHINode* PH,raw_ostream& o)
@@ -173,7 +170,20 @@ static void pretty_print(PHINode* PH,raw_ostream& o)
 	visitStack.pop_back();
 }
 
-void lle::pretty_print(Value* v,raw_ostream& o)
+static void pretty_print(LoadInst* LI, raw_ostream& O, bool E)
+{
+   O<<"*";
+   if(E) lle::pretty_print(LI->getOperand(0),O);
+   else{
+      string S;
+      raw_string_ostream SS(S);
+      LI->getOperand(0)->print(SS);
+      S = SS.str().substr(2,SS.str().find(" =")-2);
+      O<<S;
+   }
+}
+
+void lle::pretty_print(Value* v,raw_ostream& o, bool expand)
 {
 	if(auto C = dyn_cast<Constant>(v)){
 		::pretty_print(C,o);
@@ -186,16 +196,16 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 
 	if(inst->isBinaryOp())
 		::pretty_print(cast<BinaryOperator>(inst),o);
-	else if(isa<CmpInst>(inst))
-		::pretty_print(cast<CmpInst>(inst),o);
-	else if(isa<PHINode>(inst))
-		::pretty_print(cast<PHINode>(inst),o);
-	else if(isa<LoadInst>(inst)||isa<StoreInst>(inst)){
-		o<<"*";
-		lle::pretty_print(inst->getOperand(0),o);
+	else if(auto CI = dyn_cast<CmpInst>(inst))
+		::pretty_print(CI,o);
+	else if(auto P = dyn_cast<PHINode>(inst))
+		::pretty_print(P,o);
+	else if(auto LI = dyn_cast<LoadInst>(inst)){
+      ::pretty_print(LI, o, expand);
 	}else if(isa<AllocaInst>(inst))
 		o<<"%"<<inst->getName();
 	else if(isa<SelectInst>(inst)){
+		Assert(inst->getNumOperands()==3, *inst<<"select should have only 3 operant");
 		PUSH_BRACKETS(14);
 		o<<"(";
 		lle::pretty_print(inst->getOperand(0),o);
@@ -204,19 +214,17 @@ void lle::pretty_print(Value* v,raw_ostream& o)
 		o<<":";
 		lle::pretty_print(inst->getOperand(2),o);
 		POP_BRACKETS(14);
-		ASSERT(inst->getNumOperands() == 3, *inst, "select should have only 3 operant");
 	}
-	else if(isa<CastInst>(inst)){
+	else if(auto CI = dyn_cast<CastInst>(inst)){
 		o<<"(";
-		CastInst* c = cast<CastInst>(inst);
-		c->getDestTy()->print(o);
+		CI->getDestTy()->print(o);
 		o<<")";
 #undef LEFT_BRACKET
 #undef RIGHT_BRACKET
 #define LEFT_BRACKET "("
 #define RIGHT_BRACKET ")"
 		PUSH_BRACKETS(14);
-		lle::pretty_print(c->getOperand(0),o);
+		lle::pretty_print(CI->getOperand(0),o);
 		POP_BRACKETS(14);
 	}
 	else if(isa<GetElementPtrInst>(inst)){

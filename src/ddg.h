@@ -41,19 +41,20 @@ class lle::DDGNode{
    private:
    friend class DDGraph;
    DDGNodeImpl childs_;
-   ushort depth_;
    ushort ref_num_;
    Flags flags_;
    llvm::Twine expr_;
+   DDGValue* load_tg_;
 
    public:
    std::string expr_buf;
+   llvm::Twine expr();
+   std::string ref(int R);
    Flags flags(){return flags_;}
-   ushort depth(){return depth_;}
-   llvm::Twine expr(){return expr_;}
    iterator begin(){return childs_.begin();}
    iterator end(){return childs_.end();}
    DDGNodeImpl& impl(){return childs_;}
+   DDGValue* load_inst(){return load_tg_;}
 };
 
 /** never tring modify the data content

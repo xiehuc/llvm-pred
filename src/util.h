@@ -14,7 +14,7 @@ namespace lle
 {
    const std::pair<const char*, int>& lookup_sym(llvm::CmpInst* CI);
    const std::pair<const char*, int>& lookup_sym(llvm::BinaryOperator* BO);
-	void pretty_print(llvm::Value* v,llvm::raw_ostream& o = llvm::outs());
+	void pretty_print(llvm::Value* v,llvm::raw_ostream& o = llvm::outs(), bool expand = true);
 
 	//remove cast instruction for a value
 	//because cast means the original value and the returned value is

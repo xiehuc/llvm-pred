@@ -42,14 +42,4 @@
 
 #define VERBOSE(expr,verb) ( (expr) || (errs()<<"<<HERE>>:"<<*verb<<"\n",0))
 
-#ifdef ENABLE_DEBUG
-//used for return void
-#define ASSERT(expr,value,desc) if(!(expr)){errs()<<"\t"<<desc<<"\n"<<"\tFailed at:"<<__LINE__<<"\n"<<"\t"<<value<<"\n";return ;}
-//used for return null
-#define ASSERET(expr,value,desc) if(!(expr)){errs()<<"\t"<<desc<<"\n"<<"\tFailed at:"<<__LINE__<<"\n"<<"\t"<<value<<"\n";return NULL;}
-#else
-#define ASSERT(expr,value,desc) assert((expr ||(errs()<<__LINE__<<":"<<value<<"\n",0)) && desc)
-#define ASSERET(expr,value,desc) ASSERT(expr,value,desc)
-#endif
-
 #endif
