@@ -261,13 +261,14 @@ Argument* lle::findCallInstArgument(Use* use)
    CallInst* CI = dyn_cast<CallInst>(use->getUser());
    Value* v = use->get();
    if(!CI||!v) return NULL;
-   uint idx = find(CI->op_begin(), CI->op_end(), 
-         v) - CI->op_begin(); //find argument position FIXME 这里有问题
-   Assert(idx != CI->getNumOperands(), "");
+   // call inst's operands are args...args called_function
+   uint idx = find(CI->op_begin(), CI->op_begin()+CI->getNumArgOperands(), 
+         v) - CI->op_begin(); 
+   Assert(idx != CI->getNumArgOperands(), "");
    Function* CF = dyn_cast<Function>(castoff(CI->getCalledValue()));
    Assert(CF," called function should not be null");
    if(CF->getArgumentList().size() <= idx) // there are no enough argument
-      // FIXME: 通常，调用的外部函数是(...)格式，也就是说不知道会不会写入！
+      // XXX: 通常，调用的外部函数是(...)格式，也就是说不知道会不会写入！
       return NULL;
    auto ite = CF->getArgumentList().begin();
    advance(ite,idx); /* get function argument */
