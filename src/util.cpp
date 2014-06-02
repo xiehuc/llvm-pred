@@ -17,8 +17,8 @@ using namespace std;
 using namespace lle;
 using namespace llvm;
 
+
 //phinode circle recursion visit magic word
-#define PHINODE_CIRCLE "Δ"
 #define LEFT_BRACKET "{"
 #define RIGHT_BRACKET "}"
 #define PUSH_BRACKETS(precd) if(precd>op_precd.back()) o<<LEFT_BRACKET; op_precd.push_back(precd);
@@ -185,6 +185,9 @@ static void pretty_print(LoadInst* LI, raw_ostream& O, bool E)
    }
 }
 
+/* XXX because pretty_print is implement with foward iostream
+ * so the prio system is really dirty.
+ */
 void lle::pretty_print(Value* v,raw_ostream& o, bool expand)
 {
 	if(auto C = dyn_cast<Constant>(v)){

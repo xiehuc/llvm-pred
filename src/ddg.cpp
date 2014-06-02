@@ -14,7 +14,8 @@ using namespace llvm;
 
 #define LHS(N) N->impl().front()->second
 #define RHS(N) N->impl().back()->second
-#define PHINODE_CIRCLE "Δ"
+
+/** TODO LHS and RHS doesn't consider content match. 所以可能错位 */
 
 static void to_expr(Value* V, DDGNode* N, int& ref_num);
 
@@ -33,8 +34,13 @@ void DDGNode::set_expr(Twine lhs, Twine rhs, int prio)
    this->bk=lbk+")";
    this->prio = prio;
 }
+
 void DDGNode::ref(int R)
 {
+   // a small trick: use bk to store reference expr.
+   // while root store original expr.
+   // and a very low prio means always return bracket expr.
+   // so DDGraph can read real expr from root directly.
    ref_num_ = R;
    prio = 16;
    lbk=Twine(ref_num_);
@@ -80,7 +86,7 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
             Use* link = (found==c.end())?nullptr:found->second;
             if(link){
                node.load_tg_ = &*this->find(link->getUser());
-               ++node.load_tg_->second.ref_count;
+               //++node.load_tg_->second.ref_count; // shouldn't add ref count for load_tg
                to.impl().push_back(node.load_inst());
                to.flags_ = DDGNode::IMPLICITY;
             }
@@ -105,7 +111,7 @@ static void to_expr(LoadInst* LI, DDGNode* N, int& R)
 {
    if(N->flags() == DDGNode::UNSOLVED){
       raw_string_ostream O(N->expr_buf);
-      pretty_print(LI, O, false);
+      pretty_print(LI, O, false); // FIXME use pretty_print to get loaded value's name, not stable.
       N->set_expr(O.str(), "");
    }else{
       Assert(N->impl().size()==1,"");
@@ -131,6 +137,7 @@ static void to_expr(Constant* C, DDGNode* N, int& R)
 static void to_expr(PHINode* PHI, DDGNode* N, int& R)
 {
    auto& node1 = LHS(N);
+   // if a node is empty. means there is a self reference.
    if(node1.expr().isTriviallyEmpty()) N->expr_buf = PHINODE_CIRCLE;
    else N->expr_buf = node1.expr(6).str();
    for(auto I = N->impl().begin()+1, E = N->impl().end(); I!=E; ++I){
@@ -155,7 +162,7 @@ static void to_expr(Value* V, DDGNode* N, int& ref_num)
    Assert(I,*I);
 
    if(auto BI = dyn_cast<BinaryOperator>(V)){
-      Assert(N->impl().size()==2,"");// Twine doesn't support 3 param
+      Assert(N->impl().size()==2,"");
       auto Sym = lookup_sym(BI);
       int P = Sym.second;
       N->set_expr(LHS(N).expr(P),Sym.first+RHS(N).expr(P), P);

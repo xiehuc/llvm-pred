@@ -40,19 +40,29 @@ class lle::DDGNode{
    };
    private:
    friend class DDGraph;
-   DDGNodeImpl childs_;
-   unsigned char prio;
-   unsigned char ref_count;
-   uint ref_num_;
-   Flags flags_;
-   llvm::Twine lhs,rhs,root,lbk,bk;
-   DDGValue* load_tg_;
+   DDGNodeImpl childs_;     // the pointed childrens.
+   unsigned char prio;      // priority, 越小代表结合越紧密
+   unsigned char ref_count; // the count other nodes pointed this
+   uint ref_num_;           // associated number to output reference
+   Flags flags_;            // this node's type information
+   llvm::Twine lhs,rhs,root,lbk,bk; /* the twines , the structure like this:
+                                       a   +  b  ' '    (   root
+                                       \   /  \   /      \   /
+                                        lhs    rhs        lbk  )
+                                          \    /           \  /
+                                           root             bk
+      because a twine can only hold two elements. plus bk means bracket.*/
+   DDGValue* load_tg_;  /* when load's child is a call, this is the real
+                           target(argument) for load. */
 
    public:
-   std::string expr_buf;
+   std::string expr_buf; /* a buffer hold complex expression. because twine
+                            doesn't hold memory target. */
    void set_expr(llvm::Twine lhs,llvm::Twine rhs, int prio = 0);
-   llvm::Twine& expr(int prio = 14);
-   void ref(int R);
+   llvm::Twine& expr(int prio = 14); /* caculate expression with prio. when
+      prio < self.prio return a bracket expression. because it means it would
+      break the correct expression structure. */
+   void ref(int R); // set reference number
    Flags flags(){return flags_;}
    iterator begin(){return childs_.begin();}
    iterator end(){return childs_.end();}
@@ -66,11 +76,12 @@ class lle::DDGNode{
 struct lle::DDGraph : 
    public lle::DDGraphImpl
 {
+   // a helper function to make a DDGValue with initialed DDGNode structure
    DDGValue make_value(llvm::Value* root, DDGNode::Flags flags);
 
-   DDGValue* root;
+   DDGValue* root; // the root for graph
    DDGraph(lle::ResolveResult& RR, llvm::Value* root);
-   llvm::Twine expr();
+   llvm::Twine expr(); 
 };
 
 template<>

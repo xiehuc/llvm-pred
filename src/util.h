@@ -12,8 +12,12 @@
 
 namespace lle
 {
+   // find string expr and priority for CmpInst and BinaryOperator
    const std::pair<const char*, int>& lookup_sym(llvm::CmpInst* CI);
    const std::pair<const char*, int>& lookup_sym(llvm::BinaryOperator* BO);
+
+   // @param expand : true  --> nest expand the load inst's target
+   //                 false --> just print the name for load inst's target
 	void pretty_print(llvm::Value* v,llvm::raw_ostream& o = llvm::outs(), bool expand = true);
 
 	//remove cast instruction for a value
