@@ -11,5 +11,7 @@
 #define EXPR_ENABLE_REF 
 // a special symbol for self reference
 #define PHINODE_CIRCLE "Δ"
+// a ddg would produce better string expr for loop cycle(tripcount)cycle
+#define CYCLE_EXPR_USE_DDG
 
 #endif

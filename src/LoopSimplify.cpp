@@ -64,8 +64,6 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 
       DDGraph d(RR, CC);
       WriteGraph(&d, func_name+"-ddg", false, os.str());
-      errs()<<"Cycles: "<<d.expr()<<"\n";
-
    }
 	return false;
 }
@@ -75,18 +73,24 @@ void lle::LoopCycleSimplify::print(llvm::raw_ostream &OS, const llvm::Module *M)
 	auto& LC = getAnalysis<lle::LoopCycle>();
 	Value* CC = LC.getLoopCycle(CurL);
 	if(CC){
+      lle::Resolver<UseOnlyResolve> R; /* print is not a part of normal process
+         . so don't make it modify resolver cache*/
+      ResolveResult RR = R.resolve(CC);
 		OS<<"in Function:\t"<<CurL->getHeader()->getParent()->getName()<<"\n";
 		OS<<*CurL;
 		OS<<"Cycles:";
+#ifdef CYCLE_EXPR_USE_DDG
+      DDGraph d(RR, CC);
+      OS<<d.expr();
+#else
 		lle::pretty_print(CC, OS);
+#endif
       OS<<"\n";
-      lle::Resolver<UseOnlyResolve> R; /* print is not a part of normal process
-         . so don't make it modify resolver cache*/
       OS<<"resolved:\n";
-      lle::ResolveResult RR = R.resolve(CC, [&OS](Value* V){
-            if(isa<Function>(V)) return;
-            OS<<*V<<"\n";
-            });
+      for( auto V : get<0>(RR) ){
+         if(isa<Function>(V)) continue;
+         OS<<*V<<"\n";
+      }
       if(!get<1>(RR).empty()){
          OS<<"unresolved:\n";
          for( auto V : get<1>(RR) ){
