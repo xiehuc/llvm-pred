@@ -47,6 +47,7 @@ bool LibFReshape::runOnModule(Module &M)
 
    for(Module::iterator F = def->begin(), E = def->end(); F != E; ++F){
       Function* Old = M.getFunction(F->getName());
+      if(!Old) continue;
       Old->removeFromParent();
       Constant* New = M.getOrInsertFunction(F->getName(), F->getFunctionType(), F->getAttributes());
 
@@ -60,5 +61,6 @@ bool LibFReshape::runOnModule(Module &M)
       }
       Old->replaceAllUsesWith(UndefValue::get(Old->getType()));
    }
+   delete def;//release memory
    return false;
 }
