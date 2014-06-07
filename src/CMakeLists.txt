@@ -30,6 +30,7 @@ endif()
 add_library(LLVMPred SHARED
 	KnownLibCallInfo.cpp
    LoopSimplify.cpp
+   LibFReshape.cpp
    SlashShrink.cpp
    Resolver.cpp
    Print.cpp

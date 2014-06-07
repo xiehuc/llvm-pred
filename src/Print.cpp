@@ -67,6 +67,7 @@ bool PrintEnv::runOnModule(Module &M)
 #define printenv(env) errs()<<env<<":   "<<(getenv(env)?:"")<<"\n";
    printenv("SHRINK_LEVEL");
    printenv("LIBCALL_FILE");
+   printenv("LIBFDEF_FILE");
    printenv("IGNOREFUNC_FILE");
 #undef printenv
    return false;
