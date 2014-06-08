@@ -24,7 +24,15 @@ namespace lle
 	//because cast means the original value and the returned value is
 	//semanticly equal
 	llvm::Value* castoff(llvm::Value* v);
+   //from a given callinst's use, find the function argument
    llvm::Argument* findCallInstArgument(llvm::Use* use);
+   //find where to use V on instuction I
+   inline llvm::Use* findOpUseOnInstruction(llvm::Instruction* I, llvm::Value* V){
+      for(auto O = I->op_begin(), E = I->op_end(); O!=E; ++O){
+         if(O->get() == V) return &*O;
+      }
+      return nullptr;
+   }
 }
 
 #endif

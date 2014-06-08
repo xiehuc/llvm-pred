@@ -3,6 +3,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/GlobalVariable.h>
 #include <llvm/Support/raw_ostream.h>
 
 #include "util.h"
@@ -14,6 +15,7 @@ using namespace llvm;
 
 char ResolverPass::ID = 0;
 static RegisterPass<ResolverPass> Y("-Resolver","A Pass used to cache Resolver Result",false,false);
+#define MayWriteToArgument(arg) (arg && !arg->hasNoCaptureAttr() && !arg->onlyReadsMemory()) 
 
 #ifdef ENABLE_DEBUG
 void debug_print_resolved(unordered_set<Value*>& resolved)
@@ -59,7 +61,7 @@ Use* UseOnlyResolve::operator()(Value* V)
          return &U->getOperandUse(0);
       if(isa<CallInst>(U)){
          Argument* arg = findCallInstArgument(Target); // adjust attribute
-         if(arg && !arg->hasNoCaptureAttr() && !arg->onlyReadsMemory()) 
+         if(MayWriteToArgument(arg)) 
             //if no nocapture and readonly, it means could write into this addr
             return Target;
       }
@@ -78,23 +80,63 @@ Use* UseOnlyResolve::operator()(Value* V)
  * if is, return the global variable
  * else return NULL
  */
-static Value* access_global_variable(Instruction *I)
+static Use* access_global_variable(Instruction *I)
 {
-	Value* Address = NULL, *Test = NULL;
+   Use* U = nullptr ;
 	if(isa<LoadInst>(I) || isa<StoreInst>(I))
-		Test = Address = I->getOperand(0);
-	else return NULL;
-	while(ConstantExpr* CE = dyn_cast<ConstantExpr>(Address)){
-		Test = CE->getAsInstruction();
-		if(isa<CastInst>(Test))
-			Test = Address = castoff(Test);
+      U = &I->getOperandUse(0);
+	else return nullptr;
+	while(ConstantExpr* CE = dyn_cast<ConstantExpr>(U->get())){
+      Instruction*I = CE->getAsInstruction();
+		if(isa<CastInst>(I))
+         U = &I->getOperandUse(0);
 		else break;
 	}
-	if(GetElementPtrInst* GEP = dyn_cast<GetElementPtrInst>(Test))
-		Test = GEP->getPointerOperand();
-	if(isa<GlobalVariable>(Test)) return Address;
-	return NULL;
+	if(GetElementPtrInst* GEP = dyn_cast<GetElementPtrInst>(U->get()))
+      U = &GEP->getOperandUse(GEP->getPointerOperandIndex());
+	if(isa<GlobalVariable>(U->get())) return U;
+	return nullptr;
 }
+
+Use* GlobalResolve::operator()(Value *V)
+{
+   Instruction* I = dyn_cast<Instruction>(V);
+   Assert(I,*V);
+   Use* GU = access_global_variable(I);
+   Use* W = findWriteOnGV(dyn_cast<GlobalVariable>(GU->get()));
+
+}
+Use* GlobalResolve::findWriteOnGV(GlobalVariable *G)
+{
+   CacheType::iterator Ite;
+   if((Ite = Cache.find(G)) != Cache.end()) 
+      return Ite->second;
+
+   unsigned Nwrite = 0;
+   Use* last_write = nullptr;
+   for(auto I = G->use_begin(), E = G->use_end(); I != E; ++I){
+      if(isa<StoreInst>(*I) && I->getOperand(1) == G){
+         Nwrite++;
+         last_write = &I->getOperandUse(0);
+      }else if(CallInst* CI = dyn_cast<CallInst>(*I)){
+         Use *U = findOpUseOnInstruction(CI, *I);
+         if(!U) continue;
+         Argument* A = findCallInstArgument(U);
+         if(MayWriteToArgument(A)){
+            Nwrite++;
+            last_write = U;
+         }
+      }
+   }
+   if(Nwrite != 1){
+      //there a more than 2 or 0 times write , so we didn't sure about the
+      //result.
+      last_write = nullptr;
+   }
+   Cache.insert(make_pair(G,last_write));
+   return last_write;
+}
+
 /**
  * find where store to a global variable. 
  * require there a only store inst on this global variable.
@@ -124,8 +166,8 @@ void MDAResolve::find_dependencies( Instruction* I, const Pass* P,
    MemoryDependenceAnalysis& MDA = P->getAnalysis<MemoryDependenceAnalysis>();
    AliasAnalysis& AA = P->getAnalysis<AliasAnalysis>();
 
-   if(Value* GV = access_global_variable(I)){
-      find_global_dependencies(GV, Result);
+   if(Use* GV = access_global_variable(I)){
+      find_global_dependencies(GV->get(), Result);
       return;
    }
 
@@ -278,7 +320,8 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
       }
 
       res = deep_resolve(I);
-      partial.insert(make_pair(*Ite,res));
+      if(res->getUser()!= *Ite) // if returns self, it means unknow answer
+         partial.insert(make_pair(*Ite,res));
       if(!res){
          ++Ite;
          continue;

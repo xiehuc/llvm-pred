@@ -14,6 +14,7 @@
 namespace lle{
    struct NoResolve;
    struct UseOnlyResolve;
+   struct GlobalResolve;
    class MDAResolve;
    class ResolverBase;
    template<typename Impl>
@@ -42,6 +43,14 @@ struct lle::NoResolve
  */
 struct lle::UseOnlyResolve
 {
+   llvm::Use* operator()(llvm::Value*);
+};
+
+struct lle::GlobalResolve
+{
+   typedef std::unordered_map<llvm::GlobalVariable*, llvm::Use*> CacheType;
+   CacheType Cache;
+   llvm::Use* findWriteOnGV(llvm::GlobalVariable* GV);
    llvm::Use* operator()(llvm::Value*);
 };
 
