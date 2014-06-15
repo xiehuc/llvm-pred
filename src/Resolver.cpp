@@ -104,7 +104,6 @@ Use* GlobalResolve::operator()(Value *V)
    Assert(I,*V);
    Use* GU = access_global_variable(I);
    Use* W = findWriteOnGV(dyn_cast<GlobalVariable>(GU->get()));
-
 }
 Use* GlobalResolve::findWriteOnGV(GlobalVariable *G)
 {
@@ -320,11 +319,14 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
       }
 
       res = deep_resolve(I);
-      if(res->getUser()!= *Ite) // if returns self, it means unknow answer
-         partial.insert(make_pair(*Ite,res));
-      if(!res){
-         ++Ite;
-         continue;
+      if(!res || res->getUser()!= *Ite/* if returns self, it means unknow
+                                         answer, we shouldn't insert partial */
+            ){ 
+         partial.insert(make_pair(*Ite,res)); 
+         if(!res){
+            ++Ite;
+            continue;
+         }
       }
       User* U = res->getUser();
 
