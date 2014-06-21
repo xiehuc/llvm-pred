@@ -44,9 +44,8 @@ target_link_libraries(LLVMPred
 	${LLVM_PROF_LIBRARIES}
 	)
 
-add_executable(edge-merge
-	edge-merge.cpp
-	)
+# 2. profiling 数据分析与统计
+add_executable(edge-merge edge-merge.cpp)
 
 add_executable(lle-llc
    MyAsmPrinter.cpp

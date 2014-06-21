@@ -46,6 +46,7 @@ struct lle::UseOnlyResolve
    llvm::Use* operator()(llvm::Value*);
 };
 
+// not implemented , would depreciated
 struct lle::GlobalResolve
 {
    typedef std::unordered_map<llvm::GlobalVariable*, llvm::Use*> CacheType;
