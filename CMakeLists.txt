@@ -19,6 +19,7 @@ option(EXTRA_DEBUG "Enable Extra Debug Output" OFF)
 
 find_package(PkgConfig)
 pkg_check_modules(LLVM_PROF llvm-prof REQUIRED)
+pkg_check_modules(GSL gsl REQUIRED)
 
 set(ENABLE_DEBUG ${EXTRA_DEBUG})
 configure_file(config.h.in config.h)

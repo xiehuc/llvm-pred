@@ -12,6 +12,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${LLVM_CPP_FLAGS}")
 
 llvm_map_components_to_libraries(LLVM_PRED_LIBRARY bitreader analysis)
 
+# would depreciated
 add_executable(llvm-prob
     llvm-prob.cpp
     )
@@ -44,9 +45,26 @@ target_link_libraries(LLVMPred
 	${LLVM_PROF_LIBRARIES}
 	)
 
-# 2. profiling 数据分析与统计
-add_executable(edge-merge edge-merge.cpp)
+# mege edge profiling text out
+add_executable(edge-merge
+	edge-merge.cpp
+	)
+# count for instr type
+add_executable(inst-count
+   GetOpNum.cpp
+   )
+target_link_libraries(inst-count
+   ${LLVM_DYNAMIC_LIBRARY}
+   )
 
+add_executable(curve-fit
+   curve_fit.cpp get_data.cpp)
+
+target_link_libraries(curve-fit
+   ${GSL_LIBRARIES}
+   )
+
+# print Asm code for a bitcode
 add_executable(lle-llc
    MyAsmPrinter.cpp
    llc.cpp
