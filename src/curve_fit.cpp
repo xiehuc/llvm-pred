@@ -280,8 +280,7 @@ int main(int argc, char *argv[])
 {
 	if(argc != 2)
 	{
-		cerr << "wrong parameters\n"
-		     << "Example: ./a.out process_num_of_baseline" << endl;
+		cerr << "usage:"<<argv[0]<<" process_num_of_baseline" << endl;
 		return -1;
 	}
 

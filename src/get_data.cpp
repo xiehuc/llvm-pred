@@ -66,7 +66,7 @@ int retrive_data(int argc, char *argv[],int base_file,MType &freq_ave_map)
 		in_file >> ignore >> c >> freq >> c >> ignore >> name_pre;
 		in_file.getline(name_suf,MAX_BUF_SIZE);
 		sta_temp->push_back(freq/base_file);
-		freq_ave_map.insert(pair<string,vector<long double>* >(name_pre+string(name_suf),sta_temp));	
+		freq_ave_map.insert(make_pair(name_pre+string(name_suf),sta_temp));	
 	}
 	in_file.close();	
 	cout << "what's the fuck" << endl;
