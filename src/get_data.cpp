@@ -50,10 +50,9 @@ int retrive_data(int argc, char *argv[],int base_file,MType &freq_ave_map)
 	long double ignore;
 	//MType freq_ave_map;
 	vector<long double> *sta_temp = NULL;
-	double percent;
 	string name_pre;
 	char c, name_suf[MAX_BUF_SIZE]; 
-        int i,file_num[]={24,36,48,96,192,384,768}; 
+   int i,file_num[]={24,36,48,96,192,384,768}; 
 	sprintf(name_suf,"collect_info%s.txt",argv[1]);
 	ifstream in_file(name_suf,ios_base::in);
 	if(!in_file.is_open())

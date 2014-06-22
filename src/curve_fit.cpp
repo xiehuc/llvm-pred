@@ -27,17 +27,16 @@ struct best_fit
 };
 
 int base_index, x_start=0;
-const int x_data[X_NUM]={24,36,48,96,192,384};
-const int para_num[]={2,2,2,2,3,3,3,3,3,3,3,3,3,3,2,3,1,4,3,3,3,4,3,4,4,3,4,4,5,5,3};
+const unsigned x_data[X_NUM]={24,36,48,96,192,384};
+const unsigned para_num[]={2,2,2,2,3,3,3,3,3,3,3,3,3,3,2,3,1,4,3,3,3,4,3,4,4,3,4,4,5,5,3};
 
 
 long double cal_Yi(int id,const long double x,long double *a)
 {
-	int i;
 	long double result;
 	switch(id)
 	{
-		case 0:  result = a[0]*powl(x,a[1]);				      break;
+		case 0:  result = a[0]*powl(x,a[1]);				                      break;
 		case 1:  result = a[0]*powl(a[1],x);                                  break;
 		case 2:  result = a[0]*(1-expl(-a[1]*x));                             break;
 		case 3:  result = 1-1/powl((1+a[0]*x),a[1]);                          break;
@@ -286,7 +285,8 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	int status, i, j, p, n, k=0, base_file=atoi(argv[1]), iter=0;
+   int status;
+	unsigned i, j, p, n, k=0, base_file=atoi(argv[1]), iter=0;
 	double para_init[PARA_MAX] = {1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0};
 	MType freq_ave_map;
 	vector<long double> *freq_vec;
