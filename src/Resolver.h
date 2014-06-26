@@ -19,6 +19,7 @@ namespace lle{
    class ResolverBase;
    template<typename Impl>
    class Resolver;
+   class ResolverSet;
    class ResolverPass;
 
    typedef std::tuple<
@@ -84,6 +85,7 @@ class lle::MDAResolve
 
 class lle::ResolverBase
 {
+   friend class ResolverSet;
    bool stop_resolve = false; // stop resolve immediately
    static std::list<llvm::Value*> direct_resolve(
          llvm::Value* V, 
@@ -132,6 +134,24 @@ class lle::Resolver: public lle::ResolverBase
 template<typename T>
 char lle::Resolver<T>::ID = 0;
 
+class lle::ResolverSet: public lle::ResolverBase
+{
+   std::vector<ResolverBase*> impls;
+   public:
+   ResolverSet(std::initializer_list<ResolverBase*> args):impls(args)
+   {}
+
+   llvm::Use* deep_resolve(llvm::Instruction* I)
+   {
+      llvm::Use* Ret = NULL;
+      for(unsigned i=0;i<impls.size();i++){
+         Ret = impls[i]->deep_resolve(I);
+         if(Ret) return Ret;
+      }
+      return NULL;
+   }
+};
+
 class lle::ResolverPass: public llvm::FunctionPass
 {
    std::map<void*, ResolverBase*> impls;
@@ -144,6 +164,10 @@ class lle::ResolverPass: public llvm::FunctionPass
    ResolverBase& getResolver(){
       typedef lle::Resolver<T> R;
       return impls[&R::ID]?*impls[&R::ID]:*(impls[&R::ID]=new R());
+   }
+   template<typename... T>
+   ResolverSet getResolverSet(){
+      return ResolverSet({(&getResolver<T>())...});
    }
    void getAnalysisUsage(llvm::AnalysisUsage& AU) const;
    bool runOnFunction(llvm::Function& F) {return false;}

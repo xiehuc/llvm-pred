@@ -12,6 +12,7 @@
 #define DEBUG(expr) expr
 #undef NDEBUG
 #else
+#undef DEBUG
 #define DEBUG(expr) 
 #undef NDEBUG
 #define NDEBUG
