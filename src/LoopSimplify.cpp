@@ -4,6 +4,7 @@
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/GraphWriter.h>
 
+#include <ProfileInfo.h>
 #include <ValueProfiling.h>
 
 #include <list>
@@ -33,6 +34,7 @@ void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 	AU.addRequired<MemoryDependenceAnalysis>();
    AU.addRequired<ResolverPass>();
 	AU.addRequired<LoopCycle>();
+   AU.addRequired<ProfileInfo>();
 }
 
 bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
@@ -40,6 +42,7 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 	CurL = L;
 	LoopCycle& LC = getAnalysis<LoopCycle>();
    ResolverPass& RP = getAnalysis<ResolverPass>();
+   ProfileInfo& PI = getAnalysis<ProfileInfo>();
 	Value* CC = LC.getLoopCycle(L);
 
 	if(!CC) return false;

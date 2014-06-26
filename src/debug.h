@@ -8,6 +8,7 @@
 #include <llvm/Support/raw_ostream.h>
 
 #ifdef ENABLE_DEBUG
+#undef DEBUG
 #define DEBUG(expr) expr
 #undef NDEBUG
 #else
