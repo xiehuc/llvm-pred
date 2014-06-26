@@ -50,7 +50,8 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
    // auto insert value trap when used -insert-value-profiling
    CC = ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 
-   auto R = RP.getResolverSet<UseOnlyResolve,NoResolve>();
+   RP.getResolver<SLGResolve>().get_impl().initial(&PI);
+   auto R = RP.getResolverSet<UseOnlyResolve,SLGResolve>();
    ResolveResult RR = R.resolve(CC, [](Value* V){
          if(Instruction* I = dyn_cast<Instruction>(V))
             MarkPreserve::mark(I, "loop");

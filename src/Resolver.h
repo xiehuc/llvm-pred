@@ -11,11 +11,15 @@
 #include <llvm/IR/Instruction.h>
 #include <llvm/Analysis/MemoryDependenceAnalysis.h>
 
+#include <ProfileInfo.h>
+
 namespace lle{
    struct NoResolve;
    struct UseOnlyResolve;
    struct GlobalResolve;
+   struct SLGResolve;
    class MDAResolve;
+
    class ResolverBase;
    template<typename Impl>
    class Resolver;
@@ -47,12 +51,22 @@ struct lle::UseOnlyResolve
    llvm::Use* operator()(llvm::Value*);
 };
 
+
 // not implemented , would depreciated
 struct lle::GlobalResolve
 {
    typedef std::unordered_map<llvm::GlobalVariable*, llvm::Use*> CacheType;
    CacheType Cache;
    llvm::Use* findWriteOnGV(llvm::GlobalVariable* GV);
+   llvm::Use* operator()(llvm::Value*);
+};
+
+class lle::SLGResolve
+{
+   llvm::ProfileInfo* PI;
+   public:
+   SLGResolve(){PI = nullptr;}
+   void initial(llvm::ProfileInfo* PI){this->PI = PI;}
    llvm::Use* operator()(llvm::Value*);
 };
 
@@ -161,13 +175,13 @@ class lle::ResolverPass: public llvm::FunctionPass
    }
    ~ResolverPass();
    template<typename T>
-   ResolverBase& getResolver(){
+   lle::Resolver<T>& getResolver(){
       typedef lle::Resolver<T> R;
-      return impls[&R::ID]?*impls[&R::ID]:*(impls[&R::ID]=new R());
+      return static_cast<R&>(impls[&R::ID]?*impls[&R::ID]:*(impls[&R::ID]=new R()));
    }
    template<typename... T>
    ResolverSet getResolverSet(){
-      return ResolverSet({(&getResolver<T>())...});
+      return ResolverSet({(static_cast<ResolverBase*>(&getResolver<T>()))...});
    }
    void getAnalysisUsage(llvm::AnalysisUsage& AU) const;
    bool runOnFunction(llvm::Function& F) {return false;}

@@ -75,6 +75,18 @@ Use* UseOnlyResolve::operator()(Value* V)
    return NULL;
 }
 
+Use* SLGResolve::operator()(Value *V)
+{
+   if(LoadInst* LI = dyn_cast<LoadInst>(V)){
+      llvm::Value* Ret = const_cast<llvm::Value*>(PI->getTrapedTarget(LI));
+      if(Ret){
+         StoreInst* SI = dyn_cast<StoreInst>(Ret);
+         if(SI) return &SI->getOperandUse(0);
+      }
+   }
+   return NULL;
+}
+
 /**
  * access whether a Instruction is reference global variable. 
  * if is, return the global variable
