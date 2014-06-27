@@ -16,7 +16,7 @@
 namespace lle{
    struct NoResolve;
    struct UseOnlyResolve;
-   struct GlobalResolve;
+   // struct GlobalResolve;
    struct SLGResolve;
    class MDAResolve;
 
@@ -51,7 +51,7 @@ struct lle::UseOnlyResolve
    llvm::Use* operator()(llvm::Value*);
 };
 
-
+#if 0
 // not implemented , would depreciated
 struct lle::GlobalResolve
 {
@@ -60,6 +60,7 @@ struct lle::GlobalResolve
    llvm::Use* findWriteOnGV(llvm::GlobalVariable* GV);
    llvm::Use* operator()(llvm::Value*);
 };
+#endif
 
 class lle::SLGResolve
 {

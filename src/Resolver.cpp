@@ -111,7 +111,7 @@ static Use* access_global_variable(Instruction *I)
 	if(isa<GlobalVariable>(U->get())) return U;
 	return nullptr;
 }
-
+#if 0
 Use* GlobalResolve::operator()(Value *V)
 {
    Instruction* I = dyn_cast<Instruction>(V);
@@ -149,6 +149,7 @@ Use* GlobalResolve::findWriteOnGV(GlobalVariable *G)
    Cache.insert(make_pair(G,last_write));
    return last_write;
 }
+#endif
 
 /**
  * find where store to a global variable. 
