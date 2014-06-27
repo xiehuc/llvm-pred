@@ -344,26 +344,22 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
       }
       User* U = res->getUser();
 
-      bool dont_erase = false;
       if(isa<StoreInst>(U) || isa<LoadInst>(U)){
          next = res->get();
       }else if(isa<CallInst>(U)){
          Argument* arg = findCallInstArgument(res);
          // put most assert on UseOnlyResolver
+         Assert(arg,"");
          partial.insert(make_pair(arg,&arg->use_back()->getOperandUse(0)));
          next = arg->use_back();
       }else
          next = U;
 
-      if(dont_erase){
-         ++Ite;
-      }else{
-         resolved.insert(I); // original is resolved;
-         lambda(I);
-         resolved.insert(U);
-         lambda(U);
-         Ite = unsolved.erase(Ite);
-      }
+      resolved.insert(I); // original is resolved;
+      lambda(I);
+      resolved.insert(U);
+      lambda(U);
+      Ite = unsolved.erase(Ite);
    }
 
    unsolved.pop_back(); // remove last NULL
