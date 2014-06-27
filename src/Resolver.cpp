@@ -61,8 +61,10 @@ Use* UseOnlyResolve::operator()(Value* V)
          return &U->getOperandUse(0);
       if(isa<CallInst>(U)){
          Argument* arg = findCallInstArgument(Target); // adjust attribute
-         if(MayWriteToArgument(arg)) 
-            //if no nocapture and readonly, it means could write into this addr
+         if(MayWriteToArgument(arg) && arg->getNumUses()>0 && isa<StoreInst>(arg->use_back())) 
+            // if no nocapture and readonly, it means could write into this addr
+            // FIXME: when the last inst is not store, we consider this is unsolved
+            // let it return NULL if failed, to let ResolverSet use next chain
             return Target;
       }
    }
@@ -347,14 +349,9 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
          next = res->get();
       }else if(isa<CallInst>(U)){
          Argument* arg = findCallInstArgument(res);
-         if(arg && arg->getNumUses()>0 && isa<StoreInst>(arg->use_back())){
-            // FIXME: when the last inst is not store, we consider this is unsolved
-            partial.insert(make_pair(arg,&arg->use_back()->getOperandUse(0)));
-            next = arg->use_back();
-         }else{
-            dont_erase = true;
-            next = NULL;
-         }
+         // put most assert on UseOnlyResolver
+         partial.insert(make_pair(arg,&arg->use_back()->getOperandUse(0)));
+         next = arg->use_back();
       }else
          next = U;
 

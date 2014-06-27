@@ -44,6 +44,8 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
    ResolverPass& RP = getAnalysis<ResolverPass>();
    ProfileInfo& PI = getAnalysis<ProfileInfo>();
 	Value* CC = LC.getLoopCycle(L);
+   
+   DEBUG(errs()<<"[Load ProfileInfo, Traped size:"<<PI.getAllTrapedValues().size()<<"]\n");
 
 	if(!CC) return false;
 
