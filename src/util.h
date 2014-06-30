@@ -20,6 +20,12 @@ namespace lle
    //                 false --> just print the name for load inst's target
 	void pretty_print(llvm::Value* v,llvm::raw_ostream& o = llvm::outs(), bool expand = true);
 
+   // check a Argument is write to memory
+   // Argument must be PointerType
+   // if Function has lle.arg.write attribute. it would consider it first.
+   // or it would check argument use to find whether have a store instruction.
+   bool isArgumentWrite(llvm::Argument* Arg);
+
 	//remove cast instruction for a value
 	//because cast means the original value and the returned value is
 	//semanticly equal

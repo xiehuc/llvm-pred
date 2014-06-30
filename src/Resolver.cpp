@@ -15,7 +15,6 @@ using namespace llvm;
 
 char ResolverPass::ID = 0;
 static RegisterPass<ResolverPass> Y("-Resolver","A Pass used to cache Resolver Result",false,false);
-#define MayWriteToArgument(arg) (arg && !arg->hasNoCaptureAttr() && !arg->onlyReadsMemory()) 
 
 #ifdef ENABLE_DEBUG
 void debug_print_resolved(unordered_set<Value*>& resolved)
@@ -61,7 +60,7 @@ Use* UseOnlyResolve::operator()(Value* V)
          return &U->getOperandUse(0);
       if(isa<CallInst>(U)){
          Argument* arg = findCallInstArgument(Target); // adjust attribute
-         if(MayWriteToArgument(arg) && arg->getNumUses()>0 && isa<StoreInst>(arg->use_back())) 
+         if(arg && isArgumentWrite(arg) && arg->getNumUses()>0 && isa<StoreInst>(arg->use_back())) 
             // if no nocapture and readonly, it means could write into this addr
             // FIXME: when the last inst is not store, we consider this is unsolved
             // let it return NULL if failed, to let ResolverSet use next chain

@@ -5,13 +5,13 @@
 #include <string>
 #include <algorithm>
 
+#include <llvm/ADT/Twine.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/IR/GlobalVariable.h>
-
 
 using namespace std;
 using namespace lle;
@@ -275,4 +275,26 @@ Argument* lle::findCallInstArgument(Use* use)
    return &*ite;
 }
 
-
+bool lle::isArgumentWrite(llvm::Argument *Arg)
+{
+   Function* F = Arg->getParent();
+   if(!Arg->getType()->isPointerTy()) return false;
+   if(F->hasFnAttribute("lle.arg.write")){
+      Attribute Attr = F->getFnAttribute("lle.arg.write");
+      char ArgNo[5];
+      snprintf(ArgNo, sizeof(ArgNo), "%u", Arg->getArgNo());
+      size_t ArgNoLen = strlen(ArgNo);
+      StringRef AttrStr = Attr.getValueAsString();
+      for(size_t beg = 0; beg != StringRef::npos ; beg = AttrStr.find(ArgNo, beg+1)){
+         size_t end = beg+ArgNoLen+1;
+         if(!(end < AttrStr.size() && !isdigit(AttrStr[end]))) continue;
+         if(!(beg > 0 && !isdigit(AttrStr[beg-1]))) continue;
+         return true;
+      }
+   }else{
+      for(auto U = Arg->use_begin(), E = Arg->use_end(); U!=E; ++U){
+         if(isa<StoreInst>(*U)) return true;
+      }
+   }
+   return false;
+}
