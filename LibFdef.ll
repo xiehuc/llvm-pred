@@ -3,8 +3,8 @@
 
 declare void @mpi_init_(i32* %err)
 declare void @mpi_finalize_(i32* %err)
-declare void @mpi_comm_size_(i32* noalias nocapture readonly %comm, i32* %size, i32* %err)
-declare void @mpi_comm_rank_(i32* noalias nocapture readonly %comm, i32* %size, i32* %err)
+declare void @mpi_comm_size_(i32* noalias nocapture readonly %comm, i32* %size, i32* %err) "lle.arg.write"="1"
+declare void @mpi_comm_rank_(i32* noalias nocapture readonly %comm, i32* %size, i32* %err) "lle.arg.write"="1"
 ; mpi_isend_
 ; mpi_irecv_
 ;declare void @mpi_allreduce_(
