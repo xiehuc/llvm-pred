@@ -59,6 +59,9 @@ bool LibFReshape::runOnModule(Module &M)
             CI->setCalledFunction(New);
          else Assert(0,"shouldn't come to here");
       }
+      /** avoid <badref> bitcast Old ; keep the use relationship of Use. though
+       * bitcast has already removedFromParent. so we replace it with undef
+       * trickly. */
       Old->replaceAllUsesWith(UndefValue::get(Old->getType()));
    }
    delete def;//release memory
