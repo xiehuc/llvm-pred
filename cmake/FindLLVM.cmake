@@ -3,8 +3,6 @@
 # It requires that the llvm-config executable be available on the system path.
 # Once found, llvm-config is used for everything else.
 #
-# update: 2014-04-07
-#
 # The following variables are set:
 #
 # LLVM_FOUND                 - Set to YES if LLVM is found.
@@ -15,7 +13,7 @@
 # LLVM_LD_FLAGS              - Additional flags to pass to the linker.
 # LLVM_LIBRARY_DIRS          - A list of directories where the LLVM libraries are located.
 # LLVM_INCLUDE_DIRS          - A list of directories where the LLVM headers are located.
-# LLVM_DEFINITIONS           - (DELETE) The definitions should be used
+# LLVM_DEFINITIONS           - The definitions should be used
 # LLVM_LIBRARIES             - A list of libraries which should be linked
 # LLVM_DYNAMIC_LIBRARY       - A single dynamic llvm shared library
 # LLVM_DYNAMIC_LIBRARY_FOUND - Whether found the dynamic llvm shared library
@@ -27,8 +25,7 @@
 # 
 # include_directories(${LLVM_INCLUDE_DIRS})
 # link_directories(${LLVM_LIBRARY_DIRS})
-# set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${LLVM_CXX_FLAGS}")
-# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${LLVM_CPP_FLAGS}")
+# add_definitions(${LLVM_DEFINITIONS} --std=c++11)
 # 
 # 
 # llvm_map_components_to_libraries(LLVM_IRREADER_LIRARY irreader)
@@ -73,8 +70,6 @@ macro(_llvm_config _var_name)
 endmacro()
 
 set(LLVM_INSTALL_PREFIX  ${LLVM_ROOT})
-set(LLVM_INCLUDE_DIRS ${LLVM_INSTALL_PREFIX}/include)
-set(LLVM_LIBRARY_DIRS ${LLVM_INSTALL_PREFIX}/lib)
 set(LLVM_DEFINITIONS "-D__STDC_LIMIT_MACROS" "-D__STDC_CONSTANT_MACROS")
 
 _llvm_config(LLVM_VERSION --version)
@@ -84,12 +79,14 @@ _llvm_config(LLVM_C_FLAGS --cflags)
 _llvm_config(LLVM_CPP_FLAGS --cppflags)
 _llvm_config(LLVM_CXX_FLAGS --cxxflags)
 _llvm_config(LLVM_LD_FLAGS --ldflags)
+_llvm_config(LLVM_LIBRARY_DIRS --libdir)
+_llvm_config(LLVM_INCLUDE_DIRS --includedir)
 string(REGEX MATCH "-l.*" LLVM_LIBRARIES ${LLVM_LD_FLAGS})
 
 find_library(LLVM_DYNAMIC_LIBRARY 
 	NAMES "LLVM" "LLVM-${LLVM_VERSION}"
-    PATHS ${LLVM_LIBRARY_DIRS}
-    )
+   PATHS ${LLVM_LIBRARY_DIRS}
+   )
 
 if(NOT LLVM_DYNAMIC_LIBRARY)
 	set(LLVM_DYNAMIC_LIBRARY_FOUND False)
