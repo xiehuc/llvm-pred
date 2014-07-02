@@ -4,23 +4,26 @@ include_directories(
 	${PROJECT_BINARY_DIR}
 	${LLVM_INCLUDE_DIRS} 
 	)
-link_directories(${LLVM_LIBRARY_DIRS})
+link_directories(
+   ${LLVM_LIBRARY_DIRS} 
+   ${LLVM_PROF_LIBRARY_DIRS}
+   )
 add_definitions(-fno-rtti)
 add_definitions(-Wall --std=c++11)
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ${LLVM_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${LLVM_CPP_FLAGS}")
 
-llvm_map_components_to_libraries(LLVM_PRED_LIBRARY bitreader analysis)
-
-# would depreciated
-add_executable(llvm-prob
-    llvm-prob.cpp
-    )
-
-target_link_libraries(llvm-prob
-    ${LLVM_PRED_LIBRARY}
-    ${LLVM_LIBRARIES}
-    )
+# llvm_map_components_to_libraries(LLVM_PRED_LIBRARY bitreader analysis)
+# 
+# # would depreciated
+# add_executable(llvm-prob
+#     llvm-prob.cpp
+#     )
+# 
+# target_link_libraries(llvm-prob
+#     ${LLVM_PRED_LIBRARY}
+#     ${LLVM_LIBRARIES}
+#     )
 
 if(DYNAMIC_LINK)
 	set(LLVM_LOOP_LIBRARY ${LLVM_DYNAMIC_LIBRARY})
