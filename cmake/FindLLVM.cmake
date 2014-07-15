@@ -7,13 +7,8 @@
 #
 # LLVM_FOUND                 - Set to YES if LLVM is found.
 # LLVM_VERSION               - Set to the decimal version of the LLVM library.
-# LLVM_C_FLAGS               - All flags that should be passed to a C compiler.
-# LLVM_CXX_FLAGS             - All flags that should be passed to a C++ compiler.
-# LLVM_CPP_FLAGS             - All flags that should be passed to the C pre                - processor.
-# LLVM_LD_FLAGS              - Additional flags to pass to the linker.
-# LLVM_LIBRARY_DIRS          - A list of directories where the LLVM libraries are located.
 # LLVM_INCLUDE_DIRS          - A list of directories where the LLVM headers are located.
-# LLVM_DEFINITIONS           - The definitions should be used
+# LLVM_LIBRARY_DIRS          - A list of directories where the LLVM libraries are located.
 # LLVM_LIBRARIES             - A list of libraries which should be linked
 # LLVM_DYNAMIC_LIBRARY       - A single dynamic llvm shared library
 # LLVM_DYNAMIC_LIBRARY_FOUND - Whether found the dynamic llvm shared library
@@ -25,8 +20,6 @@
 # 
 # include_directories(${LLVM_INCLUDE_DIRS})
 # link_directories(${LLVM_LIBRARY_DIRS})
-# add_definitions(${LLVM_DEFINITIONS} --std=c++11)
-# 
 # 
 # llvm_map_components_to_libraries(LLVM_IRREADER_LIRARY irreader)
 # 
@@ -35,6 +28,10 @@
 #     ${LLVM_LIBRARIES}
 #     ${LLVM_IRREADER_LIRARY}
 #     )
+#
+# version: 0.9
+#    remove LLVM_{C/CPP/CXX}_FLAGS which import -DNDEBUG
+#
 #
 if(NOT DEFINED LLVM_RECOMMAND_VERSION)
     SET(LLVM_RECOMMAND_VERSION 3.4)
@@ -70,14 +67,11 @@ macro(_llvm_config _var_name)
 endmacro()
 
 set(LLVM_INSTALL_PREFIX  ${LLVM_ROOT})
-set(LLVM_DEFINITIONS "-D__STDC_LIMIT_MACROS" "-D__STDC_CONSTANT_MACROS")
+add_definitions(-D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS)
 
 _llvm_config(LLVM_VERSION --version)
 STRING(REGEX REPLACE "^([0-9]+)\\.[0-9]+(svn)?\\.?[0-9]*" "\\1" LLVM_VERSION_MAJOR "${LLVM_VERSION}")
 STRING(REGEX REPLACE "^[0-9]+\\.([0-9]+)(svn)?\\.?[0-9]*" "\\1" LLVM_VERSION_MINOR "${LLVM_VERSION}")
-_llvm_config(LLVM_C_FLAGS --cflags)
-_llvm_config(LLVM_CPP_FLAGS --cppflags)
-_llvm_config(LLVM_CXX_FLAGS --cxxflags)
 _llvm_config(LLVM_LD_FLAGS --ldflags)
 _llvm_config(LLVM_LIBRARY_DIRS --libdir)
 _llvm_config(LLVM_INCLUDE_DIRS --includedir)
