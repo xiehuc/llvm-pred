@@ -39,6 +39,18 @@ Use* NoResolve::operator()(Value* V)
    return NULL;
 }
 
+static bool indirect_access_global(Value* V)
+{
+   while(!isa<GlobalVariable>(V)){
+      if(auto LI = dyn_cast<LoadInst>(V)) V = LI->getPointerOperand();
+      else if(auto Cast = dyn_cast<CastInst>(V)) V = Cast->getOperand(0);
+      else if(auto CE = dyn_cast<ConstantExpr>(V)) V = CE->getAsInstruction();
+      else if(auto GEP = dyn_cast<GetElementPtrInst>(V)) V = GEP->getPointerOperand();
+      else return false;
+   }
+   return true;
+}
+
 Use* UseOnlyResolve::operator()(Value* V)
 {
    Use* Target = NULL, *Keep = NULL;
@@ -58,7 +70,7 @@ Use* UseOnlyResolve::operator()(Value* V)
       auto U = Target->getUser();
       if(isa<StoreInst>(U) && U->getOperand(1) == Target->get())
          return &U->getOperandUse(0);
-      if(isa<CallInst>(U)){
+      else if(isa<CallInst>(U)){
          Argument* arg = findCallInstArgument(Target); // adjust attribute
          if(arg && isArgumentWrite(arg) && arg->getNumUses()>0 && isa<StoreInst>(arg->use_back())) 
             // if no nocapture and readonly, it means could write into this addr
@@ -95,10 +107,10 @@ Use* SLGResolve::operator()(Value *V)
  */
 static Use* access_global_variable(Instruction *I)
 {
-   Use* U = nullptr ;
+   Use* U = NULL;
 	if(isa<LoadInst>(I) || isa<StoreInst>(I))
       U = &I->getOperandUse(0);
-	else return nullptr;
+	else return NULL;
 	while(ConstantExpr* CE = dyn_cast<ConstantExpr>(U->get())){
       Instruction*I = CE->getAsInstruction();
 		if(isa<CastInst>(I))
@@ -108,16 +120,32 @@ static Use* access_global_variable(Instruction *I)
 	if(GetElementPtrInst* GEP = dyn_cast<GetElementPtrInst>(U->get()))
       U = &GEP->getOperandUse(GEP->getPointerOperandIndex());
 	if(isa<GlobalVariable>(U->get())) return U;
-	return nullptr;
+	return NULL;
 }
-#if 0
+
 Use* GlobalResolve::operator()(Value *V)
 {
-   Instruction* I = dyn_cast<Instruction>(V);
-   Assert(I,*V);
-   Use* GU = access_global_variable(I);
-   Use* W = findWriteOnGV(dyn_cast<GlobalVariable>(GU->get()));
+   Use* Tg;
+   if(auto LI = dyn_cast<LoadInst>(V)){
+      Tg = &LI->getOperandUse(0);
+   }else if(auto SI = dyn_cast<StoreInst>(V)){
+      Tg = &SI->getOperandUse(0);
+   }else return NULL;
+   Value* U = Tg->get();
+   if(auto GEP = dyn_cast<GetElementPtrInst>(U)){
+      errs()<<indirect_access_global(GEP->getPointerOperand()) <<","<<
+         (GEP->getNumOperands()>2) <<","<<
+         !isa<Constant>(GEP->getOperand(1))<<"\n";
+      if(indirect_access_global(GEP->getPointerOperand()) &&
+            GEP->getNumOperands()>2 &&
+            !isa<Constant>(GEP->getOperand(1)))
+         // GEP is load from a global variable array
+         return Tg;
+   }
+   return NULL;
 }
+
+#if 0
 Use* GlobalResolve::findWriteOnGV(GlobalVariable *G)
 {
    CacheType::iterator Ite;

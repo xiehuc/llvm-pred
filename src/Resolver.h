@@ -16,7 +16,7 @@
 namespace lle{
    struct NoResolve;
    struct UseOnlyResolve;
-   // struct GlobalResolve;
+   struct GlobalResolve;
    struct SLGResolve;
    class MDAResolve;
 
@@ -51,16 +51,17 @@ struct lle::UseOnlyResolve
    llvm::Use* operator()(llvm::Value*);
 };
 
-#if 0
-// not implemented , would depreciated
+
+/**
+ * solve some special global variable situation
+ * 1. if load a GetElementPtr and it depends on a global array variable. we
+ *    consider this global variable is main datastructure, may write only once.
+ *    and use anywhere. so we return it as a solve.
+ */
 struct lle::GlobalResolve
 {
-   typedef std::unordered_map<llvm::GlobalVariable*, llvm::Use*> CacheType;
-   CacheType Cache;
-   llvm::Use* findWriteOnGV(llvm::GlobalVariable* GV);
    llvm::Use* operator()(llvm::Value*);
 };
-#endif
 
 class lle::SLGResolve
 {
