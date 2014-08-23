@@ -24,7 +24,7 @@ char lle::LoopCycle::ID = 0;
 
 static RegisterPass<LoopCycle> X("loop-cycle","Loop Cycle Pass", false, false);
 
-STATISTIC(NumUnfoundCycle, "Number of unfound loop cycle");
+// STATISTIC(NumUnfoundCycle, "Number of unfound loop cycle");
 
 //find start value fron induction variable
 static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
@@ -260,7 +260,6 @@ bool lle::LoopCycle::runOnLoop(llvm::Loop* L,llvm::LPPassManager&)
 	if(!CC){
       CycleMap[L] = CC;
 		++NumUnfoundCycle;
-		++::NumUnfoundCycle;
 		unfound<<"Function:"<<CurF->getName()<<"\n";
 		unfound<<"\t"<<*L<<"\n";
 	}
