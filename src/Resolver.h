@@ -40,7 +40,7 @@ namespace lle{
  */
 struct lle::NoResolve
 {
-   llvm::Use* operator()(llvm::Value*);
+   llvm::Use* operator()(llvm::Value*, lle::ResolverBase*);
 };
 
 /**
@@ -48,7 +48,7 @@ struct lle::NoResolve
  */
 struct lle::UseOnlyResolve
 {
-   llvm::Use* operator()(llvm::Value*);
+   llvm::Use* operator()(llvm::Value*, lle::ResolverBase*);
 };
 
 
@@ -60,7 +60,7 @@ struct lle::UseOnlyResolve
  */
 struct lle::GlobalResolve
 {
-   llvm::Use* operator()(llvm::Value*);
+   llvm::Use* operator()(llvm::Value*, lle::ResolverBase*);
 };
 
 class lle::SLGResolve
@@ -69,7 +69,7 @@ class lle::SLGResolve
    public:
    SLGResolve(){PI = nullptr;}
    void initial(llvm::ProfileInfo* PI){this->PI = PI;}
-   llvm::Use* operator()(llvm::Value*);
+   llvm::Use* operator()(llvm::Value*, lle::ResolverBase*);
 };
 
 /**
@@ -87,7 +87,7 @@ class lle::MDAResolve
    public:
    MDAResolve(){pass = NULL;}
    void initial(llvm::Pass* pass){ this->pass = pass;}
-   llvm::Use* operator()(llvm::Value*);
+   llvm::Use* operator()(llvm::Value*, lle::ResolverBase*);
 
    /** use this to find a possible dep results.
     * which may clobber, def, nonlocal, nonfunclocal
@@ -108,6 +108,7 @@ class lle::ResolverBase
          std::unordered_set<llvm::Value*>& resolved,
          std::function<void(llvm::Value*)>
          );
+   std::vector<llvm::CallInst*> call_stack;
 
    virtual llvm::Use* deep_resolve(llvm::Instruction* I) = 0;
 
@@ -118,6 +119,9 @@ class lle::ResolverBase
    public:
    virtual ~ResolverBase(){};
    static void _empty_handler(llvm::Value*);
+
+   // ignore cache once. call this in a Resolver
+   void ignore_cache();
    
    // walk through V's dependent tree and callback
    ResolveResult resolve(llvm::Value* V, std::function<void(llvm::Value*)> = _empty_handler);
@@ -138,7 +142,7 @@ class lle::Resolver: public lle::ResolverBase
       auto Ite = PartCache.find(I);
       if(Ite != PartCache.end())
          return Ite->second;
-      Ret = impl(I);
+      Ret = impl(I, this);
       PartCache.insert(std::make_pair(I, Ret));
       return Ret;
    }

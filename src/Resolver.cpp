@@ -25,7 +25,7 @@ void debug_print_resolved(unordered_set<Value*>& resolved)
 }
 #endif
 
-Use* NoResolve::operator()(Value* V)
+Use* NoResolve::operator()(Value* V, ResolverBase* _UNUSED_)
 {
    Instruction* I = dyn_cast<Instruction>(V);
    Assert(I,*I);
@@ -51,7 +51,7 @@ static bool indirect_access_global(Value* V)
    return true;
 }
 
-Use* UseOnlyResolve::operator()(Value* V)
+Use* UseOnlyResolve::operator()(Value* V, ResolverBase* _UNUSED_)
 {
    Use* Target = NULL, *Keep = NULL;
    if(LoadInst* LI = dyn_cast<LoadInst>(V)){
@@ -82,13 +82,13 @@ Use* UseOnlyResolve::operator()(Value* V)
    //if no use found, we consider this is a constant expr
    if(ConstantExpr* CE = dyn_cast<ConstantExpr>(Keep->get())){
       Instruction* TI = CE->getAsInstruction();
-      return (*this)(TI);
+      return (*this)(TI, _UNUSED_);
    }
 
    return NULL;
 }
 
-Use* SLGResolve::operator()(Value *V)
+Use* SLGResolve::operator()(Value *V, ResolverBase* _UNUSED_)
 {
    if(LoadInst* LI = dyn_cast<LoadInst>(V)){
       llvm::Value* Ret = const_cast<llvm::Value*>(PI->getTrapedTarget(LI));
@@ -123,7 +123,7 @@ static Use* access_global_variable(Instruction *I)
 	return NULL;
 }
 
-Use* GlobalResolve::operator()(Value *V)
+Use* GlobalResolve::operator()(Value *V, ResolverBase* RB)
 {
    Use* Tg;
    if(auto LI = dyn_cast<LoadInst>(V)){
@@ -269,7 +269,7 @@ void MDAResolve::find_dependencies( Instruction* I, const Pass* P,
    }
 }
 
-Use* MDAResolve::operator()(llvm::Value * V)
+Use* MDAResolve::operator()(llvm::Value * V, ResolverBase* _UNUSED_)
 {
    Assert(pass,"Not initial with pass");
 
@@ -325,8 +325,7 @@ void ResolverBase::_empty_handler(llvm::Value *)
 
 ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> lambda)
 {
-   using namespace llvm;
-   //bool changed = false;
+   call_stack.clear(); // clear call_stack
    std::unordered_set<Value*> resolved;
    std::list<Value*> unsolved;
    std::unordered_map<Value*, Use*> partial;
@@ -372,12 +371,23 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
 
       if(isa<StoreInst>(U) || isa<LoadInst>(U)){
          next = res->get();
-      }else if(isa<CallInst>(U)){
-         Argument* arg = findCallInstArgument(res);
-         // put most assert on UseOnlyResolver
-         Assert(arg,"");
-         partial.insert(make_pair(arg,&arg->use_back()->getOperandUse(0)));
-         next = arg->use_back();
+      }else if(auto CI = dyn_cast<CallInst>(U)){
+         if(CI->getCalledFunction() != I->getParent()->getParent()){ 
+            // original Instruction isn't in the function called, means param
+            // direction is out, that is, put a param to called function, and
+            // write out result into it.
+            Argument* arg = findCallInstArgument(res);
+            // put most assert on UseOnlyResolver
+            Assert(arg,"");
+            partial.insert(make_pair(arg,&arg->use_back()->getOperandUse(0)));
+            next = arg->use_back();
+            call_stack.push_back(cast<CallInst>(U));
+         }else{
+            // original Instruction is in same function called, means param
+            // direction is in, that is, the outter put a param to called
+            // function, and we(in function body) read the value and do caculate
+            next = res->get();
+         }
       }else
          next = U;
 
