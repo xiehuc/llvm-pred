@@ -4,6 +4,7 @@
 #include <list>
 #include <vector>
 #include <llvm/IR/Value.h>
+#include <llvm/IR/Argument.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/ADT/GraphTraits.h>
 #include <llvm/Support/raw_ostream.h>
@@ -32,6 +33,10 @@ namespace lle
 	llvm::Value* castoff(llvm::Value* v);
    //from a given callinst's use, find the function argument
    llvm::Argument* findCallInstArgument(llvm::Use* use);
+   // from a given function's argument and callinst, return the use
+   inline llvm::Use* findCallInstParameter(llvm::Argument* Arg, llvm::CallInst* CI){
+      return &CI->getOperandUse(Arg->getArgNo());
+   }
    //find where to use V on instuction I
    inline llvm::Use* findOpUseOnInstruction(llvm::Instruction* I, llvm::Value* V){
       for(auto O = I->op_begin(), E = I->op_end(); O!=E; ++O){

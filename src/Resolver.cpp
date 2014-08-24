@@ -131,6 +131,7 @@ Use* GlobalResolve::operator()(Value *V, ResolverBase* RB)
    }else if(auto SI = dyn_cast<StoreInst>(V)){
       Tg = &SI->getOperandUse(0);
    }else return NULL;
+
    Value* U = Tg->get();
    if(auto GEP = dyn_cast<GetElementPtrInst>(U)){
       if(indirect_access_global(GEP->getPointerOperand()) &&
@@ -139,6 +140,12 @@ Use* GlobalResolve::operator()(Value *V, ResolverBase* RB)
          // GEP is load from a global variable array
          return Tg;
    } else if(auto Arg = dyn_cast<Argument>(U)){
+      RB->ignore_cache(); /* since this doesn't point same callinst, we
+                             shouldn't cache result */
+      Function* F = Arg->getParent();
+      CallInst* CI = RB->in_call(F);
+      errs()<<*U<<"->"<<*CI<<"\n";
+      if(CI) return findCallInstParameter(Arg, CI);
    }
    return NULL;
 }
@@ -323,6 +330,16 @@ void ResolverBase::_empty_handler(llvm::Value *)
 {
 }
 
+CallInst* ResolverBase::in_call(Function *F) const
+{
+   auto Ite = find_if(call_stack.begin(), call_stack.end(), [F](CallInst* CI){
+         errs()<<CI->getCalledFunction()->getName()<<"\n";
+         return CI->getCalledFunction() == F;
+         });
+   if(Ite!=call_stack.end()) return *Ite;
+   return NULL;
+}
+
 ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> lambda)
 {
    call_stack.clear(); // clear call_stack
@@ -381,7 +398,7 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
             Assert(arg,"");
             partial.insert(make_pair(arg,&arg->use_back()->getOperandUse(0)));
             next = arg->use_back();
-            call_stack.push_back(cast<CallInst>(U));
+            call_stack.push_back(CI);
          }else{
             // original Instruction is in same function called, means param
             // direction is in, that is, the outter put a param to called

@@ -102,6 +102,7 @@ class lle::MDAResolve
 class lle::ResolverBase
 {
    friend class ResolverSet;
+   template<typename T> friend class Resolver;
    bool stop_resolve = false; // stop resolve immediately
    static std::list<llvm::Value*> direct_resolve(
          llvm::Value* V, 
@@ -113,6 +114,8 @@ class lle::ResolverBase
    virtual llvm::Use* deep_resolve(llvm::Instruction* I) = 0;
 
    protected:
+   ResolverBase* parent = NULL; // if this is belong to parent
+   bool disable_cache = false;
    // hash map, provide quick search Value* ---> Value*
    std::unordered_map<llvm::Value*, llvm::Use*> PartCache;
 
@@ -121,7 +124,10 @@ class lle::ResolverBase
    static void _empty_handler(llvm::Value*);
 
    // ignore cache once. call this in a Resolver
-   void ignore_cache();
+   void ignore_cache(){ disable_cache = true; }
+
+   // return if call_stack has a related Function
+   llvm::CallInst* in_call(llvm::Function*) const;
    
    // walk through V's dependent tree and callback
    ResolveResult resolve(llvm::Value* V, std::function<void(llvm::Value*)> = _empty_handler);
@@ -142,8 +148,12 @@ class lle::Resolver: public lle::ResolverBase
       auto Ite = PartCache.find(I);
       if(Ite != PartCache.end())
          return Ite->second;
-      Ret = impl(I, this);
-      PartCache.insert(std::make_pair(I, Ret));
+      Ret = impl(I, parent?:this);
+      bool& disable_cache = (parent?:this)->disable_cache;
+      if(!disable_cache)
+         // don't make cache collapse, every resolver makes it's own cache
+         PartCache.insert(std::make_pair(I, Ret)); 
+      disable_cache = false;
       return Ret;
    }
    public:
@@ -159,7 +169,10 @@ class lle::ResolverSet: public lle::ResolverBase
    std::vector<ResolverBase*> impls;
    public:
    ResolverSet(std::initializer_list<ResolverBase*> args):impls(args)
-   {}
+   {
+      for(auto RB : args)
+         RB->parent = this;
+   }
 
    llvm::Use* deep_resolve(llvm::Instruction* I)
    {

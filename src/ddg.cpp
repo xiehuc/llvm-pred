@@ -158,8 +158,7 @@ static void to_expr(Value* V, DDGNode* N, int& ref_num)
       return;
    }
 
-   Instruction* I = dyn_cast<Instruction>(V);
-   Assert(I,*I);
+   Assert(dyn_cast<Instruction>(V),"");
 
    if(auto BI = dyn_cast<BinaryOperator>(V)){
       Assert(N->impl().size()==2,"");
