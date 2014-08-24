@@ -133,14 +133,12 @@ Use* GlobalResolve::operator()(Value *V)
    }else return NULL;
    Value* U = Tg->get();
    if(auto GEP = dyn_cast<GetElementPtrInst>(U)){
-      errs()<<indirect_access_global(GEP->getPointerOperand()) <<","<<
-         (GEP->getNumOperands()>2) <<","<<
-         !isa<Constant>(GEP->getOperand(1))<<"\n";
       if(indirect_access_global(GEP->getPointerOperand()) &&
             GEP->getNumOperands()>2 &&
             !isa<Constant>(GEP->getOperand(1)))
          // GEP is load from a global variable array
          return Tg;
+   } else if(auto Arg = dyn_cast<Argument>(U)){
    }
    return NULL;
 }
