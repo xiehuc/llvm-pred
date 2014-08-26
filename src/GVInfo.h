@@ -17,7 +17,12 @@ class lle::GVInfo: public llvm::ModulePass
       llvm::StoreInst* store;
       std::list<llvm::Instruction*> resolve;
    };
-   llvm::DenseMap<llvm::Constant*, Data> Info;
+   struct ArgInfo {
+      bool write_once;
+      llvm::GlobalVariable* param;
+   };
+   llvm::DenseMap<llvm::Constant*, Data> info;
+   llvm::DenseMap<llvm::Argument*, ArgInfo> arg_info;
 
    bool findStoreOnGV(llvm::Value*, llvm::Constant*);
    public:
@@ -26,9 +31,7 @@ class lle::GVInfo: public llvm::ModulePass
       bool runOnModule(llvm::Module& M) override;
       void getAnalysisUsage(llvm::AnalysisUsage&) const override;
 
-      /*
-      llvm::ConstantExpr* lookup(llvm::Value*);
-      */
+      llvm::Constant* lookup(llvm::Value*);
       llvm::Value* getKey(llvm::Constant*);
       llvm::Value* getValue(llvm::Constant*);
       void print(llvm::raw_ostream&, const llvm::Module*) const override;
