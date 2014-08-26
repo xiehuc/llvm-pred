@@ -16,7 +16,7 @@
 namespace lle{
    struct NoResolve;
    struct UseOnlyResolve;
-   struct GlobalResolve;
+   struct SpecialResolve;
    struct SLGResolve;
    class MDAResolve;
 
@@ -57,8 +57,10 @@ struct lle::UseOnlyResolve
  * 1. if load a GetElementPtr and it depends on a global array variable. we
  *    consider this global variable is main datastructure, may write only once.
  *    and use anywhere. so we return it as a solve.
+ * 2. if load a Argument, check whether there is a call argument's function before.
+ *    if has. return this call inst's parameter
  */
-struct lle::GlobalResolve
+struct lle::SpecialResolve
 {
    llvm::Use* operator()(llvm::Value*, lle::ResolverBase*);
 };
@@ -169,16 +171,15 @@ class lle::ResolverSet: public lle::ResolverBase
    std::vector<ResolverBase*> impls;
    public:
    ResolverSet(std::initializer_list<ResolverBase*> args):impls(args)
-   {
-      for(auto RB : args)
-         RB->parent = this;
-   }
+   { }
 
    llvm::Use* deep_resolve(llvm::Instruction* I)
    {
       llvm::Use* Ret = NULL;
       for(unsigned i=0;i<impls.size();i++){
+         impls[i]->parent = this;
          Ret = impls[i]->deep_resolve(I);
+         impls[i]->parent = NULL;
          if(Ret) return Ret;
       }
       return NULL;

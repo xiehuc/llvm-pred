@@ -123,7 +123,7 @@ static Use* access_global_variable(Instruction *I)
 	return NULL;
 }
 
-Use* GlobalResolve::operator()(Value *V, ResolverBase* RB)
+Use* SpecialResolve::operator()(Value *V, ResolverBase* RB)
 {
    Use* Tg;
    if(auto LI = dyn_cast<LoadInst>(V)){

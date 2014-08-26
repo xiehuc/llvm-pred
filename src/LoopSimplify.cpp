@@ -53,7 +53,7 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
    CC = ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 
    RP.getResolver<SLGResolve>().get_impl().initial(&PI);
-   auto R = RP.getResolverSet<UseOnlyResolve, GlobalResolve, SLGResolve>();
+   auto R = RP.getResolverSet<UseOnlyResolve, SpecialResolve, SLGResolve>();
    ResolveResult RR = R.resolve(CC, [](Value* V){
          if(Instruction* I = dyn_cast<Instruction>(V))
             MarkPreserve::mark(I, "loop");
