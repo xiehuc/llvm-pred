@@ -4,8 +4,8 @@
 #include <llvm/Pass.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/ADT/DenseMap.h>
-#include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
+#include <list>
 
 namespace lle{
    class GVInfo;
@@ -14,11 +14,12 @@ namespace lle{
 class lle::GVInfo: public llvm::ModulePass
 {
    struct Data {
-      llvm::Instruction* store;
+      llvm::StoreInst* store;
+      std::list<llvm::Instruction*> resolve;
    };
-   llvm::DenseMap<llvm::Value*, Data> Info;
+   llvm::DenseMap<llvm::Constant*, Data> Info;
 
-   bool findStoreOnGV(llvm::Value*);
+   bool findStoreOnGV(llvm::Value*, llvm::Constant*);
    public:
       static char ID;
       explicit GVInfo():ModulePass(ID) {}
@@ -27,8 +28,9 @@ class lle::GVInfo: public llvm::ModulePass
 
       /*
       llvm::ConstantExpr* lookup(llvm::Value*);
-      llvm::Instruction* getKey(llvm::ConstantExpr*);
-      llvm::Instruction* getValue(llvm::ConstantExpr*);
       */
+      llvm::Value* getKey(llvm::Constant*);
+      llvm::Value* getValue(llvm::Constant*);
+      void print(llvm::raw_ostream&, const llvm::Module*) const override;
 };
 #endif

@@ -15,12 +15,12 @@ void GVInfo::getAnalysisUsage(AnalysisUsage & AU) const
    AU.setPreservesAll();
 }
 
-bool GVInfo::findStoreOnGV(Value* V)
+bool GVInfo::findStoreOnGV(Value* V, Constant* C)
 {
    for(auto U = V->use_begin(), E = V->use_end(); U!=E; ++U){
       bool found = false;
       if( auto CE = dyn_cast<ConstantExpr>(*U)){
-         findStoreOnGV(CE);
+         findStoreOnGV(CE, CE);
          // don't record on ConstantExpr
          continue;
       }
@@ -30,23 +30,24 @@ bool GVInfo::findStoreOnGV(Value* V)
          if(SI->getPointerOperand() != V) continue;
          // store V, %another, isn't we need
          found = true;
+         Info[C].store = SI;
          // Whether isa Array, record V->Tg
          if(isArray(SI->getValueOperand())){
-            findStoreOnGV(SI->getValueOperand());
+            findStoreOnGV(SI->getValueOperand(), C);
             // no need record twice
          }
       } else if( isa<CallInst>(Tg)){
          Argument* Arg = findCallInstArgument(&U.getUse());
          if(!Arg) continue;
-         found = findStoreOnGV(Arg);
+         found = findStoreOnGV(Arg, C);
          // if Arg == NULL, maybe function is library function, which define
          // with void func(...);
       } else if( isa<CastInst>(Tg) || isa<GetElementPtrInst>(Tg)){
-         found = findStoreOnGV(Tg);
+         found = findStoreOnGV(Tg, C);
       }
       if(found){
-         Info.insert(std::make_pair(V, Data{Tg}));
-         errs()<<*V<<"->"<<*Tg<<"\n";
+         Data& D = Info[C];
+         D.resolve.push_front(Tg);
          return true;
       }
    }
@@ -56,7 +57,34 @@ bool GVInfo::findStoreOnGV(Value* V)
 bool GVInfo::runOnModule(Module& M)
 {
    for(GlobalVariable& GV : M.getGlobalList()){
-      findStoreOnGV(&GV);
+      findStoreOnGV(&GV, &GV);
    }
    return false;
+}
+
+Value* GVInfo::getKey(Constant* C)
+{
+   auto found = Info.find(C);
+   if(found == Info.end()) return NULL;
+   return found->second.store->getPointerOperand();
+}
+
+Value* GVInfo::getValue(Constant* C)
+{
+   auto found = Info.find(C);
+   if(found == Info.end()) return NULL;
+   return found->second.store->getValueOperand();
+}
+
+void GVInfo::print(raw_ostream& OS, const Module* M) const
+{
+   for(auto& Pair : Info){
+      OS<<"Global Variable: "<<*Pair.first<<"\n";
+      OS<<"  last store: "<<*Pair.second.store<<"\n";
+      OS<<"  resolve: \n";
+      for(auto I : Pair.second.resolve){
+         OS<<*I<<"\n";
+      }
+      OS<<"\n";
+   }
 }
