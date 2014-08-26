@@ -298,3 +298,20 @@ bool lle::isArgumentWrite(llvm::Argument *Arg)
    }
    return false;
 }
+
+bool lle::isArray(Value *V)
+{
+   if(!V->getType()->isPointerTy()) return false;
+
+   if(isa<ConstantArray>(V) || isa<ConstantVector>(V))
+      return true;
+   //FIXME: if is GetElementPtr
+
+   CallInst* CI = dyn_cast<CallInst>(V);
+   if(!CI) return false;
+   auto F = CI->getCalledFunction();
+   if(!F) return false;
+   if(F->getName() == "malloc" || F->getName() == "calloc") return true;
+   return false;
+
+}

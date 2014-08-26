@@ -37,6 +37,7 @@ add_library(LLVMPred SHARED
    LibFReshape.cpp
    SlashShrink.cpp
    Resolver.cpp
+   GVInfo.cpp
    Print.cpp
 	loop.cpp
 	util.cpp

@@ -27,6 +27,8 @@ namespace lle
    // or it would check argument use to find whether have a store instruction.
    bool isArgumentWrite(llvm::Argument* Arg);
 
+   bool isArray(llvm::Value*);
+
 	//remove cast instruction for a value
 	//because cast means the original value and the returned value is
 	//semanticly equal
@@ -44,6 +46,7 @@ namespace lle
       }
       return nullptr;
    }
+
 }
 
 #endif
