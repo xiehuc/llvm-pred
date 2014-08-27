@@ -33,6 +33,24 @@ static GlobalVariable* find_all_param(Argument* Arg, bool& only)
    return param;
 }
 
+bool GVInfo::findLoadOnGVPointer(Value* V, Constant* C)
+{
+   bool ret = false;
+   for(auto U = V->use_begin(), E = V->use_end(); U!=E; ++U){
+      bool found = false;
+      Instruction* Tg = dyn_cast<Instruction>(*U);
+      if(!Tg) continue;
+      if(isa<LoadInst>(Tg))
+         found = findStoreOnGV(Tg, C);
+      if(found){
+         Data& D = info[C];
+         D.resolve.push_front(Tg);
+         ret = true;
+      }
+   }
+   return ret;
+}
+
 bool GVInfo::findStoreOnGV(Value* V, Constant* C)
 {
    bool ret = false;
@@ -49,23 +67,30 @@ bool GVInfo::findStoreOnGV(Value* V, Constant* C)
          if(SI->getPointerOperand() != V) continue;
          // store V, %another, isn't we need
          found = true;
-         info[C].store = SI;
+         Data& D = info[C];
+         D.write_once &= !(D.store && D.store!=SI);
+         D.store = SI;
          // Whether isa Array, record V->Tg
          if(isArray(SI->getValueOperand())){
-            findStoreOnGV(SI->getValueOperand(), C);
             // no need record twice
+            if(findStoreOnGV(SI->getValueOperand(), C)==false){
+               // if no found store on value, maybe there is a indirect store:
+               //   % = load i8** key;
+               //   store result, %
+               findLoadOnGVPointer(SI->getPointerOperand(), C);
+            }
          }
       } else if( isa<CallInst>(Tg)){
          Argument* Arg = findCallInstArgument(&U.getUse());
          if(!Arg) continue;
-         /* write Argument Cache */
+         // if Arg == NULL, maybe function is library function, which define
+         // with void func(...);
          bool write_once = false;
          auto V = find_all_param(Arg, write_once);
+         /* write Argument Cache */
          if(V) arg_info.insert(std::make_pair(Arg, ArgInfo{write_once, V}));
 
          found = findStoreOnGV(Arg, C);
-         // if Arg == NULL, maybe function is library function, which define
-         // with void func(...);
       } else if( isa<CastInst>(Tg)){
          found = findStoreOnGV(Tg, C);
       } else if( isa<GetElementPtrInst>(Tg)){
@@ -89,7 +114,7 @@ bool GVInfo::runOnModule(Module& M)
    return false;
 }
 
-Constant* GVInfo::lookup(Value *V)
+Constant* GVInfo::lookup(Value *V) const
 {
    if(auto GEP = dyn_cast<GetElementPtrInst>(V)){
       if(auto Arg = dyn_cast<Argument>(GEP->getPointerOperand())){
@@ -111,25 +136,12 @@ Constant* GVInfo::lookup(Value *V)
    return dyn_cast<Constant>(V);
 }
 
-Value* GVInfo::getKey(Constant* C)
-{
-   auto found = info.find(C);
-   if(found == info.end()) return NULL;
-   return found->second.store->getPointerOperand();
-}
-
-Value* GVInfo::getValue(Constant* C)
-{
-   auto found = info.find(C);
-   if(found == info.end()) return NULL;
-   return found->second.store->getValueOperand();
-}
-
 void GVInfo::print(raw_ostream& OS, const Module* M) const
 {
    for(auto& Pair : info){
       OS<<"Global Variable: "<<*Pair.first<<"\n";
       OS<<"  last store: "<<*Pair.second.store<<"\n";
+      OS<<"  write once: "<<Pair.second.write_once<<"\n";
       OS<<"  resolve: \n";
       for(auto I : Pair.second.resolve){
          OS<<*I<<"\n";
