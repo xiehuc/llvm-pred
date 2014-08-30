@@ -150,12 +150,7 @@ struct llvm::DOTGraphTraits<lle::DDGraph*> : public llvm::DefaultDOTGraphTraits
 
    static bool renderGraphFromBottomUp(){ return true;}
 
-   std::string getNodeLabel(lle::DDGValue* N,lle::DDGraph* G){
-      std::string ret;
-      llvm::raw_string_ostream os(ret);
-      N->first->print(os);
-      return ret;
-   }
+   std::string getNodeLabel(lle::DDGValue* N,lle::DDGraph* G);
 };
 
 #endif

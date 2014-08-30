@@ -224,3 +224,20 @@ Twine DDGraph::expr()
    }
    return root->second.expr();
 }
+
+
+string llvm::DOTGraphTraits<DDGraph*>::getNodeLabel(DDGValue* N,DDGraph* G)
+{
+   std::string ret;
+   llvm::raw_string_ostream os(ret);
+   N->first->print(os);
+   if(auto CI = dyn_cast<CallInst>(N->first)){
+      Function* F = CI->getCalledFunction();
+      if(!F) return ret;
+      os<<"\n\t Argument Names: [ ";
+      for(auto& Arg : F->getArgumentList())
+         os<<Arg.getName()<<"  ";
+      os<<"]";
+   }
+   return ret;
+}
