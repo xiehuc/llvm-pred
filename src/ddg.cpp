@@ -80,13 +80,24 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
          node.impl().push_back(&v);
          ++v.second.ref_count;
          node.flags_ = DDGNode::IMPLICITY;
-         if(isa<CallInst>(implicity->getUser())){
-            Argument* arg = findCallInstArgument(implicity);
-            auto found = c.find(cast<Value>(arg));
-            Use* link = (found==c.end())?nullptr:found->second;
-            if(link){
-               node.load_tg_ = &*this->find(link->getUser());
-               //++node.load_tg_->second.ref_count; // shouldn't add ref count for load_tg
+         if(auto CI = dyn_cast<CallInst>(implicity->getUser())){
+            Instruction* NI = dyn_cast<Instruction>(N.first);
+            if(NI && CI->getCalledFunction() != NI->getParent()->getParent()){
+               Argument* arg = findCallInstArgument(implicity);
+               auto found = c.find(cast<Value>(arg));
+               Use* link = (found==c.end())?nullptr:found->second;
+               if(link){
+                  node.load_tg_ = &*this->find(link->getUser());
+                  //++node.load_tg_->second.ref_count; // shouldn't add ref count for load_tg
+                  to.impl().push_back(node.load_inst());
+                  to.flags_ = DDGNode::IMPLICITY;
+               }
+            }else{
+               Use* N = implicity->getNext();
+               if(isa<AllocaInst>(implicity->get()) && N)
+                  node.load_tg_ = &*this->find(N->getUser());
+               else 
+                  node.load_tg_ = &*this->find(implicity->get());
                to.impl().push_back(node.load_inst());
                to.flags_ = DDGNode::IMPLICITY;
             }
@@ -94,10 +105,11 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
       }else{
          Instruction* Inst = dyn_cast<llvm::Instruction>(N.first);
          if(!Inst) continue;
+         if(isa<CallInst>(Inst)) continue; // callinst never can be direct solve
          for(auto O = Inst->op_begin(),E=Inst->op_end();O!=E;++O){
             auto Target = this->find(*O);
             if(Target != this->end()){
-               auto v = &*this->find(*O);
+               DDGValue* v = &*Target;
                ++v->second.ref_count;
                node.impl().push_back(v);
             }

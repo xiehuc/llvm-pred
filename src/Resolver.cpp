@@ -401,7 +401,11 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
             // original Instruction is in same function called, means param
             // direction is in, that is, the outter put a param to called
             // function, and we(in function body) read the value and do caculate
-            next = res->get();
+            Use* N = res->getNext();
+            if(isa<AllocaInst>(res->get()) && N){
+               next = N->getUser();
+            }else 
+               next = res->get();
          }
       }else
          next = U;
