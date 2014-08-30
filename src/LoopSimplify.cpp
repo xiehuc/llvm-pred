@@ -12,6 +12,7 @@
 #include "ddg.h"
 #include "loop.h"
 #include "util.h"
+#include "GVInfo.h"
 #include "config.h"
 #include "Resolver.h"
 #include "SlashShrink.h"
@@ -30,6 +31,7 @@ static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simpl
 void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
 	AU.setPreservesAll();
+   AU.addRequired<GVInfo>();
 	AU.addRequired<AliasAnalysis>();
 	AU.addRequired<MemoryDependenceAnalysis>();
    AU.addRequired<ResolverPass>();
@@ -43,6 +45,7 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 	LoopCycle& LC = getAnalysis<LoopCycle>();
    ResolverPass& RP = getAnalysis<ResolverPass>();
    ProfileInfo& PI = getAnalysis<ProfileInfo>();
+   GVInfo& GVI = getAnalysis<GVInfo>();
 	Value* CC = LC.getLoopCycle(L);
    
    DEBUG(errs()<<"[Load ProfileInfo, Traped size:"<<PI.getAllTrapedValues().size()<<"]\n");
@@ -53,7 +56,8 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
    CC = ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 
    RP.getResolver<SLGResolve>().get_impl().initial(&PI);
-   auto R = RP.getResolverSet<UseOnlyResolve, SpecialResolve, SLGResolve>();
+   RP.getResolver<GVResolve>().get_impl().initial(&GVI);
+   auto R = RP.getResolverSet<UseOnlyResolve, SpecialResolve, GVResolve, SLGResolve>();
    ResolveResult RR = R.resolve(CC, [](Value* V){
          if(Instruction* I = dyn_cast<Instruction>(V))
             MarkPreserve::mark(I, "loop");

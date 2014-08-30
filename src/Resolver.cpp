@@ -144,7 +144,6 @@ Use* SpecialResolve::operator()(Value *V, ResolverBase* RB)
                              shouldn't cache result */
       Function* F = Arg->getParent();
       CallInst* CI = RB->in_call(F);
-      errs()<<*U<<"->"<<*CI<<"\n";
       if(CI) return findCallInstParameter(Arg, CI);
    }
    return NULL;
@@ -333,7 +332,6 @@ void ResolverBase::_empty_handler(llvm::Value *)
 CallInst* ResolverBase::in_call(Function *F) const
 {
    auto Ite = find_if(call_stack.begin(), call_stack.end(), [F](CallInst* CI){
-         errs()<<CI->getCalledFunction()->getName()<<"\n";
          return CI->getCalledFunction() == F;
          });
    if(Ite!=call_stack.end()) return *Ite;

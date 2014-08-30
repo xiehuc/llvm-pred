@@ -1,8 +1,12 @@
 #include "GVInfo.h"
+#include "Resolver.h"
 #include "util.h"
+
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
+
+#include "debug.h"
 
 using namespace lle;
 using namespace llvm;
@@ -150,3 +154,15 @@ void GVInfo::print(raw_ostream& OS, const Module* M) const
    }
 }
 
+Use* GVResolve::operator()(Value* V, ResolverBase*)
+{
+   Value* Tg = NULL;
+   Assert(gv_info, __FUNCTION__" need initial with GVInfo first");
+   if(auto LI = dyn_cast<LoadInst>(V)){
+      Tg = LI->getPointerOperand();
+   }
+   if(!Tg) return NULL;
+   Constant* CTg = gv_info->lookup(Tg);
+   if(!CTg) return NULL;
+   return const_cast<Use*>(gv_info->getValue(CTg));
+}

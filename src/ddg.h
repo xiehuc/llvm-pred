@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <llvm/IR/User.h>
 #include <llvm/IR/Value.h>
+#include <llvm/IR/Function.h>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallVector.h>

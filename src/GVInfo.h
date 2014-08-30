@@ -9,7 +9,11 @@
 
 namespace lle{
    class GVInfo;
+   class GVResolve;
+
+   class ResolverBase;
 };
+
 
 class lle::GVInfo: public llvm::ModulePass
 {
@@ -47,12 +51,12 @@ class lle::GVInfo: public llvm::ModulePass
             SI->getPointerOperand(): NULL;
       }
       // return store value on GlobalVariable, valid only write_once
-      const llvm::Value* getValue(llvm::Constant* C) const {
+      const llvm::Use* getValue(llvm::Constant* C) const {
          auto found = info.find(C);
          if(found == info.end()) return NULL;
          auto SI = found->second.store;
          return (SI && found->second.write_once)?
-            SI->getValueOperand(): NULL;
+            &SI->getOperandUse(0): NULL;
       }
       const std::list<const llvm::Instruction*>* getResolve(llvm::Constant* C) const {
          auto found = info.find(C);
@@ -60,5 +64,14 @@ class lle::GVInfo: public llvm::ModulePass
          return &found->second.resolve;
       }
       void print(llvm::raw_ostream&, const llvm::Module*) const override;
+};
+
+class lle::GVResolve
+{
+   lle::GVInfo* gv_info = NULL;
+
+   public:
+   void initial(lle::GVInfo* gv){gv_info = gv;}
+   llvm::Use* operator()(llvm::Value*, lle::ResolverBase*);
 };
 #endif
