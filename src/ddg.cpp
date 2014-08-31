@@ -102,17 +102,24 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
                to.flags_ = DDGNode::IMPLICITY;
             }
          }
-      }else{
-         Instruction* Inst = dyn_cast<llvm::Instruction>(N.first);
-         if(!Inst) continue;
-         if(isa<CallInst>(Inst)) continue; // callinst never can be direct solve
-         for(auto O = Inst->op_begin(),E=Inst->op_end();O!=E;++O){
-            auto Target = this->find(*O);
-            if(Target != this->end()){
-               DDGValue* v = &*Target;
-               ++v->second.ref_count;
-               node.impl().push_back(v);
-            }
+      }
+   }
+   for(auto& N : *this){
+      // for stability, make sure all implicity marked over before this.
+      auto found = c.find(N.first);
+      if(found != c.end()) continue;
+
+      Instruction* Inst = dyn_cast<llvm::Instruction>(N.first);
+      DDGNode& node = N.second;
+      if(!Inst) continue;
+      if(isa<CallInst>(Inst) && (N.second.flags_ & DDGNode::IMPLICITY))
+         continue; // implicity callinst never can be direct solve
+      for(auto O = Inst->op_begin(),E=Inst->op_end();O!=E;++O){
+         auto Target = this->find(*O);
+         if(Target != this->end()){
+            DDGValue* v = &*Target;
+            ++v->second.ref_count;
+            node.impl().push_back(v);
          }
       }
    }
