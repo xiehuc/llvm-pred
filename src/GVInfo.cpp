@@ -1,6 +1,7 @@
 #include "GVInfo.h"
 #include "Resolver.h"
 #include "util.h"
+#include "KnownLibCallInfo.h"
 
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Constants.h>
@@ -13,6 +14,7 @@ using namespace llvm;
 
 char GVInfo::ID = 0;
 static RegisterPass<GVInfo> X("GVinfo", "Provide Global Variable Information");
+static LibCallFromFile LCFF;
 
 void GVInfo::getAnalysisUsage(AnalysisUsage & AU) const
 {
@@ -84,17 +86,29 @@ bool GVInfo::findStoreOnGV(Value* V, Constant* C)
                findLoadOnGVPointer(SI->getPointerOperand(), C);
             }
          }
-      } else if( isa<CallInst>(Tg)){
+      } else if(auto CI = dyn_cast<CallInst>(Tg)){
          Argument* Arg = findCallInstArgument(&U.getUse());
-         if(!Arg) continue;
-         // if Arg == NULL, maybe function is library function, which define
-         // with void func(...);
-         bool write_once = false;
-         auto V = find_all_param(Arg, write_once);
-         /* write Argument Cache */
-         if(V) arg_info.insert(std::make_pair(Arg, ArgInfo{write_once, V}));
+         if(!Arg){
+            // if Arg == NULL, maybe function is library function, which define
+            // with void func(...);
+            Function* CF = dyn_cast<Function>(castoff(CI->getCalledValue()));
+            if(!CF) continue;
+            auto FI = LCFF.getFunctionInfo(CF);
+            if(FI && FI->UniversalBehavior & AliasAnalysis::ModRefResult::Mod){
+               found = true;
+               Data& D = info[C];
+               D.write_once &= !(D.store && D.store!=SI);
+               D.store = CI;
+               errs()<<*C<<"--->"<<*CI<<"\n";
+            }
+         }else{
+            bool write_once = false;
+            auto V = find_all_param(Arg, write_once);
+            /* write Argument Cache */
+            if(V) arg_info.insert(std::make_pair(Arg, ArgInfo{write_once, V}));
 
-         found = findStoreOnGV(Arg, C);
+            found = findStoreOnGV(Arg, C);
+         }
       } else if( isa<CastInst>(Tg)){
          found = findStoreOnGV(Tg, C);
       } else if( isa<GetElementPtrInst>(Tg)){

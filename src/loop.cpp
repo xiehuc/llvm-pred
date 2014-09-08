@@ -199,6 +199,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	//process non add later
 	unsigned next_phi_idx = 0;
 	ConstantInt* Step = NULL,*PrevStep = NULL;/*only used if next is phi node*/
+   ret_null_fail(next, "");
 	PHINode* next_phi = dyn_cast<PHINode>(next);
 	do{
 		if(next_phi) {

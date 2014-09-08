@@ -392,11 +392,12 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
             // direction is out, that is, put a param to called function, and
             // write out result into it.
             Argument* arg = findCallInstArgument(res);
-            // put most assert on UseOnlyResolver
-            Assert(arg,"");
-            partial.insert(make_pair(arg,&arg->use_back()->getOperandUse(0)));
-            next = arg->use_back();
-            call_stack.push_back(CI);
+            if(arg){
+               // arg == NULL, maybe it calls a library function
+               partial.insert(make_pair(arg,&arg->use_back()->getOperandUse(0)));
+               next = arg->use_back();
+               call_stack.push_back(CI);
+            }
          }else{
             // original Instruction is in same function called, means param
             // direction is in, that is, the outter put a param to called

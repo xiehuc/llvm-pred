@@ -84,6 +84,7 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
             Instruction* NI = dyn_cast<Instruction>(N.first);
             if(NI && CI->getCalledFunction() != NI->getParent()->getParent()){
                Argument* arg = findCallInstArgument(implicity);
+               if(!arg) continue;
                auto found = c.find(cast<Value>(arg));
                Use* link = (found==c.end())?nullptr:found->second;
                if(link){

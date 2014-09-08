@@ -19,7 +19,8 @@ class lle::GVInfo: public llvm::ModulePass
 {
    struct Data {
       bool write_once = true;
-      llvm::StoreInst* store; // last store inst, invalid when !write_once
+      llvm::Instruction* store; // type is StoreInst or CallInst. 
+      // last store inst, invalid when !write_once
       std::list<const llvm::Instruction*> resolve; // resolve link
    };
    struct ArgInfo {
@@ -47,8 +48,9 @@ class lle::GVInfo: public llvm::ModulePass
          auto found = info.find(C);
          if(found == info.end()) return NULL;
          auto SI = found->second.store;
-         return (SI && found->second.write_once)?
-            SI->getPointerOperand(): NULL;
+         return NULL;
+         // return (SI && found->second.write_once)?
+         //   SI->getPointerOperand(): NULL;
       }
       // return store value on GlobalVariable, valid only write_once
       const llvm::Use* getValue(llvm::Constant* C) const {
