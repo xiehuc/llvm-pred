@@ -74,8 +74,8 @@ bool GVInfo::findStoreOnGV(Value* V, Constant* C)
          // store V, %another, isn't we need
          found = true;
          Data& D = info[C];
-         D.write_once &= !(D.store && D.store!=SI);
-         D.store = SI;
+         D.write_once &= !(D.store && D.store->getUser()!=SI);
+         D.store = &SI->getOperandUse(0);
          // Whether isa Array, record V->Tg
          if(isArray(SI->getValueOperand())){
             // no need record twice
@@ -97,9 +97,8 @@ bool GVInfo::findStoreOnGV(Value* V, Constant* C)
             if(FI && FI->UniversalBehavior & AliasAnalysis::ModRefResult::Mod){
                found = true;
                Data& D = info[C];
-               D.write_once &= !(D.store && D.store!=SI);
-               D.store = CI;
-               errs()<<*C<<"--->"<<*CI<<"\n";
+               D.write_once &= !(D.store && D.store->getUser()!=CI);
+               D.store = &U.getUse();
             }
          }else{
             bool write_once = false;
@@ -153,6 +152,22 @@ Constant* GVInfo::lookup(Value *V) const
    }
    return dyn_cast<Constant>(V);
 }
+
+const Value* GVInfo::getKey(Constant *C) const 
+{
+   auto found = info.find(C);
+   if(found == info.end()) return NULL;
+   if(!found->second.write_once) return NULL;
+   auto I = found->second.store->getUser();
+
+   if(auto CI = dyn_cast<CallInst>(I))
+      return castoff(CI->getCalledValue());
+   else if(auto SI = dyn_cast<StoreInst>(I))
+      return SI->getPointerOperand();
+   else
+      return NULL;
+}
+
 
 void GVInfo::print(raw_ostream& OS, const Module* M) const
 {

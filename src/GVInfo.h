@@ -19,7 +19,7 @@ class lle::GVInfo: public llvm::ModulePass
 {
    struct Data {
       bool write_once = true;
-      llvm::Instruction* store; // type is StoreInst or CallInst. 
+      llvm::Use* store; // type is StoreInst or CallInst. 
       // last store inst, invalid when !write_once
       std::list<const llvm::Instruction*> resolve; // resolve link
    };
@@ -44,21 +44,15 @@ class lle::GVInfo: public llvm::ModulePass
        * GetElementPtr ConstantExpr , using ArgInfo*/
       llvm::Constant* lookup(llvm::Value*) const;
       // return store pointer on GlobalVariable, valid only write_once
-      const llvm::Value* getKey(llvm::Constant* C) const {
-         auto found = info.find(C);
-         if(found == info.end()) return NULL;
-         auto SI = found->second.store;
-         return NULL;
-         // return (SI && found->second.write_once)?
-         //   SI->getPointerOperand(): NULL;
-      }
+      // if is call instruction, return called function
+      const llvm::Value* getKey(llvm::Constant* C) const ;
       // return store value on GlobalVariable, valid only write_once
+      // if is call instruction, return NULL
       const llvm::Use* getValue(llvm::Constant* C) const {
          auto found = info.find(C);
          if(found == info.end()) return NULL;
-         auto SI = found->second.store;
-         return (SI && found->second.write_once)?
-            &SI->getOperandUse(0): NULL;
+         if(!found->second.write_once) return NULL;
+         return found->second.store;
       }
       const std::list<const llvm::Instruction*>* getResolve(llvm::Constant* C) const {
          auto found = info.find(C);
