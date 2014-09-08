@@ -129,6 +129,7 @@ class lle::ResolverBase
    void ignore_cache(){ disable_cache = true; }
 
    // return if call_stack has a related Function
+   // or if there only one call on related Function
    llvm::CallInst* in_call(llvm::Function*) const;
    
    // walk through V's dependent tree and callback

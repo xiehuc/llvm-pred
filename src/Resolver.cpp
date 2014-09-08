@@ -335,6 +335,11 @@ CallInst* ResolverBase::in_call(Function *F) const
          return CI->getCalledFunction() == F;
          });
    if(Ite!=call_stack.end()) return *Ite;
+   CallInst* only;
+   unsigned call_count = count_if(F->use_begin(), F->use_end(), [&only](User* U){
+         return (only = dyn_cast<CallInst>(U)) > 0;
+         });
+   if(call_count==1) return only;
    return NULL;
 }
 
