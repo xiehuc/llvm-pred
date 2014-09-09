@@ -42,6 +42,7 @@ endif()
 if(NOT(DEFINED LLVM_ROOT) )
 	if(NOT "${LLVM_VERSION}" EQUAL "{LLVM_RECOMMAND_VERSION}")
 		unset(LLVM_CONFIG_EXE CACHE)
+		unset(LLVM_DYNAMIC_LIBRARY CACHE)
 	endif()
 	# find llvm-config. perfers to the one with version suffix, Ex:llvm-config-3.2
 	find_program(LLVM_CONFIG_EXE NAMES "llvm-config-${LLVM_RECOMMAND_VERSION}" "llvm-config")
