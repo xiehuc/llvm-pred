@@ -94,10 +94,11 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
                   to.flags_ = DDGNode::IMPLICITY;
                }
             }else{
-               Use* N = implicity->getNext();
-               if(isa<AllocaInst>(implicity->get()) && N)
-                  node.load_tg_ = &*this->find(N->getUser());
-               else 
+               if(isa<AllocaInst>(implicity->get())){
+                  auto found = c.find(implicity->get());
+                  Use* link = (found==c.end())?nullptr:found->second;
+                  if(link) node.load_tg_ = &*this->find(link->getUser());
+               }else 
                   node.load_tg_ = &*this->find(implicity->get());
                to.impl().push_back(node.load_inst());
                to.flags_ = DDGNode::IMPLICITY;

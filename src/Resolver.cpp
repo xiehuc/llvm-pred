@@ -51,6 +51,19 @@ static bool indirect_access_global(Value* V)
    return true;
 }
 
+struct CallArgResolve{
+   Use* operator()(Use* U){
+      Argument* arg = findCallInstArgument(U); // adjust attribute
+      if(arg && isArgumentWrite(arg) && arg->getNumUses()>0 && isa<StoreInst>(arg->use_back())) 
+         // if no nocapture and readonly, it means could write into this addr
+         // FIXME: when the last inst is not store, we consider this is unsolved
+         // let it return NULL if failed, to let ResolverSet use next chain
+         return U;
+      else
+         return NULL;
+   }
+};
+
 Use* UseOnlyResolve::operator()(Value* V, ResolverBase* _UNUSED_)
 {
    Use* Target = NULL, *Keep = NULL;
@@ -71,12 +84,8 @@ Use* UseOnlyResolve::operator()(Value* V, ResolverBase* _UNUSED_)
       if(isa<StoreInst>(U) && U->getOperand(1) == Target->get())
          return &U->getOperandUse(0);
       else if(isa<CallInst>(U)){
-         Argument* arg = findCallInstArgument(Target); // adjust attribute
-         if(arg && isArgumentWrite(arg) && arg->getNumUses()>0 && isa<StoreInst>(arg->use_back())) 
-            // if no nocapture and readonly, it means could write into this addr
-            // FIXME: when the last inst is not store, we consider this is unsolved
-            // let it return NULL if failed, to let ResolverSet use next chain
-            return Target;
+         Use* R = CallArgResolve()(Target);
+         if(R) return R;
       }
    }
    //if no use found, we consider this is a constant expr
@@ -389,6 +398,13 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
       }
       User* U = res->getUser();
 
+      resolved.insert(I); // original is resolved;
+      lambda(I);
+      resolved.insert(U);
+      lambda(U);
+      Ite = unsolved.erase(Ite);
+
+recursive:
       if(isa<StoreInst>(U) || isa<LoadInst>(U)){
          next = res->get();
       }else if(auto CI = dyn_cast<CallInst>(U)){
@@ -407,20 +423,30 @@ ResolveResult ResolverBase::resolve(llvm::Value* V, std::function<void(Value*)> 
             // original Instruction is in same function called, means param
             // direction is in, that is, the outter put a param to called
             // function, and we(in function body) read the value and do caculate
-            Use* N = res->getNext();
-            if(isa<AllocaInst>(res->get()) && N){
-               next = N->getUser();
-            }else 
+            if(!isa<AllocaInst>(res->get())){
                next = res->get();
+               continue;
+            }
+
+            while((res = res->getNext())){
+               Use* R = NULL;
+               User* Ur = res->getUser();
+               if(isa<CallInst>(Ur)){
+                  R = CallArgResolve()(res);
+                  if(R){
+                     U = Ur;
+                     goto recursive; // goto above siatuation
+                  }
+               }else if(isa<LoadInst>(Ur) || isa<StoreInst>(Ur)){
+                  next = Ur;
+                  partial.insert(make_pair(res->get(),res));
+                  break;
+               }else
+                  AssertRuntime(0);
+            }
          }
       }else
          next = U;
-
-      resolved.insert(I); // original is resolved;
-      lambda(I);
-      resolved.insert(U);
-      lambda(U);
-      Ite = unsolved.erase(Ite);
    }
 
    unsolved.pop_back(); // remove last NULL
