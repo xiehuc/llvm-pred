@@ -29,6 +29,8 @@ class lle::PrintEnv: public ModulePass
    PrintEnv():ModulePass(ID) {}
    bool runOnModule(Module& M);
 };
+
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
 /** A simple helper to print callgraph,
  * the difference with -print-callgraph is this only print module function,
  * ant this also print a tree, insteal just print a list
@@ -42,6 +44,9 @@ class lle::PrintCgTree: public ModulePass
    PrintCgTree():ModulePass(ID) {}
    bool runOnModule(Module& M);
 };
+char PrintCgTree::ID = 0;
+static RegisterPass<PrintCgTree> Y("Cg", "print Callgraph Tree", true, true);
+#endif
 /* A simple helper to print functions called what libcalls
  * this is useful to debug and check the program structure
  */
@@ -55,11 +60,9 @@ class lle::PrintLibCall: public FunctionPass
 };
 
 char PrintEnv::ID = 0;
-char PrintCgTree::ID = 0;
 char PrintLibCall::ID = 0;
 
 static RegisterPass<PrintEnv> X("Env","print environment params", true, true);
-static RegisterPass<PrintCgTree> Y("Cg", "print Callgraph Tree", true, true);
 static RegisterPass<PrintLibCall> Z("Call", "print function invokes what libcall", true, true);
 
 bool PrintEnv::runOnModule(Module &M)
@@ -73,6 +76,7 @@ bool PrintEnv::runOnModule(Module &M)
    return false;
 }
 
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
 bool PrintCgTree::runOnModule(Module &M)
 {
    CallGraph CG;
@@ -109,6 +113,7 @@ void PrintCgTree::print_cg(CallGraphNode *node)
    }
    level.pop_back();
 }
+#endif
 
 bool PrintLibCall::runOnFunction(Function &F)
 {

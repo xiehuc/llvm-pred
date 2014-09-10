@@ -10,7 +10,6 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
-#include <llvm/Analysis/Verifier.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Analysis/LibCallAliasAnalysis.h>
 
