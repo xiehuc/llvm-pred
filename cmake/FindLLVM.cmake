@@ -28,6 +28,9 @@
 #     ${LLVM_LIBRARIES}
 #     ${LLVM_IRREADER_LIRARY}
 #     )
+# 
+# version: 0.9.1
+#    add LLVM_FLAGS_NDEBUG means llvm build with NDEBUG
 #
 # version: 0.9
 #    remove LLVM_{C/CPP/CXX}_FLAGS which import -DNDEBUG
@@ -77,6 +80,10 @@ _llvm_config(LLVM_LD_FLAGS --ldflags)
 _llvm_config(LLVM_LIBRARY_DIRS --libdir)
 _llvm_config(LLVM_INCLUDE_DIRS --includedir)
 string(REGEX MATCH "-l.*" LLVM_LIBRARIES ${LLVM_LD_FLAGS})
+_llvm_config(LLVM_C_FLAGS --cflags)
+if(LLVM_C_FLAGS MATCHES "-DNDEBUG")
+   add_definitions(-DLLVM_FLAGS_NDEBUG)
+endif()
 
 find_library(LLVM_DYNAMIC_LIBRARY 
 	NAMES "LLVM" "LLVM-${LLVM_VERSION}"

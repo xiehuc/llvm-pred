@@ -1,3 +1,4 @@
+#include "preheader.h"
 #include <llvm/Pass.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Analysis/CallGraph.h>
@@ -5,9 +6,10 @@
 
 #include <string>
 
-#include "preheader.h"
 #include "util.h"
 #include "KnownLibCallInfo.h"
+
+#include "debug.h"
 
 namespace lle{
    class PrintEnv;
@@ -113,7 +115,6 @@ void PrintCgTree::print_cg(CallGraphNode *node)
    level.push_back(1);
    for(auto I = node->begin(), E = node->end(); I!=E; ++I){
       Function* F = I->second->getFunction();
-      errs()<<F->getName()<<"\n";
       if(!F || F->empty()) continue; // this is a external function
       lastC = I;
    }
@@ -140,7 +141,9 @@ bool PrintCgTree::runOnModule(Module &M)
    CallGraph CG(M);
    Function* Main = M.getFunction("main");
    CallGraphNode* root = Main?CG[Main]:CG.getExternalCallingNode();
+   
 #endif
+   Assert(root->getFunction()==Main, "");
    errs()<<root->getFunction()->getName()<<"\n";
    print_cg(root);
    return false;

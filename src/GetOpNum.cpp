@@ -3,12 +3,12 @@
 #include <string>
 #include <map>
 
+#include "preheader.h"
 #include <llvm/Support/DataTypes.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/IRReader/IRReader.h>
-#include <llvm/Support/InstIterator.h>
 #include <llvm/ADT/StringRef.h>
 
 using namespace std;
