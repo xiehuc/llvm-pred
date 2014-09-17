@@ -32,6 +32,7 @@ namespace llvm{
 
 class lle::DDGNode{
    public:
+   typedef std::string expr_type;
    typedef llvm::SmallVector<DDGValue*, 3> DDGNodeImpl;
    typedef DDGNodeImpl::iterator iterator;
    enum Flags{
@@ -46,6 +47,8 @@ class lle::DDGNode{
    unsigned char ref_count; // the count other nodes pointed this
    uint ref_num_;           // associated number to output reference
    Flags flags_;            // this node's type information
+   expr_type root;
+#if 0
    llvm::Twine lhs,rhs,root,lbk,bk; /* the twines , the structure like this:
                                        a   +  b  ' '    (   root
                                        \   /  \   /      \   /
@@ -53,14 +56,15 @@ class lle::DDGNode{
                                           \    /           \  /
                                            root             bk
       because a twine can only hold two elements. plus bk means bracket.*/
+#endif
    DDGValue* load_tg_;  /* when load's child is a call, this is the real
                            target(argument) for load. */
 
    public:
    std::string expr_buf; /* a buffer hold complex expression. because twine
                             doesn't hold memory target. */
-   void set_expr(llvm::Twine lhs,llvm::Twine rhs, int prio = 0);
-   llvm::Twine& expr(int prio = 14); /* caculate expression with prio. when
+   void set_expr(const expr_type& lhs,const expr_type& rhs = "", int prio = 0);
+   const expr_type expr(int prio = 14); /* caculate expression with prio. when
       prio < self.prio return a bracket expression. because it means it would
       break the correct expression structure. */
    void ref(int R); // set reference number
@@ -77,12 +81,13 @@ class lle::DDGNode{
 struct lle::DDGraph : 
    public lle::DDGraphImpl
 {
+   typedef DDGNode::expr_type expr_type;
    // a helper function to make a DDGValue with initialed DDGNode structure
    DDGValue make_value(llvm::Value* root, DDGNode::Flags flags);
 
    DDGValue* root; // the root for graph
    DDGraph(lle::ResolveResult& RR, llvm::Value* root);
-   llvm::Twine expr(); 
+   expr_type expr(); 
 };
 
 template<>

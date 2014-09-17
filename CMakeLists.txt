@@ -25,4 +25,3 @@ set(ENABLE_DEBUG ${EXTRA_DEBUG})
 configure_file(config.h.in config.h)
 
 add_subdirectory(src)
-add_subdirectory(test)

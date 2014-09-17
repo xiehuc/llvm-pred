@@ -60,7 +60,7 @@ bool GVInfo::findLoadOnGVPointer(Value* V, Constant* C)
 bool GVInfo::findStoreOnGV(Value* V, Constant* C)
 {
    bool ret = false;
-   for(auto U = V->use_begin(), E = V->use_end(); U!=E; ++U){
+   for(auto U = user_begin(V), E = user_end(V); U!=E; ++U){
       bool found = false;
       if( auto CE = dyn_cast<ConstantExpr>(*U)){
          findStoreOnGV(CE, CE);

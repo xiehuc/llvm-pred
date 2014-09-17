@@ -49,4 +49,14 @@ namespace lle
 
 }
 
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
+#define user_back(ins)  ins->use_back()
+#define user_begin(ins) ins->use_begin()
+#define user_end(ins)   ins->use_end()
+#else
+#define user_back(ins)  ins->user_back()
+#define user_begin(ins) ins->user_begin()
+#define user_end(ins)   ins->user_end()
+#endif
+
 #endif

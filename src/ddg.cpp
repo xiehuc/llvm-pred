@@ -17,21 +17,25 @@ using namespace llvm;
 
 /** TODO LHS and RHS doesn't consider content match. 所以可能错位 */
 
+typedef DDGNode::expr_type expr_type;
 static void to_expr(Value* V, DDGNode* N, int& ref_num);
 
-Twine& DDGNode::expr(int prio)
+const expr_type DDGNode::expr(int prio)
 {
-   if(prio<this->prio) return bk;
+   if(prio<this->prio) return "("+root+")";
    return root;
 }
 
-void DDGNode::set_expr(Twine lhs, Twine rhs, int prio)
+void DDGNode::set_expr(const expr_type& lhs, const expr_type& rhs, int prio)
 {
-   this->lhs = lhs;
-   this->rhs = rhs;
+   this->root = lhs+rhs;
+#if 0
+   this->lhs(lhs);
+   this->rhs(rhs);
    this->root=this->lhs+this->rhs;
    this->lbk="("+this->root;
    this->bk=lbk+")";
+#endif
    this->prio = prio;
 }
 
@@ -43,8 +47,11 @@ void DDGNode::ref(int R)
    // so DDGraph can read real expr from root directly.
    ref_num_ = R;
    prio = 16;
+#if 0
    lbk=Twine(ref_num_);
    bk="#"+lbk;
+#endif
+   root = "#"+std::to_string(ref_num_);
 }
 
 DDGValue DDGraph::make_value(Value *root, DDGNode::Flags flags)
@@ -133,13 +140,13 @@ static void to_expr(LoadInst* LI, DDGNode* N, int& R)
    if(N->flags() == DDGNode::UNSOLVED){
       raw_string_ostream O(N->expr_buf);
       pretty_print(LI, O, false); // FIXME use pretty_print to get loaded value's name, not stable.
-      N->set_expr(O.str(), "");
+      N->set_expr(O.str());
    }else{
       Assert(N->impl().size()==1,"");
       if(isa<CallInst>(N->impl().front()->first)){
          N->set_expr(LHS(N).expr()+"{", N->load_inst()->second.expr()+"}");
       }else{
-         N->set_expr(LHS(N).expr(), "");
+         N->set_expr(LHS(N).expr());
       }
    }
 }
@@ -151,7 +158,7 @@ static void to_expr(Constant* C, DDGNode* N, int& R)
    else{
       raw_string_ostream O(N->expr_buf);
       pretty_print(C,O);
-      N->set_expr(N->expr_buf, "");
+      N->set_expr(N->expr_buf);
    }
 }
 
@@ -159,12 +166,12 @@ static void to_expr(PHINode* PHI, DDGNode* N, int& R)
 {
    auto& node1 = LHS(N);
    // if a node is empty. means there is a self reference.
-   if(node1.expr().isTriviallyEmpty()) N->expr_buf = PHINODE_CIRCLE;
-   else N->expr_buf = node1.expr(6).str();
+   if(node1.expr().empty()) N->expr_buf = PHINODE_CIRCLE;
+   else N->expr_buf = node1.expr(6);
    for(auto I = N->impl().begin()+1, E = N->impl().end(); I!=E; ++I){
       auto& node = (*I)->second;
-      if(node.expr().isTriviallyEmpty()) N->expr_buf += "||" PHINODE_CIRCLE;
-      else N->expr_buf += ("||"+(*I)->second.expr(6)).str();
+      if(node.expr().empty()) N->expr_buf += "||" PHINODE_CIRCLE;
+      else N->expr_buf += ("||"+(*I)->second.expr(6));
    }
    N->set_expr(N->expr_buf,"",14);
 }
@@ -223,7 +230,7 @@ static void to_expr(Value* V, DDGNode* N, int& ref_num)
       Assert(0,*I);
 }
 
-Twine DDGraph::expr()
+expr_type DDGraph::expr()
 {
    int ref_num = 0;
    vector<DDGNode*> refs;
@@ -237,9 +244,9 @@ Twine DDGraph::expr()
 #endif
    }
    if(!refs.empty()){
-      root->second.expr_buf = (root->second.expr()+" aka {").str();
+      root->second.expr_buf = (root->second.expr()+" aka {");
       for(auto I : refs)
-         root->second.expr_buf += (I->expr()+":"+I->root+"; ").str();
+         root->second.expr_buf += (I->expr()+":"+I->root+"; ");
       root->second.expr_buf += "}";
       root->second.root = root->second.expr_buf;
    }

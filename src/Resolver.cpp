@@ -54,7 +54,7 @@ static bool indirect_access_global(Value* V)
 struct CallArgResolve{
    Use* operator()(Use* U){
       Argument* arg = findCallInstArgument(U); // adjust attribute
-      if(arg && isArgumentWrite(arg) && arg->getNumUses()>0 && isa<StoreInst>(arg->use_back())) 
+      if(arg && isArgumentWrite(arg) && arg->getNumUses()>0 && isa<StoreInst>(user_back(arg) )) 
          // if no nocapture and readonly, it means could write into this addr
          // FIXME: when the last inst is not store, we consider this is unsolved
          // let it return NULL if failed, to let ResolverSet use next chain
@@ -345,7 +345,7 @@ CallInst* ResolverBase::in_call(Function *F) const
          });
    if(Ite!=call_stack.end()) return *Ite;
    CallInst* only;
-   unsigned call_count = count_if(F->use_begin(), F->use_end(), [&only](User* U){
+   unsigned call_count = count_if(user_begin(F), user_end(F), [&only](User* U){
          return (only = dyn_cast<CallInst>(U)) > 0;
          });
    if(call_count==1) return only;
@@ -415,8 +415,8 @@ recursive:
             Argument* arg = findCallInstArgument(res);
             if(arg){
                // arg == NULL, maybe it calls a library function
-               partial.insert(make_pair(arg,&arg->use_back()->getOperandUse(0)));
-               next = arg->use_back();
+               partial.insert(make_pair(arg,&user_back(arg)->getOperandUse(0)));
+               next = user_back(arg);
                call_stack.push_back(CI);
             }
          }else{

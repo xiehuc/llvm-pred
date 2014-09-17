@@ -56,6 +56,7 @@ target_link_libraries(curve-fit
    ${GSL_LIBRARIES}
    )
 
+if(LLVM_VERSION VERSION_EQUAL "3.4")
 # print Asm code for a bitcode
 add_executable(lle-llc
    MyAsmPrinter.cpp
@@ -66,3 +67,4 @@ target_link_libraries(lle-llc
    ${LLVM_DYNAMIC_LIBRARY}
    )
 
+endif()
