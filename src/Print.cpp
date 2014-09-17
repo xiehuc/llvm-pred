@@ -1,4 +1,5 @@
 #include <llvm/Pass.h>
+#include <llvm/IR/Module.h>
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Support/raw_ostream.h>
 
@@ -30,23 +31,6 @@ class lle::PrintEnv: public ModulePass
    bool runOnModule(Module& M);
 };
 
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
-/** A simple helper to print callgraph,
- * the difference with -print-callgraph is this only print module function,
- * ant this also print a tree, insteal just print a list
- * which makes output clean and meanningful
- */
-class lle::PrintCgTree: public ModulePass
-{
-   static void print_cg(CallGraphNode* node);
-   public:
-   static char ID;
-   PrintCgTree():ModulePass(ID) {}
-   bool runOnModule(Module& M);
-};
-char PrintCgTree::ID = 0;
-static RegisterPass<PrintCgTree> Y("Cg", "print Callgraph Tree", true, true);
-#endif
 /* A simple helper to print functions called what libcalls
  * this is useful to debug and check the program structure
  */
@@ -76,44 +60,6 @@ bool PrintEnv::runOnModule(Module &M)
    return false;
 }
 
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
-bool PrintCgTree::runOnModule(Module &M)
-{
-   CallGraph CG;
-   CG.runOnModule(M);
-   CallGraphNode* root = CG.getRoot();
-   errs()<<root->getFunction()->getName()<<"\n";
-   print_cg(root);
-   return false;
-}
-
-void PrintCgTree::print_cg(CallGraphNode *node)
-{
-   static vector<bool> level;
-   const char* empty   = "    ";
-   const char* ancient = "│   ";
-   const char* parent  = "├─";
-   const char* last    = "└─";
-   auto lastC = node->begin();
-   level.push_back(1);
-   for(auto I = node->begin(), E = node->end(); I!=E; ++I){
-      Function* F = I->second->getFunction();
-      if(!F || F->empty()) continue; // this is a external function
-      lastC = I;
-   }
-   for(auto I = node->begin(), E = node->end(); I!=E; ++I){
-      Function* F = I->second->getFunction();
-      if(!F || F->empty()) continue; // this is a external function
-      bool is_last = I == lastC;
-
-      for(auto b = level.begin();b!=level.end()-1;++b) errs()<<(*b?ancient:empty);
-      errs()<<(is_last?last:parent)<<" "<<F->getName()<<"\n";
-      if(is_last) level.back()=0;
-      print_cg(I->second);
-   }
-   level.pop_back();
-}
-#endif
 
 bool PrintLibCall::runOnFunction(Function &F)
 {
@@ -137,5 +83,65 @@ bool PrintLibCall::runOnFunction(Function &F)
       }
    }
    if(!empty) errs()<<"\n";
+   return false;
+}
+
+/** A simple helper to print callgraph,
+ * the difference with -print-callgraph is this only print module function,
+ * ant this also print a tree, insteal just print a list
+ * which makes output clean and meanningful
+ */
+class lle::PrintCgTree: public ModulePass
+{
+   static void print_cg(CallGraphNode* node);
+   public:
+   static char ID;
+   PrintCgTree():ModulePass(ID) {}
+   bool runOnModule(Module& M);
+};
+char PrintCgTree::ID = 0;
+static RegisterPass<PrintCgTree> Y("Cg", "print Callgraph Tree", true, true);
+
+void PrintCgTree::print_cg(CallGraphNode *node)
+{
+   static vector<bool> level;
+   const char* empty   = "    ";
+   const char* ancient = "│   ";
+   const char* parent  = "├─";
+   const char* last    = "└─";
+   auto lastC = node->begin();
+   level.push_back(1);
+   for(auto I = node->begin(), E = node->end(); I!=E; ++I){
+      Function* F = I->second->getFunction();
+      errs()<<F->getName()<<"\n";
+      if(!F || F->empty()) continue; // this is a external function
+      lastC = I;
+   }
+   for(auto I = node->begin(), E = node->end(); I!=E; ++I){
+      Function* F = I->second->getFunction();
+      if(!F || F->empty()) continue; // this is a external function
+      bool is_last = I == lastC;
+
+      for(auto b = level.begin();b!=level.end()-1;++b) errs()<<(*b?ancient:empty);
+      errs()<<(is_last?last:parent)<<" "<<F->getName()<<"\n";
+      if(is_last) level.back()=0;
+      print_cg(I->second);
+   }
+   level.pop_back();
+}
+
+bool PrintCgTree::runOnModule(Module &M)
+{
+#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
+   CallGraph CG;
+   CG.runOnModule(M);
+   CallGraphNode* root = CG.getRoot();
+#else
+   CallGraph CG(M);
+   Function* Main = M.getFunction("main");
+   CallGraphNode* root = Main?CG[Main]:CG.getExternalCallingNode();
+#endif
+   errs()<<root->getFunction()->getName()<<"\n";
+   print_cg(root);
    return false;
 }
