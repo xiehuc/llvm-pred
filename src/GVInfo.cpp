@@ -187,7 +187,7 @@ void GVInfo::print(raw_ostream& OS, const Module* M) const
 Use* GVResolve::operator()(Value* V, ResolverBase*)
 {
    Value* Tg = NULL;
-   Assert(gv_info, __FUNCTION__" need initial with GVInfo first");
+   Assert(gv_info, "need initial with GVInfo first");
    if(auto LI = dyn_cast<LoadInst>(V)){
       Tg = LI->getPointerOperand();
    }

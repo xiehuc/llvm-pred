@@ -228,7 +228,7 @@ static void to_expr(Value* V, DDGNode* N, int& ref_num)
    else if(isa<ShuffleVectorInst>(V))
       N->set_expr("too ", "complex");
    else
-      Assert(0,*I);
+      Assert(0,"unreachable");
 }
 
 expr_type DDGraph::expr()
