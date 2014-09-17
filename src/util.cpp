@@ -1,5 +1,5 @@
+#include "preheader.h"
 #include "util.h"
-#include "debug.h"
 
 #include <set>
 #include <string>
@@ -13,6 +13,7 @@
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/IR/GlobalVariable.h>
 
+#include "debug.h"
 using namespace std;
 using namespace lle;
 using namespace llvm;

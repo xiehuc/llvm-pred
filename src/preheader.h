@@ -9,6 +9,7 @@
  */
 
 #ifdef LLVM_FLAGS_NDEBUG // a special macro shows llvm build with NDEBUG
+#undef NDEBUG
 #define NDEBUG
 #endif
 

@@ -1,3 +1,4 @@
+#include "preheader.h"
 #include "Resolver.h"
 
 #include <llvm/IR/Function.h>
@@ -16,7 +17,7 @@ using namespace llvm;
 char ResolverPass::ID = 0;
 static RegisterPass<ResolverPass> Y("-Resolver","A Pass used to cache Resolver Result",false,false);
 
-#ifdef ENABLE_DEBUG
+#ifndef NO_DEBUG
 void debug_print_resolved(unordered_set<Value*>& resolved)
 {
    for ( auto V : resolved){

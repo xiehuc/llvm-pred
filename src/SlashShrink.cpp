@@ -1,3 +1,4 @@
+#include "preheader.h"
 #include "Resolver.h"
 #include "SlashShrink.h"
 #include "KnownLibCallInfo.h"

@@ -1,5 +1,5 @@
 #define DEBUG_TYPE "loop-cycle"
-
+#include "preheader.h"
 #include "loop.h"
 #include "util.h"
 #include "config.h"

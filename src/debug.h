@@ -7,15 +7,17 @@
 #include "config.h"
 #include <llvm/Support/raw_ostream.h>
 
-#ifdef ENABLE_DEBUG
-#undef DEBUG
-#define DEBUG(expr) expr
-#undef NDEBUG
-#else
+#ifdef NO_DEBUG
 #undef DEBUG
 #define DEBUG(expr) 
 #undef NDEBUG
 #define NDEBUG
+
+#else
+
+#undef DEBUG
+#define DEBUG(expr) expr
+#undef NDEBUG
 #endif
 
 #include <assert.h> // NDEBUG macro would affact this

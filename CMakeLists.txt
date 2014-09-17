@@ -21,7 +21,9 @@ find_package(PkgConfig)
 pkg_check_modules(LLVM_PROF llvm-prof REQUIRED)
 pkg_check_modules(GSL gsl REQUIRED)
 
-set(NO_DEBUG ${NOT WITH_DEBUG})
+if(NOT WITH_DEBUG)
+   set(NO_DEBUG On)
+endif()
 configure_file(config.h.in config.h)
 
 add_subdirectory(src)
