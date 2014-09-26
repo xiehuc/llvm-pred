@@ -24,6 +24,7 @@ add_library(LLVMPred SHARED
    LoopSimplify.cpp
    LibFReshape.cpp
    SlashShrink.cpp
+   PerformPred.cpp
    Resolver.cpp
    GVInfo.cpp
    Print.cpp
