@@ -15,6 +15,7 @@
 #include <llvm/ADT/GraphTraits.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/DOTGraphTraits.h>
+#include <llvm/Support/CommandLine.h>
 
 #include "Resolver.h"
 
@@ -23,6 +24,7 @@ namespace lle{
    typedef llvm::DenseMap<llvm::Value*, DDGNode > DDGraphImpl;
    typedef DDGraphImpl::value_type DDGValue;
    struct DDGraph;
+   extern llvm::cl::opt<bool> Ddg;
 }
 namespace llvm{
    template<> struct GraphTraits<lle::DDGraph*>;

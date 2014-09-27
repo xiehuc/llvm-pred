@@ -1,7 +1,6 @@
 #include "preheader.h"
 #include "LoopSimplify.h"
 #include <llvm/IR/Module.h>
-#include <llvm/Support/CommandLine.h>
 #include <llvm/Support/GraphWriter.h>
 
 #include <ProfileInfo.h>
@@ -25,7 +24,6 @@ using namespace llvm;
 
 char LoopCycleSimplify::ID = 0;
 
-static cl::opt<bool> Ddg("Ddg", cl::desc("Draw Data Dependencies Graph"));
 static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simplify Pass",false,false);
 
 void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const

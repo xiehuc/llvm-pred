@@ -16,6 +16,8 @@ using namespace llvm;
 #define LHS(N) N->impl().front()->second
 #define RHS(N) N->impl().back()->second
 
+cl::opt<bool> lle::Ddg("Ddg", cl::desc("Draw Data Dependencies Graph"));
+
 /** TODO LHS and RHS doesn't consider content match. 所以可能错位 */
 
 typedef DDGNode::expr_type expr_type;

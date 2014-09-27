@@ -3,10 +3,13 @@
 #include <llvm/Analysis/BlockFrequencyInfo.h>
 #include <llvm/Analysis/CallGraphSCCPass.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/GraphWriter.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/CFG.h>
+#include "Resolver.h"
+#include "ddg.h"
 
 #include <unordered_map>
 
@@ -22,9 +25,11 @@ class lle::PerformPred : public llvm::FunctionPass
    bool runOnFunction(llvm::Function& F) override;
    //bool runOnSCC(llvm::CallGraphSCC& SCC) override;
    void getAnalysisUsage(llvm::AnalysisUsage& AU) const override;
+   void print(llvm::raw_ostream&,const llvm::Module*) const override;
 
    private:
    llvm::GlobalVariable* cpu_times = NULL;
+   llvm::Value* PrintSum; // a sum value used for print
    llvm::Value* cost(llvm::BasicBlock& BB, llvm::IRBuilder<>& Builder, llvm::Value* Sum);
 };
 
@@ -89,8 +94,25 @@ bool PerformPred::runOnFunction(Function &F)
       Sum = Builder.CreateMul(Sum, ConstantInt::get(I32Ty, freq));
       Sum->setName(BB.getName()+".freq");
    }
+   PrintSum = Sum;
    memset(Loads, 0, sizeof(Value*)*NumTypes);
+
+   if(Ddg){
+      lle::Resolver<NoResolve> R;
+      auto Res = R.resolve(PrintSum);
+      DDGraph ddg(Res, PrintSum);
+      WriteGraph(&ddg, F.getName()+"-ddg");
+   }
+
    return true;
+}
+
+void PerformPred::print(llvm::raw_ostream & OS, const llvm::Module * M) const
+{
+   lle::Resolver<NoResolve> R;
+   auto Res = R.resolve(PrintSum);
+   DDGraph ddg(Res, PrintSum);
+   OS<<ddg.expr()<<"\n";
 }
 
 inline void count(llvm::BasicBlock &BB, unsigned int *counter)

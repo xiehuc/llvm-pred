@@ -13,9 +13,9 @@ class lle::LoopCycleSimplify:public llvm::LoopPass
    public:
    static char ID;
    explicit LoopCycleSimplify():LoopPass(ID){}
-   void getAnalysisUsage(llvm::AnalysisUsage&) const;
-   bool runOnLoop(llvm::Loop* L,llvm::LPPassManager&);
+   void getAnalysisUsage(llvm::AnalysisUsage&) const override;
+   bool runOnLoop(llvm::Loop* L,llvm::LPPassManager&) override;
    //bool runOnModule(llvm::Module&);
-   void print(llvm::raw_ostream&,const llvm::Module*) const;
+   void print(llvm::raw_ostream&,const llvm::Module*) const override;
 };
 #endif
