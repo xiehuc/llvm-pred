@@ -1,6 +1,5 @@
 #include "preheader.h"
 #include <llvm/Analysis/BranchProbabilityInfo.h>
-#include <llvm/Analysis/BlockFrequencyInfo.h>
 #include <llvm/Analysis/CallGraphSCCPass.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/GraphWriter.h>
@@ -8,6 +7,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/CFG.h>
+#include "BlockFreqExpr.h"
 #include "Resolver.h"
 #include "ddg.h"
 
@@ -57,7 +57,7 @@ void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
 {
    //CallGraphSCCPass::getAnalysisUsage(AU);
    AU.addRequired<BranchProbabilityInfo>();
-   AU.addRequired<BlockFrequencyInfo>();
+   AU.addRequired<BlockFreqExpr>();
 }
 
 /*
@@ -76,7 +76,7 @@ bool PerformPred::runOnSCC(CallGraphSCC &SCC)
 bool PerformPred::runOnFunction(Function &F)
 {
    if( F.isDeclaration() ) return false;
-   BlockFrequencyInfo& BFI = getAnalysis<BlockFrequencyInfo>();
+   BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
 
    if(cpu_times == NULL){
       Type* ETy = Type::getInt32Ty(F.getContext());
@@ -89,7 +89,7 @@ bool PerformPred::runOnFunction(Function &F)
    Value* Sum = ConstantInt::get(I32Ty, 0);
    for(auto& BB : F){
       Sum = cost(BB, Builder, Sum);
-      uint64_t freq = BFI.getBlockFreq(&BB).getFrequency();
+      uint64_t freq = BFE.getBlockFreq(&BB).getFrequency();
       // XXX use scale in caculate
       Sum = Builder.CreateMul(Sum, ConstantInt::get(I32Ty, freq));
       Sum->setName(BB.getName()+".freq");

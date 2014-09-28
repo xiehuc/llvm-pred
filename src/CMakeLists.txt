@@ -21,6 +21,7 @@ endif()
 
 add_library(LLVMPred SHARED
 	KnownLibCallInfo.cpp
+   BlockFreqExpr.cpp
    LoopSimplify.cpp
    LibFReshape.cpp
    SlashShrink.cpp
