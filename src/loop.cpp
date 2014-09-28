@@ -56,6 +56,9 @@ void lle::LoopCycle::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 
 Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 {
+	if(L->getLoopPreheader()==NULL)
+		InsertPreheaderForLoop(L, ParentPass?:this);
+
 	// inspired from Loop::getCanonicalInductionVariable
 	BasicBlock *H = L->getHeader();
 	BasicBlock* LoopPred = L->getLoopPredecessor();
@@ -253,9 +256,6 @@ bool lle::LoopCycle::runOnLoop(llvm::Loop* L,llvm::LPPassManager&)
 {
 	CurL = L;
 	Function* CurF = L->getHeader()->getParent();
-
-	if(L->getLoopPreheader()==NULL)
-		InsertPreheaderForLoop(L, this);
 
 	Value* CC = insertLoopCycle(L);
 	if(!CC){

@@ -23,11 +23,21 @@ namespace lle
 
 		std::map<llvm::Loop*,llvm::Value*> CycleMap;
 		llvm::Loop* CurL;
+      llvm::Pass* ParentPass;
 		public:
 		static char ID;
 		explicit LoopCycle():LoopPass(ID),unfound(unfound_str){
 			NumUnfoundCycle = 0;
+         ParentPass = NULL;
 		}
+      /** use this constructor when use it on in a FunctionPass
+       * example in runOnFunction():
+       *  LoopCycle LC(this); //this is a Function Pass
+       *  LC.getOrInsertCycle(...);
+       */
+      explicit LoopCycle(Pass* parent):LoopCycle(){
+         ParentPass = parent;
+      }
 		virtual ~LoopCycle();
 		void getAnalysisUsage(llvm::AnalysisUsage&) const;
 		bool runOnLoop(llvm::Loop* L,llvm::LPPassManager&);
@@ -45,6 +55,11 @@ namespace lle
 			auto ite = CycleMap.find(l);
 			return ite!=CycleMap.end()?ite->second:NULL;
 		}
+      // a helper function which convenient.
+      llvm::Value* getOrInsertCycle(llvm::Loop* l)
+      {
+         return getLoopCycle(l)?:insertLoopCycle(l);
+      }
 	};
 }
 

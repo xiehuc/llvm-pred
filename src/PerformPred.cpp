@@ -1,6 +1,4 @@
 #include "preheader.h"
-#include <llvm/Analysis/BranchProbabilityInfo.h>
-#include <llvm/Analysis/CallGraphSCCPass.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/GraphWriter.h>
 #include <llvm/IR/GlobalVariable.h>
@@ -56,7 +54,6 @@ static Value* Loads[NumTypes] = {NULL};
 void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
 {
    //CallGraphSCCPass::getAnalysisUsage(AU);
-   AU.addRequired<BranchProbabilityInfo>();
    AU.addRequired<BlockFreqExpr>();
 }
 

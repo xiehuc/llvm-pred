@@ -18,18 +18,16 @@ BlockFreqExpr::BlockFreqExpr() : FunctionPass(ID) { }
 void BlockFreqExpr::getAnalysisUsage(AnalysisUsage &AU) const
 {
    AU.addRequired<BlockFrequencyInfo>();
-   AU.addRequired<LPPassManager>();
    AU.addRequired<LoopInfo>();
 }
 
 bool BlockFreqExpr::runOnFunction(Function &F) 
 {
    LoopInfo& LI = getAnalysis<LoopInfo>();
-   /*LPPassManager& LPP = getAnalysis<LPPassManager>();
-   LoopCycle LC;
+   LoopCycle LC(this);
    for(Loop* L : LI){
-      LPP.insertLoopIntoQueue(L);
-   }*/
+      errs()<<LC.getOrInsertCycle(L)<<"\n";
+   }
    return false;
 }
 
