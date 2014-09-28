@@ -14,5 +14,10 @@ namespace lle {
       llvm::Value* getBlockFreqExpr(llvm::BasicBlock* BB);
       llvm::BlockFrequency getBlockFreq(llvm::BasicBlock* BB);
    };
+
+   llvm::BranchProbability operator/(
+         const llvm::BlockFrequency& LHS,
+         const llvm::BlockFrequency& RHS
+         );
 }
 #endif

@@ -3,7 +3,9 @@
 #include <llvm/IR/Module.h>
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Support/raw_ostream.h>
-
+#include <llvm/Support/GraphWriter.h>
+#include <llvm/Analysis/BlockFrequencyInfo.h>
+#include <llvm/IR/CFG.h>
 #include <string>
 
 #include "util.h"
@@ -15,6 +17,7 @@ namespace lle{
    class PrintEnv;
    class PrintCgTree;
    class PrintLibCall;
+   class DotBlockFreq;
 }
 
 using namespace std;
@@ -30,7 +33,15 @@ class lle::PrintEnv: public ModulePass
    public:
    static char ID;
    PrintEnv():ModulePass(ID) {}
-   bool runOnModule(Module& M);
+   bool runOnModule(Module& M) override{
+#define printenv(env) errs()<<env<<":   "<<(getenv(env)?:"")<<"\n";
+      printenv("SHRINK_LEVEL");
+      printenv("LIBCALL_FILE");
+      printenv("LIBFDEF_FILE");
+      printenv("IGNOREFUNC_FILE");
+#undef printenv
+      return false;
+   }
 };
 
 /* A simple helper to print functions called what libcalls
@@ -50,18 +61,6 @@ char PrintLibCall::ID = 0;
 
 static RegisterPass<PrintEnv> X("Env","print environment params", true, true);
 static RegisterPass<PrintLibCall> Z("Call", "print function invokes what libcall", true, true);
-
-bool PrintEnv::runOnModule(Module &M)
-{
-#define printenv(env) errs()<<env<<":   "<<(getenv(env)?:"")<<"\n";
-   printenv("SHRINK_LEVEL");
-   printenv("LIBCALL_FILE");
-   printenv("LIBFDEF_FILE");
-   printenv("IGNOREFUNC_FILE");
-#undef printenv
-   return false;
-}
-
 
 bool PrintLibCall::runOnFunction(Function &F)
 {
@@ -148,3 +147,4 @@ bool PrintCgTree::runOnModule(Module &M)
    print_cg(root);
    return false;
 }
+
