@@ -28,7 +28,7 @@ class lle::PerformPred : public llvm::FunctionPass
    private:
    llvm::GlobalVariable* cpu_times = NULL;
    llvm::Value* PrintSum; // a sum value used for print
-   llvm::Value* cost(llvm::BasicBlock& BB, llvm::IRBuilder<>& Builder, llvm::Value* Sum);
+   llvm::Value* cost(llvm::BasicBlock& BB, llvm::IRBuilder<>& Builder);
 };
 
 using namespace llvm;
@@ -55,6 +55,7 @@ void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
 {
    //CallGraphSCCPass::getAnalysisUsage(AU);
    AU.addRequired<BlockFreqExpr>();
+   AU.addRequired<LoopInfo>();
 }
 
 /*
@@ -74,6 +75,7 @@ bool PerformPred::runOnFunction(Function &F)
 {
    if( F.isDeclaration() ) return false;
    BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
+   LoopInfo& LI = getAnalysis<LoopInfo>();
 
    if(cpu_times == NULL){
       Type* ETy = Type::getInt32Ty(F.getContext());
@@ -83,15 +85,26 @@ bool PerformPred::runOnFunction(Function &F)
 
    IRBuilder<> Builder(F.getEntryBlock().getTerminator());
    auto I32Ty = Type::getInt32Ty(F.getContext());
-   Value* Sum = ConstantInt::get(I32Ty, 0);
+   Value* SumLhs = ConstantInt::get(I32Ty, 0), *SumRhs;
    for(auto& BB : F){
-      Sum = cost(BB, Builder, Sum);
-      uint64_t freq = BFE.getBlockFreq(&BB).getFrequency();
-      // XXX use scale in caculate
-      Sum = Builder.CreateMul(Sum, ConstantInt::get(I32Ty, freq));
-      Sum->setName(BB.getName()+".freq");
+      SumRhs = cost(BB, Builder);
+      auto FreqExpr = BFE.getBlockFreqExpr(&BB);
+      if(FreqExpr.second == NULL){
+         uint64_t freq = BFE.getBlockFreq(&BB).getFrequency();
+         // XXX use scale in caculate
+         SumRhs = Builder.CreateMul(SumRhs, ConstantInt::get(I32Ty, freq));
+      }else{
+         // XXX use scale in caculate
+         uint64_t prob = FreqExpr.first.scale(1);
+         auto InsertPos = LI.getLoopFor(&BB)->getLoopPreheader()->getTerminator();
+         Builder.SetInsertPoint(InsertPos);
+         Value* freq = Builder.CreateMul(FreqExpr.second, ConstantInt::get(I32Ty, prob));
+         SumRhs = Builder.CreateMul(freq, SumRhs);
+      }
+      SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
+      SumLhs->setName(BB.getName()+".freq");
    }
-   PrintSum = Sum;
+   PrintSum = SumLhs;
    memset(Loads, 0, sizeof(Value*)*NumTypes);
 
    if(Ddg){
@@ -123,12 +136,13 @@ inline void count(llvm::BasicBlock &BB, unsigned int *counter)
    }
 }
 
-llvm::Value* PerformPred::cost(BasicBlock& BB, IRBuilder<>& Builder, Value* Sum)
+llvm::Value* PerformPred::cost(BasicBlock& BB, IRBuilder<>& Builder)
 {
    unsigned InstCounts[NumTypes] = {0};
 
    count(BB, InstCounts);
    auto I32Ty = Type::getInt32Ty(BB.getContext());
+   Value* Sum = ConstantInt::get(I32Ty, 0);
 
    for(unsigned Idx = 0; Idx<NumTypes; ++Idx){
       unsigned Num = InstCounts[Idx];

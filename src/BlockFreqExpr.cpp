@@ -4,7 +4,6 @@
 #include <llvm/Analysis/LoopInfo.h>
 
 #include "BlockFreqExpr.h"
-#include "loop.h"
 #include "debug.h"
 
 using namespace lle;
@@ -14,7 +13,7 @@ char BlockFreqExpr::ID = 0;
 
 static RegisterPass<BlockFreqExpr> X("Block-freq-expr", "Block Frequency Expression Analysis", true, true);
 
-BlockFreqExpr::BlockFreqExpr() : FunctionPass(ID) { }
+BlockFreqExpr::BlockFreqExpr() : FunctionPass(ID), LC(this) { }
 
 void BlockFreqExpr::getAnalysisUsage(AnalysisUsage &AU) const
 {
@@ -25,27 +24,26 @@ void BlockFreqExpr::getAnalysisUsage(AnalysisUsage &AU) const
 bool BlockFreqExpr::runOnFunction(Function &F) 
 {
    LoopInfo& LI = getAnalysis<LoopInfo>();
-   BlockFrequencyInfo& BFI = getAnalysis<BlockFrequencyInfo>();
-   LoopCycle LC(this);
 
-   for(Loop* L : LI){
-      errs()<<LC.getOrInsertCycle(L)<<"\n";
-      BlockFrequency HeaderF = BFI.getBlockFreq(L->getHeader());
-      for(auto BB =L->block_begin(), BE = L->block_end(); BB!=BE; ++BB){
-         errs()<<(BFI.getBlockFreq(*BB)/HeaderF)<<"\n";
-      }
-   }
-   return false;
+   for(Loop* L : LI)
+      LC.insertLoopCycle(L);
+   return true;
 }
 
-BlockFrequency BlockFreqExpr::getBlockFreq(BasicBlock* BB)
+BlockFrequency BlockFreqExpr::getBlockFreq(BasicBlock* BB) const
 {
    return getAnalysis<BlockFrequencyInfo>().getBlockFreq(BB);
 }
 
-Value* BlockFreqExpr::getBlockFreqExpr(BasicBlock *BB)
+std::pair<BranchProbability, Value*> BlockFreqExpr::getBlockFreqExpr(BasicBlock *BB) const
 {
-   return NULL;
+   LoopInfo& LI = getAnalysis<LoopInfo>();
+   BlockFrequencyInfo& BFI = getAnalysis<BlockFrequencyInfo>();
+   Loop* L = LI.getLoopFor(BB);
+   if(L==NULL) return std::make_pair(BranchProbability(0, 0), nullptr);
+
+   BlockFrequency HeaderF = BFI.getBlockFreq(L->getHeader());
+   return std::make_pair(BFI.getBlockFreq(BB)/HeaderF, LC.getLoopCycle(L));
 }
 
 

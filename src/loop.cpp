@@ -247,7 +247,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 	RES = (OneStep==1)?Builder.CreateAdd(RES,Step):(OneStep==-1)?Builder.CreateSub(RES, Step):RES;
 	if(!Step->isMinusOne()&&!Step->isOne())
 		RES = Builder.CreateSDiv(RES, Step);
-	RES->setName("loop-cycle");
+	RES->setName(H->getName()+".tc");
 
 	return CycleMap[L] = RES;
 }
