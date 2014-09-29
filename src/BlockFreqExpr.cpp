@@ -25,8 +25,9 @@ bool BlockFreqExpr::runOnFunction(Function &F)
 {
    LoopInfo& LI = getAnalysis<LoopInfo>();
 
-   for(Loop* L : LI)
-      LC.insertLoopCycle(L);
+   for(Loop* L : LI){
+      LC.getOrInsertCycle(L);
+   }
    return true;
 }
 

@@ -3,13 +3,13 @@
 #include <llvm/Support/GraphWriter.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/Dominators.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/CFG.h>
 #include "BlockFreqExpr.h"
 #include "Resolver.h"
 #include "ddg.h"
-
-#include <unordered_map>
+#include "debug.h"
 
 namespace lle {
    class PerformPred;
@@ -29,6 +29,7 @@ class lle::PerformPred : public llvm::FunctionPass
    llvm::GlobalVariable* cpu_times = NULL;
    llvm::Value* PrintSum; // a sum value used for print
    llvm::Value* cost(llvm::BasicBlock& BB, llvm::IRBuilder<>& Builder);
+   llvm::BasicBlock* promote(llvm::Instruction* LoopTC);
 };
 
 using namespace llvm;
@@ -55,27 +56,55 @@ void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
 {
    //CallGraphSCCPass::getAnalysisUsage(AU);
    AU.addRequired<BlockFreqExpr>();
+   AU.addRequired<DominatorTreeWrapperPass>();
    AU.addRequired<LoopInfo>();
+   AU.setPreservesCFG();
 }
 
-/*
-bool PerformPred::runOnSCC(CallGraphSCC &SCC)
+BasicBlock* PerformPred::promote(Instruction* LoopTC)
 {
-   for(auto CG : SCC){
-      Function* F = CG->getFunction();
-      if(F && !F->isDeclaration()){
-         calc(F);
+   auto& DTWP = getAnalysis<DominatorTreeWrapperPass>();
+   DominatorTree& DomT = DTWP.getDomTree();
+   SmallVector<Instruction*, 4> depends;
+   std::deque<Instruction*> targets;
+   targets.push_back(LoopTC);
+
+   auto Ite = targets.begin();
+   while(Ite != targets.end()){
+      Instruction* I = *Ite;
+      for(auto O = I->op_begin(), E = I->op_end(); O!=E; ++O){
+         if(Instruction* OI = dyn_cast<Instruction>(O->get())){
+            if(O->get()->getNumUses() > 1)
+               depends.push_back(OI);
+            else{
+               OI->removeFromParent();
+               targets.push_back(OI);
+            }
+         }
       }
+      ++Ite;
    }
-   return false;
+
+   BasicBlock* InsertInto = NULL;
+   Assert(depends.size() > 0,"");
+   InsertInto = depends.front()->getParent();
+   if(depends.size()>1){
+      for(auto Ite = depends.begin()+1, E = depends.end(); Ite != E; ++Ite)
+         InsertInto = DomT.findNearestCommonDominator(InsertInto, (*Ite)->getParent());
+   }
+   if(LoopTC->getParent() == InsertInto) return InsertInto;
+
+   for(auto I = targets.rbegin(), E = targets.rend(); I!=E; ++I)
+      (*I)->moveBefore(InsertInto->getTerminator());
+   return InsertInto;
 }
-*/
 
 bool PerformPred::runOnFunction(Function &F)
 {
    if( F.isDeclaration() ) return false;
    BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
    LoopInfo& LI = getAnalysis<LoopInfo>();
+   DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
    if(cpu_times == NULL){
       Type* ETy = Type::getInt32Ty(F.getContext());
@@ -87,22 +116,50 @@ bool PerformPred::runOnFunction(Function &F)
    auto I32Ty = Type::getInt32Ty(F.getContext());
    Value* SumLhs = ConstantInt::get(I32Ty, 0), *SumRhs;
    for(auto& BB : F){
-      SumRhs = cost(BB, Builder);
       auto FreqExpr = BFE.getBlockFreqExpr(&BB);
-      if(FreqExpr.second == NULL){
-         uint64_t freq = BFE.getBlockFreq(&BB).getFrequency();
-         // XXX use scale in caculate
-         SumRhs = Builder.CreateMul(SumRhs, ConstantInt::get(I32Ty, freq));
-      }else{
-         // XXX use scale in caculate
-         uint64_t prob = FreqExpr.first.scale(1);
-         auto InsertPos = LI.getLoopFor(&BB)->getLoopPreheader()->getTerminator();
-         Builder.SetInsertPoint(InsertPos);
-         Value* freq = Builder.CreateMul(FreqExpr.second, ConstantInt::get(I32Ty, prob));
-         SumRhs = Builder.CreateMul(freq, SumRhs);
-      }
+      if(FreqExpr.second != NULL) continue;
+      SumRhs = cost(BB, Builder);
+      uint64_t freq = BFE.getBlockFreq(&BB).getFrequency();
+      // XXX use scale in caculate
+      SumRhs = Builder.CreateMul(SumRhs, ConstantInt::get(I32Ty, freq));
       SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
       SumLhs->setName(BB.getName()+".freq");
+   }
+   SmallVector<Instruction*, 20> Temp;
+   for(auto& BB : F){
+      auto FreqExpr = BFE.getBlockFreqExpr(&BB);
+      if(FreqExpr.second == NULL) continue;
+      if(Instruction* LoopTC = dyn_cast<Instruction>(FreqExpr.second)){
+         Instruction* InsertPos = promote(LoopTC)->getTerminator();
+         Builder.SetInsertPoint(InsertPos);
+      }
+      SumRhs = cost(BB, Builder);
+      // XXX use scale in caculate
+      uint64_t prob = FreqExpr.first.scale(1);
+      Value* freq = Builder.CreateMul(FreqExpr.second, ConstantInt::get(I32Ty, prob));
+      SumRhs = Builder.CreateMul(freq, SumRhs);
+
+      Instruction* SumLI = dyn_cast<Instruction>(SumLhs);
+      BasicBlock* InsertB = Builder.GetInsertBlock();
+      if(SumLI && !DomT.dominates(SumLI->getParent(), InsertB) && InsertB->getNumUses()>1){
+         auto save = Builder.saveIP();
+         Builder.SetInsertPoint(InsertB->getFirstNonPHI());
+         PHINode* Phi = Builder.CreatePHI(SumLI->getType(), InsertB->getNumUses());
+         Builder.restoreIP(save);
+         for(auto PI = pred_begin(InsertB), PE = pred_end(InsertB); PI!=PE; ++PI){
+            BasicBlock* BB = *PI;
+            Value* V = *find_if(Temp.rbegin(), Temp.rend(), [BB,&DomT](Instruction* I){
+                  return DomT.dominates(I->getParent(), BB);
+                  });
+            errs()<<"Phi:"<<*V<<BB->getName()<<"\n";
+            Phi->addIncoming(V, BB);
+         }
+         SumLhs = Phi;
+      }
+
+      SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
+      SumLhs->setName(BB.getName()+".freq");
+      Temp.push_back(dyn_cast<Instruction>(SumLhs));
    }
    PrintSum = SumLhs;
    memset(Loads, 0, sizeof(Value*)*NumTypes);

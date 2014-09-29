@@ -49,17 +49,14 @@ namespace lle
 		 * source, so we directly return it. caller can make a cast
 		 * instruction and insert it by hand.
 		 */
-		llvm::Value* insertLoopCycle(llvm::Loop* l);
+		llvm::Value* insertLoopCycle(llvm::Loop* l, llvm::Instruction* InsertPos);
 		llvm::Value* getLoopCycle(llvm::Loop* l) const
 		{ 
 			auto ite = CycleMap.find(l);
 			return ite!=CycleMap.end()?ite->second:NULL;
 		}
       // a helper function which convenient.
-      llvm::Value* getOrInsertCycle(llvm::Loop* l)
-      {
-         return getLoopCycle(l)?:insertLoopCycle(l);
-      }
+      llvm::Value* getOrInsertCycle(llvm::Loop* l);
 	};
 }
 

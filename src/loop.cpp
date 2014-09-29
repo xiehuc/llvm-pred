@@ -54,11 +54,8 @@ void lle::LoopCycle::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 	//setPreservesCFG would block llvm-loop
 }
 
-Value* lle::LoopCycle::insertLoopCycle(Loop* L)
+Value* lle::LoopCycle::insertLoopCycle(Loop* L, Instruction* InsertPos)
 {
-	if(L->getLoopPreheader()==NULL)
-		InsertPreheaderForLoop(L, ParentPass?:this);
-
 	// inspired from Loop::getCanonicalInductionVariable
 	BasicBlock *H = L->getHeader();
 	BasicBlock* LoopPred = L->getLoopPredecessor();
@@ -225,7 +222,7 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L)
 
 	Value* RES = NULL;
 	//if there are no predecessor, we can insert code into start value basicblock
-	IRBuilder<> Builder(LoopPred->getTerminator());
+	IRBuilder<> Builder(InsertPos);
 	Assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() , " why increment is not integer type");
 	if(start->getType() != END->getType()){
 		start = Builder.CreateCast(CastInst::getCastOpcode(start, false,
@@ -257,7 +254,7 @@ bool lle::LoopCycle::runOnLoop(llvm::Loop* L,llvm::LPPassManager&)
 	CurL = L;
 	Function* CurF = L->getHeader()->getParent();
 
-	Value* CC = insertLoopCycle(L);
+	Value* CC = getOrInsertCycle(L);
 	if(!CC){
       CycleMap[L] = CC;
 		++NumUnfoundCycle;
@@ -284,4 +281,10 @@ void lle::LoopCycle::print(llvm::raw_ostream& OS,const llvm::Module*) const
 	OS<<*CurL<<"\n";
 	OS<<"Cycle:"<<*getLoopCycle(CurL)<<"\n";
 }
-
+Value* lle::LoopCycle::getOrInsertCycle(Loop *L)
+{
+   if(L->getLoopPreheader()==NULL)
+      InsertPreheaderForLoop(L, ParentPass?:this);
+   Instruction* InsertPos = L->getLoopPredecessor()->getTerminator();
+   return getLoopCycle(L)?:insertLoopCycle(L, InsertPos);
+}
