@@ -141,15 +141,18 @@ bool PerformPred::runOnFunction(Function &F)
    Temp.push_back(dyn_cast<Instruction>(SumLhs)); // the last instr in entry block
    for(auto& BB : F){
       auto FreqExpr = BFE.getBlockFreqExpr(&BB);
-      if(FreqExpr.second == NULL) continue;
-      if(Instruction* LoopTC = dyn_cast<Instruction>(FreqExpr.second)){
-         Instruction* InsertPos = promote(LoopTC)->getTerminator();
+      Value* LoopTC = FreqExpr.second;
+      if(LoopTC == NULL) continue;
+      if(Instruction* LoopTCI = dyn_cast<Instruction>(FreqExpr.second)){
+         Instruction* InsertPos = promote(LoopTCI)->getTerminator();
          Builder.SetInsertPoint(InsertPos);
       }
       SumRhs = cost(BB, Builder);
       // XXX use scale in caculate
       uint64_t prob = FreqExpr.first.scale(1);
-      Value* freq = Builder.CreateMul(FreqExpr.second, ConstantInt::get(I32Ty, prob));
+      if(LoopTC->getType()!= I32Ty)
+         LoopTC = Builder.CreateCast(Instruction::SExt, LoopTC, I32Ty);
+      Value* freq = Builder.CreateMul(LoopTC, ConstantInt::get(I32Ty, prob));
       SumRhs = Builder.CreateMul(freq, SumRhs);
 
       Instruction* SumLI = dyn_cast<Instruction>(SumLhs);
@@ -170,7 +173,6 @@ bool PerformPred::runOnFunction(Function &F)
                   return DomT.dominates(I->getParent(), BB);
                   });
             Assert(Found != Temp.rend(), "");
-            errs()<<"Phi:"<<**Found<<BB->getName()<<"\n";
             Phi->addIncoming(*Found, BB);
          }
          SumLhs = Phi;
