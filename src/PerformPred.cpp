@@ -1,4 +1,5 @@
 #include "preheader.h"
+#include <llvm/Analysis/PostDominators.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/GraphWriter.h>
 #include <llvm/IR/GlobalVariable.h>
@@ -57,14 +58,15 @@ void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
    //CallGraphSCCPass::getAnalysisUsage(AU);
    AU.addRequired<BlockFreqExpr>();
    AU.addRequired<DominatorTreeWrapperPass>();
+   //AU.addRequired<PostDominatorTree>();
    AU.addRequired<LoopInfo>();
    AU.setPreservesCFG();
 }
 
 BasicBlock* PerformPred::promote(Instruction* LoopTC)
 {
-   auto& DTWP = getAnalysis<DominatorTreeWrapperPass>();
-   DominatorTree& DomT = DTWP.getDomTree();
+   DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+
    SmallVector<Instruction*, 4> depends;
    std::deque<Instruction*> targets;
    targets.push_back(LoopTC);
@@ -99,12 +101,22 @@ BasicBlock* PerformPred::promote(Instruction* LoopTC)
    return InsertInto;
 }
 
+/*
+template<class DomT>
+inline BasicBlock* nearestDominator(DomT& T, BasicBlock* Lhs, BasicBlock* Rhs)
+{
+   if(T.dominates(Rhs, Lhs)) return Rhs;
+   else return T.findNearestCommonDominator(Lhs, Rhs);
+}
+*/
+
 bool PerformPred::runOnFunction(Function &F)
 {
    if( F.isDeclaration() ) return false;
    BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
    LoopInfo& LI = getAnalysis<LoopInfo>();
    DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+   //PostDominatorTree& PDomT = getAnalysis<PostDominatorTree>();
 
    if(cpu_times == NULL){
       Type* ETy = Type::getInt32Ty(F.getContext());
@@ -126,6 +138,7 @@ bool PerformPred::runOnFunction(Function &F)
       SumLhs->setName(BB.getName()+".freq");
    }
    SmallVector<Instruction*, 20> Temp;
+   Temp.push_back(dyn_cast<Instruction>(SumLhs)); // the last instr in entry block
    for(auto& BB : F){
       auto FreqExpr = BFE.getBlockFreqExpr(&BB);
       if(FreqExpr.second == NULL) continue;
@@ -141,6 +154,11 @@ bool PerformPred::runOnFunction(Function &F)
 
       Instruction* SumLI = dyn_cast<Instruction>(SumLhs);
       BasicBlock* InsertB = Builder.GetInsertBlock();
+      if(DomT.dominates(InsertB, SumLI->getParent())){ 
+         //if promote too much, Insert before SumLI, we should demote it.
+         Builder.SetInsertPoint(SumLI->getParent()->getTerminator());
+         InsertB = Builder.GetInsertBlock();
+      }
       if(SumLI && !DomT.dominates(SumLI->getParent(), InsertB) && InsertB->getNumUses()>1){
          auto save = Builder.saveIP();
          Builder.SetInsertPoint(InsertB->getFirstNonPHI());
@@ -148,11 +166,12 @@ bool PerformPred::runOnFunction(Function &F)
          Builder.restoreIP(save);
          for(auto PI = pred_begin(InsertB), PE = pred_end(InsertB); PI!=PE; ++PI){
             BasicBlock* BB = *PI;
-            Value* V = *find_if(Temp.rbegin(), Temp.rend(), [BB,&DomT](Instruction* I){
+            auto Found = find_if(Temp.rbegin(), Temp.rend(), [BB,&DomT](Instruction* I){
                   return DomT.dominates(I->getParent(), BB);
                   });
-            errs()<<"Phi:"<<*V<<BB->getName()<<"\n";
-            Phi->addIncoming(V, BB);
+            Assert(Found != Temp.rend(), "");
+            errs()<<"Phi:"<<**Found<<BB->getName()<<"\n";
+            Phi->addIncoming(*Found, BB);
          }
          SumLhs = Phi;
       }
