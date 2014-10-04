@@ -16,6 +16,8 @@ find_package(LLVM)
 
 option(DYNAMIC_LINK "Link Dynamic LLVM Libraries" ${LLVM_DYNAMIC_LIBRARY_FOUND})
 option(WITH_DEBUG "Enable Extra Debug Output" OFF)
+set(PRED_TYPE "BLOCK_FREQ" CACHE STRING "Select What to Predicate for Performance Model")
+set_property(CACHE PRED_TYPE PROPERTY STRINGS "BLOCK_FREQ" "EXEC_TIME")
 
 find_package(PkgConfig)
 pkg_check_modules(LLVM_PROF llvm-prof REQUIRED)

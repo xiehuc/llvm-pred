@@ -53,6 +53,23 @@ static const std::unordered_map<int, InstTypes>  InstTMap = {
 };
 static Value* Loads[NumTypes] = {NULL};
 
+
+inline void count(llvm::BasicBlock &BB, unsigned int *counter)
+{
+   for(auto& I : BB){
+      try{
+         ++counter[InstTMap.at(I.getOpcode())];
+      }catch(std::out_of_range e){
+         //ignore exception
+      }
+   }
+}
+
+inline Value* force_insert(llvm::Value* V, IRBuilder<>& Builder, const Twine& Name="")
+{
+   return isa<Constant>(V)?CastInst::CreateSExtOrBitCast(V, V->getType(), Name, Builder.GetInsertPoint()):V;
+}
+
 void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
 {
    //CallGraphSCCPass::getAnalysisUsage(AU);
@@ -101,15 +118,6 @@ BasicBlock* PerformPred::promote(Instruction* LoopTC)
    return InsertInto;
 }
 
-/*
-template<class DomT>
-inline BasicBlock* nearestDominator(DomT& T, BasicBlock* Lhs, BasicBlock* Rhs)
-{
-   if(T.dominates(Rhs, Lhs)) return Rhs;
-   else return T.findNearestCommonDominator(Lhs, Rhs);
-}
-*/
-
 bool PerformPred::runOnFunction(Function &F)
 {
    if( F.isDeclaration() ) return false;
@@ -130,23 +138,37 @@ bool PerformPred::runOnFunction(Function &F)
    for(auto& BB : F){
       auto FreqExpr = BFE.getBlockFreqExpr(&BB);
       if(FreqExpr.second != NULL) continue;
+      // process other blocks outside loops
       SumRhs = cost(BB, Builder);
       uint64_t freq = BFE.getBlockFreq(&BB).getFrequency();
       // XXX use scale in caculate
       SumRhs = Builder.CreateMul(SumRhs, ConstantInt::get(I32Ty, freq));
+      SumRhs->setName(BB.getName()+".bfreq");
+#if PRED_TYPE == EXEC_TIME
       SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
-      SumLhs->setName(BB.getName()+".freq");
+      SumLhs->setName(BB.getName()+".sfreq");
+#else
+      SumRhs = force_insert(SumRhs, Builder, BB.getName()+".bfreq");
+#endif
    }
-   SmallVector<Instruction*, 20> Temp;
-   Temp.push_back(dyn_cast<Instruction>(SumLhs)); // the last instr in entry block
+
+   SmallVector<Instruction*, 20> BfreqStack;
+   BfreqStack.push_back(dyn_cast<Instruction>(SumLhs)); // the last instr in entry block
    for(auto& BB : F){
       auto FreqExpr = BFE.getBlockFreqExpr(&BB);
       Value* LoopTC = FreqExpr.second;
       if(LoopTC == NULL) continue;
+      // process all loops
       if(Instruction* LoopTCI = dyn_cast<Instruction>(FreqExpr.second)){
+#if PRED_TYPE == EXEC_TIME
          Instruction* InsertPos = promote(LoopTCI)->getTerminator();
+         // promote insert point
          Builder.SetInsertPoint(InsertPos);
-      }
+#else
+         Builder.SetInsertPoint(LoopTCI->getParent()->getTerminator());
+#endif
+      }else
+         Builder.SetInsertPoint(F.getEntryBlock().getTerminator());
       SumRhs = cost(BB, Builder);
       // XXX use scale in caculate
       uint64_t prob = FreqExpr.first.scale(1);
@@ -154,7 +176,9 @@ bool PerformPred::runOnFunction(Function &F)
          LoopTC = Builder.CreateCast(Instruction::SExt, LoopTC, I32Ty);
       Value* freq = Builder.CreateMul(LoopTC, ConstantInt::get(I32Ty, prob));
       SumRhs = Builder.CreateMul(freq, SumRhs);
+      SumRhs->setName(BB.getName()+".bfreq");
 
+#if PRED_TYPE == EXEC_TIME
       Instruction* SumLI = dyn_cast<Instruction>(SumLhs);
       BasicBlock* InsertB = Builder.GetInsertBlock();
       if(DomT.dominates(InsertB, SumLI->getParent())){ 
@@ -163,24 +187,27 @@ bool PerformPred::runOnFunction(Function &F)
          InsertB = Builder.GetInsertBlock();
       }
       if(SumLI && !DomT.dominates(SumLI->getParent(), InsertB) && InsertB->getNumUses()>1){
+         //still couldn't dominate all, try create phi instruction
          auto save = Builder.saveIP();
          Builder.SetInsertPoint(InsertB->getFirstNonPHI());
          PHINode* Phi = Builder.CreatePHI(SumLI->getType(), InsertB->getNumUses());
          Builder.restoreIP(save);
          for(auto PI = pred_begin(InsertB), PE = pred_end(InsertB); PI!=PE; ++PI){
             BasicBlock* BB = *PI;
-            auto Found = find_if(Temp.rbegin(), Temp.rend(), [BB,&DomT](Instruction* I){
+            auto Found = find_if(BfreqStack.rbegin(), BfreqStack.rend(), [BB,&DomT](Instruction* I){
                   return DomT.dominates(I->getParent(), BB);
+                  // find prev bfreq that could access
                   });
-            Assert(Found != Temp.rend(), "");
+            Assert(Found != BfreqStack.rend(), "");
             Phi->addIncoming(*Found, BB);
          }
          SumLhs = Phi;
       }
 
       SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
-      SumLhs->setName(BB.getName()+".freq");
-      Temp.push_back(dyn_cast<Instruction>(SumLhs));
+      SumLhs->setName(BB.getName()+".sfreq");
+      BfreqStack.push_back(dyn_cast<Instruction>(SumLhs));
+#endif
    }
    PrintSum = SumLhs;
    memset(Loads, 0, sizeof(Value*)*NumTypes);
@@ -203,23 +230,14 @@ void PerformPred::print(llvm::raw_ostream & OS, const llvm::Module * M) const
    OS<<ddg.expr()<<"\n";
 }
 
-inline void count(llvm::BasicBlock &BB, unsigned int *counter)
-{
-   for(auto& I : BB){
-      try{
-         ++counter[InstTMap.at(I.getOpcode())];
-      }catch(std::out_of_range e){
-         //ignore exception
-      }
-   }
-}
 
 llvm::Value* PerformPred::cost(BasicBlock& BB, IRBuilder<>& Builder)
 {
+   auto I32Ty = Type::getInt32Ty(BB.getContext());
+#if PRED_TYPE == EXEC_TIME
    unsigned InstCounts[NumTypes] = {0};
 
    count(BB, InstCounts);
-   auto I32Ty = Type::getInt32Ty(BB.getContext());
    Value* Sum = ConstantInt::get(I32Ty, 0);
 
    for(unsigned Idx = 0; Idx<NumTypes; ++Idx){
@@ -234,5 +252,9 @@ llvm::Value* PerformPred::cost(BasicBlock& BB, IRBuilder<>& Builder)
       Sum = Builder.CreateAdd(Sum, S);
    }
    return Sum;
+#else
+   return ConstantInt::get(I32Ty,1);
+#endif
 }
+
 
