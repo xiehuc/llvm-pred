@@ -33,7 +33,8 @@
 // a assert which always need check
 #define AssertRuntime(expr) if( !(expr) ){ \
    errs()<<"Assert Failed:"<<__FILE__<<":"<<__LINE__<<"\n"; \
-   assert(0);\
+   errs()<<#expr<<"\n";\
+   assert(#expr);\
    exit(-1);\
 }
 

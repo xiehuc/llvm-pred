@@ -2,15 +2,20 @@
 #include <llvm/Analysis/PostDominators.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/GraphWriter.h>
+#include <llvm/Analysis/LoopInfo.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Dominators.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/CFG.h>
+
+#include <deque>
+
 #include "BlockFreqExpr.h"
 #include "Resolver.h"
 #include "ddg.h"
 #include "debug.h"
+
 
 namespace lle {
    class PerformPred;

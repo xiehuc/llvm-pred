@@ -1,28 +1,29 @@
 #define DEBUG_TYPE "loop-cycle"
 #include "preheader.h"
-#include "loop.h"
-#include "util.h"
-#include "config.h"
 
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/ADT/Statistic.h>
+#include <llvm/Analysis/LoopInfo.h>
 #include <llvm/Transforms/Utils/LoopUtils.h>
 
 #include <map>
 #include <vector>
 #include <algorithm>
 
+#include "util.h"
+#include "config.h"
+#include "LoopTripCount.h"
 #include "debug.h"
 
 using namespace std;
 using namespace lle;
 using namespace llvm;
 
-char lle::LoopCycle::ID = 0;
+char LoopTripCount::ID = 0;
 
-static RegisterPass<LoopCycle> X("loop-cycle","Loop Cycle Pass", false, false);
+static RegisterPass<LoopTripCount> X("Loop-Trip-Count","Generate and insert loop trip count pass", false, false);
 
 // STATISTIC(NumUnfoundCycle, "Number of unfound loop cycle");
 
@@ -47,14 +48,12 @@ static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
 }
 
 
-void lle::LoopCycle::getAnalysisUsage(llvm::AnalysisUsage & AU) const
+void LoopTripCount::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
-	AU.setPreservesAll();
-	//AU.addRequired<LoopInfo>();
-	//setPreservesCFG would block llvm-loop
+	AU.addRequired<LoopInfo>();
 }
 
-Value* lle::LoopCycle::insertLoopCycle(Loop* L, Instruction* InsertPos)
+Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 {
 	// inspired from Loop::getCanonicalInductionVariable
 	BasicBlock *H = L->getHeader();
@@ -249,23 +248,24 @@ Value* lle::LoopCycle::insertLoopCycle(Loop* L, Instruction* InsertPos)
 	return CycleMap[L] = RES;
 }
 
-bool lle::LoopCycle::runOnLoop(llvm::Loop* L,llvm::LPPassManager&)
+bool LoopTripCount::runOnFunction(Function &F)
 {
-	CurL = L;
-	Function* CurF = L->getHeader()->getParent();
+   LoopInfo& LI = getAnalysis<LoopInfo>();
 
-	Value* CC = getOrInsertCycle(L);
-	if(!CC){
-      CycleMap[L] = CC;
-		++NumUnfoundCycle;
-		unfound<<"Function:"<<CurF->getName()<<"\n";
-		unfound<<"\t"<<*L<<"\n";
-	}
+   for(Loop* L : LI){
+      Value* CC = getOrInsertTripCount(L);
+
+      if(CC != NULL){
+         ++NumUnfoundCycle;
+         unfound<<"Function:"<<F.getName()<<"\n";
+         unfound<<"\t"<<*L<<"\n";
+      }
+   }
 
 	return true;
 }
 
-lle::LoopCycle::~LoopCycle()
+LoopTripCount::~LoopTripCount()
 	//we have no place to print out statistics information
 {
 	if(NumUnfoundCycle){
@@ -276,15 +276,44 @@ lle::LoopCycle::~LoopCycle()
 	}
 }
 
-void lle::LoopCycle::print(llvm::raw_ostream& OS,const llvm::Module*) const
+void LoopTripCount::print(llvm::raw_ostream& OS,const llvm::Module*) const
 {
-	OS<<*CurL<<"\n";
-	OS<<"Cycle:"<<*getLoopCycle(CurL)<<"\n";
+   LoopInfo& LI = getAnalysis<LoopInfo>();
+   for(Loop* L : LI){
+      Value* TripCount = getTripCount(L);
+      if(TripCount == NULL) continue;
+      OS<<"In Loop:"<<*L<<"\n";
+      OS<<"Cycle:"<<*TripCount<<"\n";
+   }
 }
-Value* lle::LoopCycle::getOrInsertCycle(Loop *L)
+
+Value* LoopTripCount::getTripCount(Loop *L)
+{
+   auto ite = CycleMap.find(L);
+   if(ite==CycleMap.end()){
+      BasicBlock* Preheader = L->getLoopPreheader();
+      if(Preheader == NULL)
+         return CycleMap[L] = NULL;
+      string HName = (L->getHeader()->getName()+".tc").str();
+      auto Found = find_if(Preheader->begin(),Preheader->end(), [HName](Instruction& I){
+            return I.getName()==HName;
+            });
+      if(Found == Preheader->end())
+         return CycleMap[L] = NULL;
+      return CycleMap[L] = &*Found;
+   }else
+      return ite->second;
+}
+
+Value* LoopTripCount::getTripCount(Loop *L) const
+{
+   auto ite = CycleMap.find(L);
+   return ite!=CycleMap.end()?ite->second:nullptr;
+}
+Value* LoopTripCount::getOrInsertTripCount(Loop *L)
 {
    if(L->getLoopPreheader()==NULL)
-      InsertPreheaderForLoop(L, ParentPass?:this);
+      InsertPreheaderForLoop(L, this);
    Instruction* InsertPos = L->getLoopPredecessor()->getTerminator();
-   return getLoopCycle(L)?:insertLoopCycle(L, InsertPos);
+   return getTripCount(L)?:insertTripCount(L, InsertPos);
 }

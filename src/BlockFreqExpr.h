@@ -1,6 +1,5 @@
 #ifndef BLOCKFREQEXPR_H_H
 #define BLOCKFREQEXPR_H_H
-#include "loop.h"
 #include <llvm/Pass.h>
 #include <llvm/Support/BlockFrequency.h>
 #include <llvm/Support/BranchProbability.h>
@@ -17,7 +16,6 @@ namespace lle {
     */
    class BlockFreqExpr: public llvm::FunctionPass
    {
-      LoopCycle LC;
       public:
       static char ID;
       BlockFreqExpr();

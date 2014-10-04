@@ -1,9 +1,4 @@
 #include "preheader.h"
-#include "util.h"
-
-#include <set>
-#include <string>
-#include <algorithm>
 
 #include <llvm/ADT/Twine.h>
 #include <llvm/IR/Function.h>
@@ -13,6 +8,11 @@
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/IR/GlobalVariable.h>
 
+#include <set>
+#include <string>
+#include <algorithm>
+
+#include "util.h"
 #include "debug.h"
 using namespace std;
 using namespace lle;

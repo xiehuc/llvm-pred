@@ -9,12 +9,12 @@
 #include <list>
 
 #include "ddg.h"
-#include "loop.h"
 #include "util.h"
 #include "GVInfo.h"
 #include "config.h"
 #include "Resolver.h"
 #include "SlashShrink.h"
+#include "LoopTripCount.h"
 
 #include "debug.h"
 
@@ -33,18 +33,18 @@ void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 	AU.addRequired<AliasAnalysis>();
 	AU.addRequired<MemoryDependenceAnalysis>();
    AU.addRequired<ResolverPass>();
-	AU.addRequired<LoopCycle>();
+	AU.addRequired<LoopTripCount>();
    AU.addRequired<ProfileInfo>();
 }
 
 bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 {
 	CurL = L;
-	LoopCycle& LC = getAnalysis<LoopCycle>();
+	LoopTripCount& LC = getAnalysis<LoopTripCount>();
    ResolverPass& RP = getAnalysis<ResolverPass>();
    ProfileInfo& PI = getAnalysis<ProfileInfo>();
    GVInfo& GVI = getAnalysis<GVInfo>();
-	Value* CC = LC.getLoopCycle(L);
+	Value* CC = LC.getTripCount(L);
    
    DEBUG(errs()<<"[Load ProfileInfo, Traped size:"<<PI.getAllTrapedValues().size()<<"]\n");
 
@@ -78,8 +78,8 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 
 void lle::LoopCycleSimplify::print(llvm::raw_ostream &OS, const llvm::Module *M) const
 {
-	auto& LC = getAnalysis<lle::LoopCycle>();
-	Value* CC = LC.getLoopCycle(CurL);
+	auto& LC = getAnalysis<LoopTripCount>();
+	Value* CC = LC.getTripCount(CurL);
 	if(CC){
       lle::Resolver<UseOnlyResolve> R; /* print is not a part of normal process
          . so don't make it modify resolver cache*/

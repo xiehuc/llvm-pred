@@ -22,6 +22,7 @@ endif()
 add_library(LLVMPred SHARED
 	KnownLibCallInfo.cpp
    BlockFreqExpr.cpp
+	LoopTripCount.cpp
    LoopSimplify.cpp
    LibFReshape.cpp
    SlashShrink.cpp
@@ -29,7 +30,6 @@ add_library(LLVMPred SHARED
    Resolver.cpp
    GVInfo.cpp
    Print.cpp
-	loop.cpp
 	util.cpp
    ddg.cpp
 	)
