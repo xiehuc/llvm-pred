@@ -245,7 +245,8 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 		RES = Builder.CreateSDiv(RES, Step);
 	RES->setName(H->getName()+".tc");
 
-	return CycleMap[L] = RES;
+   // doesn't cache here, because it's information is outdate.
+	return /*CycleMap[L] =*/ RES;
 }
 
 bool LoopTripCount::runOnFunction(Function &F)
@@ -312,8 +313,10 @@ Value* LoopTripCount::getTripCount(Loop *L) const
 }
 Value* LoopTripCount::getOrInsertTripCount(Loop *L)
 {
-   if(L->getLoopPreheader()==NULL)
+   if(L->getLoopPreheader()==NULL){
       InsertPreheaderForLoop(L, this);
+   }
    Instruction* InsertPos = L->getLoopPredecessor()->getTerminator();
    return getTripCount(L)?:insertTripCount(L, InsertPos);
 }
+

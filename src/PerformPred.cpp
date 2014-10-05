@@ -82,7 +82,6 @@ void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
    AU.addRequired<BlockFreqExpr>();
    AU.addRequired<DominatorTreeWrapperPass>();
    //AU.addRequired<PostDominatorTree>();
-   AU.addRequired<LoopInfo>();
    AU.setPreservesCFG();
 }
 
@@ -128,7 +127,6 @@ bool PerformPred::runOnFunction(Function &F)
 {
    if( F.isDeclaration() ) return false;
    BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
-   LoopInfo& LI = getAnalysis<LoopInfo>();
    DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
    //PostDominatorTree& PDomT = getAnalysis<PostDominatorTree>();
 
@@ -172,6 +170,7 @@ bool PerformPred::runOnFunction(Function &F)
          // promote insert point
          Builder.SetInsertPoint(InsertPos);
 #else
+         AssertRuntime(LoopTCI->getParent()->getParent()==&F);
          Builder.SetInsertPoint(LoopTCI->getParent()->getTerminator());
 #endif
       }else
