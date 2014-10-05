@@ -10,6 +10,7 @@
 #include <llvm/IR/CFG.h>
 
 #include <deque>
+#include <ValueProfiling.h>
 
 #include "BlockFreqExpr.h"
 #include "Resolver.h"
@@ -154,6 +155,7 @@ bool PerformPred::runOnFunction(Function &F)
       SumLhs->setName(BB.getName()+".sfreq");
 #else
       SumRhs = force_insert(SumRhs, Builder, BB.getName()+".bfreq");
+      ValueProfiler::insertValueTrap(SumRhs, Builder.GetInsertPoint());
 #endif
    }
 
@@ -212,6 +214,8 @@ bool PerformPred::runOnFunction(Function &F)
       SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
       SumLhs->setName(BB.getName()+".sfreq");
       BfreqStack.push_back(dyn_cast<Instruction>(SumLhs));
+#else
+      ValueProfiler::insertValueTrap(SumRhs, Builder.GetInsertPoint());
 #endif
    }
    PrintSum = SumLhs;
