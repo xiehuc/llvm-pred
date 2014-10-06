@@ -245,7 +245,6 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 		RES = Builder.CreateSDiv(RES, Step);
 	RES->setName(H->getName()+".tc");
 
-   // doesn't cache here, because it's information is outdate.
 	return /*CycleMap[L] =*/ RES;
 }
 
@@ -288,29 +287,32 @@ void LoopTripCount::print(llvm::raw_ostream& OS,const llvm::Module*) const
    }
 }
 
-Value* LoopTripCount::getTripCount(Loop *L)
+Value* LoopTripCount::getTripCount(Loop *L) const
 {
-   auto ite = CycleMap.find(L);
+   /*auto ite = CycleMap.find(L);
    if(ite==CycleMap.end()){
-      BasicBlock* Preheader = L->getLoopPreheader();
-      if(Preheader == NULL)
-         return CycleMap[L] = NULL;
-      string HName = (L->getHeader()->getName()+".tc").str();
-      auto Found = find_if(Preheader->begin(),Preheader->end(), [HName](Instruction& I){
-            return I.getName()==HName;
-            });
-      if(Found == Preheader->end())
-         return CycleMap[L] = NULL;
-      return CycleMap[L] = &*Found;
-   }else
-      return ite->second;
+   */
+   BasicBlock* Preheader = L->getLoopPreheader();
+   if(Preheader == NULL)
+      return /*CycleMap[L] =*/ NULL;
+   string HName = (L->getHeader()->getName()+".tc").str();
+   auto Found = find_if(Preheader->begin(),Preheader->end(), [HName](Instruction& I){
+         return I.getName()==HName;
+         });
+   if(Found == Preheader->end())
+      return /*CycleMap[L] =*/ NULL;
+   return /*CycleMap[L] =*/ &*Found;
+   //}else
+   //   return ite->second;
 }
 
+#if 0
 Value* LoopTripCount::getTripCount(Loop *L) const
 {
    auto ite = CycleMap.find(L);
    return ite!=CycleMap.end()?ite->second:nullptr;
 }
+#endif
 Value* LoopTripCount::getOrInsertTripCount(Loop *L)
 {
    if(L->getLoopPreheader()==NULL){

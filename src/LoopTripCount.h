@@ -19,7 +19,8 @@ namespace lle
 		unsigned NumUnfoundCycle;
 		//}
 
-		std::map<llvm::Loop*,llvm::Value*> CycleMap;
+		// don't use cache here, because Loop may invalid.
+      // std::map<llvm::Loop*,llvm::Value*> CycleMap;
 		public:
 		static char ID;
 		explicit LoopTripCount():FunctionPass(ID),unfound(unfound_str){
@@ -37,7 +38,6 @@ namespace lle
 		 * instruction and insert it by hand.
 		 */
 		llvm::Value* insertTripCount(llvm::Loop* l, llvm::Instruction* InsertPos);
-		llvm::Value* getTripCount(llvm::Loop* l);
       llvm::Value* getTripCount(llvm::Loop* l) const;
       // a helper function which convenient.
       llvm::Value* getOrInsertTripCount(llvm::Loop* l);
