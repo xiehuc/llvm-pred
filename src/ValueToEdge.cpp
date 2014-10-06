@@ -22,7 +22,6 @@ namespace lle{
       void getAnalysisUsage(llvm::AnalysisUsage&) const override;
       bool runOnModule(llvm::Module&) override;
    };
-
 }
 
 using namespace lle;
@@ -66,19 +65,15 @@ bool ValueToEdgeProfiling::runOnModule(Module & M)
       const Function* F = I->getParent()->getParent();
       const BasicBlock* BB = find_block_by_name(F, Name);
       Assert(BB,"");
-      errs()<<F->getName()<<":"<<"\n";
-      errs()<<*CI<<"\n";
-      errs()<<BB->getName()<<"\n";
       BlockExecutions[BB] = value;
    }
 
-
    std::vector<unsigned> Counters;
-   if (Counters.size() > 0) {
-      for (Module::iterator F = M.begin(), E = M.end(); F != E; ++F) {
-         if (F->isDeclaration()) continue;
-         for (Function::iterator BB = F->begin(), E = F->end(); BB != E; ++BB)
-            Counters.push_back(BlockExecutions[BB]);
+   for (Module::iterator F = M.begin(), E = M.end(); F != E; ++F) {
+      if (F->isDeclaration()) continue;
+      for (Function::iterator BB = F->begin(), E = F->end(); BB != E; ++BB){
+         errs()<<BlockExecutions[BB]<<"\n";
+         Counters.push_back(BlockExecutions[BB]);
       }
    }
 

@@ -38,6 +38,8 @@ namespace lle
 		 * instruction and insert it by hand.
 		 */
 		llvm::Value* insertTripCount(llvm::Loop* l, llvm::Instruction* InsertPos);
+      /**trying to find inserted loop trip count in preheader 
+       * don't use cache because Loop structure is not stable*/
       llvm::Value* getTripCount(llvm::Loop* l) const;
       // a helper function which convenient.
       llvm::Value* getOrInsertTripCount(llvm::Loop* l);
