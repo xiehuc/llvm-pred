@@ -25,6 +25,8 @@ void BlockFreqExpr::getAnalysisUsage(AnalysisUsage &AU) const
 
 bool BlockFreqExpr::runOnFunction(Function &F) 
 {
+   LoopTripCount& LTC = getAnalysis<LoopTripCount>();
+   LTC.updateCache(getAnalysis<LoopInfo>());
    return false;
 }
 

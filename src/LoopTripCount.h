@@ -19,8 +19,18 @@ namespace lle
 		unsigned NumUnfoundCycle;
 		//}
 
-		// don't use cache here, because Loop may invalid.
-      // std::map<llvm::Loop*,llvm::Value*> CycleMap;
+		// a stable cache, the index of Loop in df order -> LoopTripCount
+      std::vector<llvm::Value*> CycleMap;
+      // an unstable cache, the Loop -> index of Loop in df order
+      llvm::DenseMap<llvm::Loop*, size_t> LoopMap;
+		/**
+		 * trying to find loop cycle, if it is a variable, because it is a
+		 * sub instruction, first insert it into source then we can get it.
+		 * if it is a constant, we couldn't simply insert a constant into
+		 * source, so we directly return it. caller can make a cast
+		 * instruction and insert it by hand.
+		 */
+		llvm::Value* insertTripCount(llvm::Loop* l, llvm::Instruction* InsertPos);
 		public:
 		static char ID;
 		explicit LoopTripCount():FunctionPass(ID),unfound(unfound_str){
@@ -30,14 +40,8 @@ namespace lle
 		void getAnalysisUsage(llvm::AnalysisUsage&) const;
 		bool runOnFunction(llvm::Function& F);
 		void print(llvm::raw_ostream&,const llvm::Module*) const;
-		/**
-		 * trying to find loop cycle, if it is a variable, because it is a
-		 * sub instruction, first insert it into source then we can get it.
-		 * if it is a constant, we couldn't simply insert a constant into
-		 * source, so we directly return it. caller can make a cast
-		 * instruction and insert it by hand.
-		 */
-		llvm::Value* insertTripCount(llvm::Loop* l, llvm::Instruction* InsertPos);
+      // use this before getTripCount, to make a stable Loop Index Order
+      void updateCache(llvm::LoopInfo& LI);
       /**trying to find inserted loop trip count in preheader 
        * don't use cache because Loop structure is not stable*/
       llvm::Value* getTripCount(llvm::Loop* l) const;

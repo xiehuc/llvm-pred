@@ -6,6 +6,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/ADT/Statistic.h>
 #include <llvm/Analysis/LoopInfo.h>
+#include <llvm/ADT/DepthFirstIterator.h>
 #include <llvm/Transforms/Utils/LoopUtils.h>
 
 #include <map>
@@ -245,20 +246,28 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 		RES = Builder.CreateSDiv(RES, Step);
 	RES->setName(H->getName()+".tc");
 
-	return /*CycleMap[L] =*/ RES;
+	return RES;
 }
 
 bool LoopTripCount::runOnFunction(Function &F)
 {
    LoopInfo& LI = getAnalysis<LoopInfo>();
+   LoopMap.clear();
+   CycleMap.clear();
 
-   for(Loop* L : LI){
-      Value* CC = getOrInsertTripCount(L);
+   for(Loop* TopL : LI){
+      for(auto LIte = df_begin(TopL), E = df_end(TopL); LIte!=E; ++LIte){
+         Loop* L = *LIte;
+         Value* CC = getOrInsertTripCount(L);
+         LoopMap[L] = CycleMap.size(); // write to cache
+         CycleMap.push_back(CC);
+         AssertRuntime(LoopMap[L] < CycleMap.size() && " should insert indeed");
 
-      if(CC != NULL){
-         ++NumUnfoundCycle;
-         unfound<<"Function:"<<F.getName()<<"\n";
-         unfound<<"\t"<<*L<<"\n";
+         if(CC != NULL){
+            ++NumUnfoundCycle;
+            unfound<<"Function:"<<F.getName()<<"\n";
+            unfound<<"\t"<<*L<<"\n";
+         }
       }
    }
 
@@ -279,40 +288,35 @@ LoopTripCount::~LoopTripCount()
 void LoopTripCount::print(llvm::raw_ostream& OS,const llvm::Module*) const
 {
    LoopInfo& LI = getAnalysis<LoopInfo>();
-   for(Loop* L : LI){
-      Value* TripCount = getTripCount(L);
-      if(TripCount == NULL) continue;
-      OS<<"In Loop:"<<*L<<"\n";
-      OS<<"Cycle:"<<*TripCount<<"\n";
+   for(Loop* TopL : LI){
+      for(auto LIte = df_begin(TopL), E = df_end(TopL); LIte != E; ++LIte){
+         Loop* L = *LIte;
+         Value* TripCount = getTripCount(L);
+         if(TripCount == NULL) continue;
+         OS<<"In Loop:"<<*L<<"\n";
+         OS<<"Cycle:"<<*TripCount<<"\n";
+      }
    }
 }
 
 Value* LoopTripCount::getTripCount(Loop *L) const
 {
-   /*auto ite = CycleMap.find(L);
-   if(ite==CycleMap.end()){
-   */
-   BasicBlock* Preheader = L->getLoopPreheader();
-   if(Preheader == NULL)
-      return /*CycleMap[L] =*/ NULL;
-   string HName = (L->getHeader()->getName()+".tc").str();
-   auto Found = find_if(Preheader->begin(),Preheader->end(), [HName](Instruction& I){
-         return I.getName()==HName;
-         });
-   if(Found == Preheader->end())
-      return /*CycleMap[L] =*/ NULL;
-   return /*CycleMap[L] =*/ &*Found;
-   //}else
-   //   return ite->second;
+   auto ite = LoopMap.find(L);
+   if(ite==LoopMap.end()){
+      BasicBlock* Preheader = L->getLoopPreheader();
+      if(Preheader == NULL)
+         return NULL;
+      string HName = (L->getHeader()->getName()+".tc").str();
+      auto Found = find_if(Preheader->begin(),Preheader->end(), [HName](Instruction& I){
+            return I.getName()==HName;
+            });
+      if(Found == Preheader->end())
+         return NULL;
+      return &*Found;
+   }else
+      return CycleMap[ite->second];
 }
 
-#if 0
-Value* LoopTripCount::getTripCount(Loop *L) const
-{
-   auto ite = CycleMap.find(L);
-   return ite!=CycleMap.end()?ite->second:nullptr;
-}
-#endif
 Value* LoopTripCount::getOrInsertTripCount(Loop *L)
 {
    if(L->getLoopPreheader()==NULL){
@@ -322,3 +326,12 @@ Value* LoopTripCount::getOrInsertTripCount(Loop *L)
    return getTripCount(L)?:insertTripCount(L, InsertPos);
 }
 
+void LoopTripCount::updateCache(LoopInfo& LI)
+{
+   size_t Idx = 0;
+   for(Loop* TopL : LI){
+      for(auto LIte = df_begin(TopL), E = df_end(TopL); LIte != E; ++LIte){
+         LoopMap[*LIte] = Idx++;
+      }
+   }
+}
