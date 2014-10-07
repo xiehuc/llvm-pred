@@ -76,6 +76,29 @@ inline Value* force_insert(llvm::Value* V, IRBuilder<>& Builder, const Twine& Na
    return isa<Constant>(V)?CastInst::CreateSExtOrBitCast(V, V->getType(), Name, Builder.GetInsertPoint()):V;
 }
 
+static uint32_t GCD(uint32_t A, uint32_t B) // 最大公约数
+{
+   uint32_t Max=A, Min=B;
+   A<B?Max=B,Min=A:0;
+   do{
+      A=Min,B=Max%Min;
+      A<B?Max=B,Min=A:Max=A,Min=B;
+   }while(B!=0);
+   return A;
+}
+
+static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbability prob)
+{
+   uint32_t n = prob.getNumerator(), d = prob.getDenominator();
+   if(n == d) return TripCount; /* TC * 1.0 */
+   uint32_t gcd = GCD(n,d);
+   n/=gcd,d/=gcd;// scale number, avoid overflow
+   Type* I32Ty = Type::getInt32Ty(TripCount->getContext());
+   Value* Ret = TripCount;
+   if(n!=1) Ret = Builder.CreateMul(Ret, ConstantInt::get(I32Ty, n));
+   return Builder.CreateSDiv(Ret, ConstantInt::get(I32Ty, d));
+}
+
 void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
 {
    //CallGraphSCCPass::getAnalysisUsage(AU);
@@ -176,11 +199,9 @@ bool PerformPred::runOnFunction(Function &F)
       }else
          Builder.SetInsertPoint(F.getEntryBlock().getTerminator());
       SumRhs = cost(BB, Builder);
-      // XXX use scale in caculate
-      uint64_t prob = FreqExpr.first.scale(1);
       if(LoopTC->getType()!= I32Ty)
          LoopTC = Builder.CreateCast(Instruction::SExt, LoopTC, I32Ty);
-      Value* freq = Builder.CreateMul(LoopTC, ConstantInt::get(I32Ty, prob));
+      Value* freq = CreateMul(Builder, LoopTC, FreqExpr.first); // a scale mul
       SumRhs = Builder.CreateMul(freq, SumRhs);
       SumRhs->setName(BB.getName()+".bfreq");
 
