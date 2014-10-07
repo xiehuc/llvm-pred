@@ -32,5 +32,7 @@ namespace lle {
          const llvm::BlockFrequency& LHS,
          const llvm::BlockFrequency& RHS
          );
+   //scale prob with a small number using gcd.
+   llvm::BranchProbability scale(const llvm::BranchProbability& prob);
 }
 #endif

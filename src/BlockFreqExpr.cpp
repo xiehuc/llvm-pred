@@ -50,5 +50,23 @@ BranchProbability lle::operator/(
       const BlockFrequency& LHS, 
       const BlockFrequency& RHS)
 {
-   return BranchProbability(LHS.getFrequency(), RHS.getFrequency());
+   return scale(BranchProbability(LHS.getFrequency(), RHS.getFrequency()));
+}
+
+static uint32_t GCD(uint32_t A, uint32_t B) // 最大公约数
+{
+   uint32_t Max=A, Min=B;
+   A<B?Max=B,Min=A:0;
+   do{
+      A=Min,B=Max%Min;
+      A<B?Max=B,Min=A:Max=A,Min=B;
+   }while(B!=0);
+   return A;
+}
+
+BranchProbability lle::scale(const BranchProbability& prob)
+{
+   uint32_t n = prob.getNumerator(), d = prob.getDenominator();
+   uint32_t gcd = GCD(n,d);
+   return BranchProbability(n/gcd, d/gcd);
 }
