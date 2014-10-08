@@ -151,14 +151,14 @@ bool PerformPred::runOnFunction(Function &F)
    IRBuilder<> Builder(F.getEntryBlock().getTerminator());
    auto I32Ty = Type::getInt32Ty(F.getContext());
    Value* SumLhs = ConstantInt::get(I32Ty, 0), *SumRhs;
+   BlockFrequency EntryFreq = BFE.getBlockFreq(&F.getEntryBlock());
    for(auto& BB : F){
       auto FreqExpr = BFE.getBlockFreqExpr(&BB);
       if(FreqExpr.second != NULL) continue;
       // process other blocks outside loops
       SumRhs = cost(BB, Builder);
-      uint64_t freq = BFE.getBlockFreq(&BB).getFrequency();
       // XXX use scale in caculate
-      SumRhs = Builder.CreateMul(SumRhs, ConstantInt::get(I32Ty, freq));
+      SumRhs = CreateMul(Builder, SumRhs, BFE.getBlockFreq(&BB)/EntryFreq);
       SumRhs->setName(BB.getName()+".bfreq");
 #if PRED_TYPE == EXEC_TIME
       SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
@@ -224,6 +224,7 @@ bool PerformPred::runOnFunction(Function &F)
       SumLhs->setName(BB.getName()+".sfreq");
       BfreqStack.push_back(dyn_cast<Instruction>(SumLhs));
 #else
+      force_insert(SumRhs, Builder, BB.getName()+".bfreq");
       ValueProfiler::insertValueTrap(SumRhs, Builder.GetInsertPoint());
 #endif
    }
