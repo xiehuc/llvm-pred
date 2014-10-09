@@ -47,6 +47,11 @@ std::pair<BranchProbability, Value*> BlockFreqExpr::getBlockFreqExpr(BasicBlock 
    return std::make_pair(BFI.getBlockFreq(BB)/HeaderF, LTC.getTripCount(L));
 }
 
+bool BlockFreqExpr::inLoop(BasicBlock *BB) const
+{
+   return getAnalysis<LoopInfo>().getLoopFor(BB) != NULL;
+}
+
 
 BranchProbability lle::operator/(
       const BlockFrequency& LHS, 

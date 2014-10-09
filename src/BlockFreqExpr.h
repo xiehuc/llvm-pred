@@ -26,6 +26,7 @@ namespace lle {
          getBlockFreqExpr(llvm::BasicBlock* BB) const;
       /** if getBlockFreqExpr failed, use this to get normal BlockFrequency */
       llvm::BlockFrequency getBlockFreq(llvm::BasicBlock* BB) const;
+      bool inLoop(llvm::BasicBlock* BB) const;
    };
 
    llvm::BranchProbability operator/(

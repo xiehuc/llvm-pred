@@ -24,6 +24,30 @@ namespace lle {
 
 class lle::PerformPred : public llvm::FunctionPass
 {
+   llvm::GlobalVariable* cpu_times = NULL;
+   llvm::Value* PrintSum; // a sum value used for print
+   enum ClassifyType {
+      STATIC_BLOCK,        // 静态预测的普通基本块
+      STATIC_LOOP,         // 静态预测的循环
+      DYNAMIC_LOOP_CONST,  // 动态预测的循环次数常量
+      DYNAMIC_LOOP_INST,   // 动态预测的循环次数非常量
+   };
+   struct Classify {
+      Classify(ClassifyType t, llvm::BasicBlock* b, llvm::BranchProbability p):type(t),block(b) {
+         data.freq = (double)p.getNumerator()/p.getDenominator();
+      }
+      Classify(ClassifyType t, llvm::BasicBlock* b, int64_t v):type(t),block(b) { data.ext_val = v;}
+      Classify(ClassifyType t, llvm::BasicBlock* b, llvm::Value* v):type(t),block(b) { data.value = v;}
+      ClassifyType type;
+      llvm::BasicBlock* block;
+      union {
+         double freq;
+         int64_t ext_val;
+         llvm::Value* value;
+      }data;
+   };
+   std::vector<Classify> pred_cls;
+
    public:
    static char ID;
    PerformPred():llvm::FunctionPass(ID) {}
@@ -33,8 +57,6 @@ class lle::PerformPred : public llvm::FunctionPass
    void print(llvm::raw_ostream&,const llvm::Module*) const override;
 
    private:
-   llvm::GlobalVariable* cpu_times = NULL;
-   llvm::Value* PrintSum; // a sum value used for print
    llvm::Value* cost(llvm::BasicBlock& BB, llvm::IRBuilder<>& Builder);
    llvm::BasicBlock* promote(llvm::Instruction* LoopTC);
 };
@@ -141,6 +163,7 @@ bool PerformPred::runOnFunction(Function &F)
    BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
    DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
    //PostDominatorTree& PDomT = getAnalysis<PostDominatorTree>();
+   pred_cls.clear();
 
    if(cpu_times == NULL){
       Type* ETy = Type::getInt32Ty(F.getContext());
@@ -158,7 +181,8 @@ bool PerformPred::runOnFunction(Function &F)
       // process other blocks outside loops
       SumRhs = cost(BB, Builder);
       // XXX use scale in caculate
-      SumRhs = CreateMul(Builder, SumRhs, BFE.getBlockFreq(&BB)/EntryFreq);
+      BranchProbability freq = BFE.getBlockFreq(&BB)/EntryFreq;
+      SumRhs = CreateMul(Builder, SumRhs, freq);
       SumRhs->setName(BB.getName()+".bfreq");
 #if PRED_TYPE == EXEC_TIME
       SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
@@ -167,6 +191,7 @@ bool PerformPred::runOnFunction(Function &F)
       SumRhs = force_insert(SumRhs, Builder, BB.getName()+".bfreq");
       ValueProfiler::insertValueTrap(SumRhs, Builder.GetInsertPoint());
 #endif
+      pred_cls.emplace_back(BFE.inLoop(&BB)?STATIC_LOOP:STATIC_BLOCK, &BB, freq);
    }
 
    SmallVector<Instruction*, 20> BfreqStack;
@@ -193,6 +218,10 @@ bool PerformPred::runOnFunction(Function &F)
       Value* freq = CreateMul(Builder, LoopTC, FreqExpr.first); // a scale mul
       SumRhs = Builder.CreateMul(freq, SumRhs);
       SumRhs->setName(BB.getName()+".bfreq");
+      if(ConstantInt* CI = dyn_cast<ConstantInt>(SumRhs)){
+         pred_cls.emplace_back(DYNAMIC_LOOP_CONST, &BB, CI->getSExtValue());
+      }else
+         pred_cls.emplace_back(DYNAMIC_LOOP_INST, &BB, SumRhs);
 
 #if PRED_TYPE == EXEC_TIME
       Instruction* SumLI = dyn_cast<Instruction>(SumLhs);
@@ -243,6 +272,28 @@ bool PerformPred::runOnFunction(Function &F)
 
 void PerformPred::print(llvm::raw_ostream & OS, const llvm::Module * M) const
 {
+   static size_t idx = 0;
+   for(auto classify : pred_cls){
+      OS<<"No."<<idx++<<"\t";
+      switch(classify.type){
+         case STATIC_BLOCK: 
+         case STATIC_LOOP:  
+            OS<<(classify.type==STATIC_BLOCK?"Static Block:\t\"":"Static Loop Block:\t\"")<<
+               classify.block->getName()<<"\"\t"<<
+               classify.data.freq<<"\n";
+            break;
+         case DYNAMIC_LOOP_CONST: 
+            OS<<"Dynamic Loop Constant Trip Count:\t\""<<
+               classify.block->getName()<<"\"\t"<<classify.data.ext_val<<"\n"; 
+            break;
+         case DYNAMIC_LOOP_INST:  
+            OS<<"Dynamic Loop Instrumented Trip Count\t\""<<
+               classify.block->getName()<<"\"\t"<<
+               *classify.data.value<<"\n"; 
+            break;
+      }
+   }
+
    lle::Resolver<NoResolve> R;
    auto Res = R.resolve(PrintSum);
    DDGraph ddg(Res, PrintSum);
