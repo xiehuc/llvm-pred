@@ -105,7 +105,14 @@ static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbabilit
    uint32_t n = prob.getNumerator(), d = prob.getDenominator();
    if(n == d) return TripCount; /* TC * 1.0 */
    Type* I32Ty = Type::getInt32Ty(TripCount->getContext());
+   Type* FloatTy = Type::getFloatTy(TripCount->getContext());
    Value* Ret = TripCount;
+   constexpr double square = std::sqrt(INT32_MAX);
+   if(n>square){
+      // it may overflow, use float to caculate
+      Ret = Builder.CreateFMul(Builder.CreateSIToFP(Ret, FloatTy), ConstantFP::get(FloatTy, (double)n/d));
+      return Builder.CreateFPToSI(Ret, I32Ty);
+   }
    if(n!=1) Ret = Builder.CreateMul(Ret, ConstantInt::get(I32Ty, n));
    return Builder.CreateSDiv(Ret, ConstantInt::get(I32Ty, d));
 }

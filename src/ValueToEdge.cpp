@@ -72,7 +72,6 @@ bool ValueToEdgeProfiling::runOnModule(Module & M)
    for (Module::iterator F = M.begin(), E = M.end(); F != E; ++F) {
       if (F->isDeclaration()) continue;
       for (Function::iterator BB = F->begin(), E = F->end(); BB != E; ++BB){
-         errs()<<BlockExecutions[BB]<<"\n";
          Counters.push_back(BlockExecutions[BB]);
       }
    }
