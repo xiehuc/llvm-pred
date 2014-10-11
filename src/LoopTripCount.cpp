@@ -93,13 +93,14 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 
 	Instruction* IndOrNext = NULL;
 	Value* END = NULL;
-
+   //终止块的终止指令：分情况讨论branchinst,switchinst;
+   //跳转指令br bool a1,a2;condition<-->bool
 	if(isa<BranchInst>(TE->getTerminator())){
 		const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
 		Assert(EBR->isConditional(), "end branch is not conditional");
 		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
 		if(EC->getPredicate() == EC->ICMP_SGT){
-         Assert(!L->contains(EBR->getSuccessor(0)), *EBR<<":abnormal exit with great than");
+         Assert(!L->contains(EBR->getSuccessor(0)), *EBR<<":abnormal exit with great than");//终止块的终止指令---->跳出执行循环外的指令
          OneStep += 1;
       } else if(EC->getPredicate() == EC->ICMP_EQ)
          Assert(!L->contains(EBR->getSuccessor(0)), *EBR<<":abnormal exit with great than");
@@ -108,7 +109,7 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
       } else {
          ret_null_fail(0, *EC<<" unknow combination of end condition");
       }
-		IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));
+		IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));//去掉类型转化
 		END = EC->getOperand(1);
 		DEBUG(errs()<<"end   value:"<<*EC<<"\n");
 	}else if(isa<SwitchInst>(TE->getTerminator())){
@@ -126,7 +127,7 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 		assert(0 && "unknow terminator type");
 	}
 
-	ret_null_fail(L->isLoopInvariant(END), "end value should be loop invariant");
+	ret_null_fail(L->isLoopInvariant(END), "end value should be loop invariant");//至此得END值
 
 	Value* start = NULL;
 	Value* ind = NULL;
