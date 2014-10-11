@@ -29,11 +29,12 @@ static RegisterPass<LoopCycleSimplify> Y("loop-cycle-simplify","Loop Cycle Simpl
 void lle::LoopCycleSimplify::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
 	AU.setPreservesAll();
-   AU.addRequired<GVInfo>();
+   //AU.addRequired<GVInfo>();
+	AU.addRequired<LoopTripCount>();
+   AU.addRequired<LoopInfo>();
 	AU.addRequired<AliasAnalysis>();
 	AU.addRequired<MemoryDependenceAnalysis>();
    AU.addRequired<ResolverPass>();
-	AU.addRequired<LoopTripCount>();
    AU.addRequired<ProfileInfo>();
 }
 
@@ -43,7 +44,8 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 	LoopTripCount& LC = getAnalysis<LoopTripCount>();
    ResolverPass& RP = getAnalysis<ResolverPass>();
    ProfileInfo& PI = getAnalysis<ProfileInfo>();
-   GVInfo& GVI = getAnalysis<GVInfo>();
+   //GVInfo& GVI = getAnalysis<GVInfo>();
+   LC.updateCache(getAnalysis<LoopInfo>());
 	Value* CC = LC.getTripCount(L);
    
    DEBUG(errs()<<"[Load ProfileInfo, Traped size:"<<PI.getAllTrapedValues().size()<<"]\n");
@@ -54,8 +56,8 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
    CC = ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 
    RP.getResolver<SLGResolve>().get_impl().initial(&PI);
-   RP.getResolver<GVResolve>().get_impl().initial(&GVI);
-   auto R = RP.getResolverSet<UseOnlyResolve, SpecialResolve, GVResolve, SLGResolve>();
+   //RP.getResolver<GVResolve>().get_impl().initial(&GVI);
+   auto R = RP.getResolverSet<UseOnlyResolve, SpecialResolve, /*GVResolve,*/ SLGResolve>();
    ResolveResult RR = R.resolve(CC, [](Value* V){
          if(Instruction* I = dyn_cast<Instruction>(V))
             MarkPreserve::mark(I, "loop");

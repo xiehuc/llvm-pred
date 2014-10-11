@@ -175,6 +175,7 @@ bool PerformPred::runOnFunction(Function &F)
    auto I32Ty = Type::getInt32Ty(F.getContext());
    Value* SumLhs = ConstantInt::get(I32Ty, 0), *SumRhs;
    BlockFrequency EntryFreq = BFE.getBlockFreq(&F.getEntryBlock());
+   errs()<<EntryFreq.getFrequency()<<"\n";
    for(auto& BB : F){
       auto FreqExpr = BFE.getBlockFreqExpr(&BB);
       if(FreqExpr.second != NULL) continue;
