@@ -15,7 +15,7 @@ namespace lle{
 };
 
 
-class lle::GVInfo: public llvm::ModulePass
+class lle::GVInfo: public llvm::ImmutablePass
 {
    struct Data {
       bool write_once = true;
@@ -36,7 +36,7 @@ class lle::GVInfo: public llvm::ModulePass
    bool findStoreOnGV(llvm::Value*, llvm::Constant*);
    public:
       static char ID;
-      explicit GVInfo():ModulePass(ID) {}
+      explicit GVInfo():ImmutablePass(ID) {}
       bool runOnModule(llvm::Module& M) override;
       void getAnalysisUsage(llvm::AnalysisUsage&) const override;
 
@@ -54,7 +54,8 @@ class lle::GVInfo: public llvm::ModulePass
          if(!found->second.write_once) return NULL;
          return found->second.store;
       }
-      const std::list<const llvm::Instruction*>* getResolve(llvm::Constant* C) const {
+      const std::list<const llvm::Instruction*>* 
+      getResolve(llvm::Constant* C) const {
          auto found = info.find(C);
          if(found == info.end()) return NULL;
          return &found->second.resolve;
