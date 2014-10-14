@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+# 通过Value-To-Edge 和 Edge 来比较差异. 使用算数平均. 
 
 import argparse
 import re
@@ -9,11 +10,27 @@ def perror(*args, **keys):
     exit(-1)
 
 def calc_average(v2e_map, e_map):
+    print("### following predication exceeds too much ###")
+    part_n = 0
+    total_n = 0
+    total = 0.0
+    part = 0.0
     for k in v2e_map.keys() & e_map.keys():
         predict = int(v2e_map[k])
         real = int(e_map[k])
         diff = abs(predict - real)/real
-        print(diff)
+        if diff > 2:
+            print("predicted:", predict, "\treal:", real, "\t rate:", diff, "\t", k)
+        else:
+            part += diff
+            part_n += 1
+        total += diff
+        total_n += 1
+    print()
+    print("### general report ###")
+    # 平均公式选用算数平均.
+    print("total diverse rate:", round(total/total_n*100,2), "%")
+    print("diverse rate without exceeded predication:", round(part/part_n*100, 2), "%") #去除差别过大的再求平均
 
 def read_profiling(filename):
     handle = open(filename, 'r')
