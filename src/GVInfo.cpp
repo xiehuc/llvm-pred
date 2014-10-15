@@ -27,7 +27,7 @@ static GlobalVariable* find_all_param(Argument* Arg, bool& only)
    Function* F = Arg->getParent();
    GlobalVariable* param = NULL;
    unsigned count = 0;
-   for(auto U = F->use_begin(),E = F->use_end(); U!=E; ++U){
+   for(auto U = user_begin(F),E = user_end(F); U!=E; ++U){
       if(auto CI = dyn_cast<CallInst>(*U)){
          ++count;
          Value* P = findCallInstParameter(Arg, CI)->get();
@@ -43,7 +43,7 @@ static GlobalVariable* find_all_param(Argument* Arg, bool& only)
 bool GVInfo::findLoadOnGVPointer(Value* V, Constant* C)
 {
    bool ret = false;
-   for(auto U = V->use_begin(), E = V->use_end(); U!=E; ++U){
+   for(auto U = user_begin(V), E = user_begin(V); U!=E; ++U){
       bool found = false;
       Instruction* Tg = dyn_cast<Instruction>(*U);
       if(!Tg) continue;

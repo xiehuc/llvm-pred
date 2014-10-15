@@ -6,6 +6,7 @@
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/SourceMgr.h>
 
+#include "util.h"
 #include "debug.h"
 
 using namespace llvm;
@@ -52,7 +53,7 @@ bool LibFReshape::runOnModule(Module &M)
       Old->removeFromParent();
       Constant* New = M.getOrInsertFunction(F->getName(), F->getFunctionType(), F->getAttributes());
 
-      for(auto I = Old->use_begin(), E = Old->use_end(); I!=E; ++I){
+      for(auto I = user_begin(Old), E = user_end(Old); I!=E; ++I){
          if(ConstantExpr* CE = dyn_cast<ConstantExpr>(*I))
             //Assume all CE is used with in a call
             CE->replaceAllUsesWith(New);

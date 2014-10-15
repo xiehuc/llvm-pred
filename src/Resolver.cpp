@@ -200,7 +200,7 @@ Use* GlobalResolve::findWriteOnGV(GlobalVariable *G)
  */
 static void find_global_dependencies(const Value* GV,SmallVectorImpl<FindedDependenciesType>& Result)
 {
-	for(auto U = GV->use_begin(),E = GV->use_end();U!=E;++U){
+	for(auto U = user_begin(GV),E = user_end(GV); U!=E;++U){
 		Instruction* I = const_cast<Instruction*>(dyn_cast<Instruction>(*U));
 		if(!I){
 			find_global_dependencies(*U, Result);

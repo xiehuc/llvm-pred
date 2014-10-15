@@ -293,7 +293,7 @@ bool lle::isArgumentWrite(llvm::Argument *Arg)
          return true;
       }
    }else{
-      for(auto U = Arg->use_begin(), E = Arg->use_end(); U!=E; ++U){
+      for(auto U = user_begin(Arg), E = user_end(Arg); U!=E; ++U){
          if(isa<StoreInst>(*U)) return true;
       }
    }

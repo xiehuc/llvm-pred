@@ -139,7 +139,7 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 		Value* PSi = IndOrNext->getOperand(0);//point type Step.i
 
 		int SICount[2] = {0};//store in predecessor count,store in loop body count
-		for( auto I = PSi->use_begin(),E = PSi->use_end();I!=E;++I){
+		for( auto I = user_begin(PSi),E = user_end(PSi);I!=E;++I){
 			DISABLE(errs()<<**I<<"\n");
 			StoreInst* SI = dyn_cast<StoreInst>(*I);
 			if(!SI || SI->getOperand(1) != PSi) continue;
@@ -157,7 +157,9 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 			}
 
 		}
-		AssertThrow(SICount[0]==1 && SICount[1]==1, not_found("should only have 1 store in/before loop"));
+      AssertThrow(SICount[0]==1 && SICount[1]==1, 
+            not_found(dbg() <<"should only have 1 store in/before loop:"
+               <<SICount[0] <<"," <<SICount[1] <<*PSi));
 		ind = IndOrNext;
 	}else{
 		if(isa<PHINode>(IndOrNext)){
