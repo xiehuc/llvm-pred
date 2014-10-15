@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 # 通过Value-To-Edge 和 Edge 来比较差异. 使用算数平均. 
+# using equation: 
+# $\frac {pred - real} {min(pred, real)}$
 
 import argparse
 import re
@@ -20,7 +22,7 @@ def calc_average(v2e_map, e_map):
         real = int(e_map[k])
         diff = abs(predict - real)/min(real, predict)
         if diff > 2:
-            print("predicted:%7d real:%7d rate:%.2f\t%s" % (predict, real, diff, k))
+            print("predicted: %7d real: %7d rate: %.2f\t%s" % (predict, real, diff, k))
         else:
             part += diff
             part_n += 1
@@ -47,7 +49,6 @@ def read_profiling(filename):
             # name == m.group(2)
             data[m.group(2)] = m.group(1)
         if cmd_ready: 
-            print(line)
             is_v2e = line.strip('\r\n') == ""
             cmd_ready = False
         if line.startswith('Sorted executed basic blocks'):
@@ -68,7 +69,6 @@ def main():
 
     v2e_map, yes_v2e = read_profiling(args.value_to_edge)
     e_map, no_v2e = read_profiling(args.edge)
-    print(yes_v2e, no_v2e)
     if e_map == None or v2e_map == None:
         perror('file format unmatch, please use ``llvm-prof -list-all`` to generate output')
     if yes_v2e == no_v2e:

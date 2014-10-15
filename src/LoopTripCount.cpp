@@ -62,12 +62,12 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 	BasicBlock* startBB = NULL;//which basicblock stores start value
 	int OneStep = 0;// the extra add or plus step for calc
 
-   Assert(LoopPred, "Require Loop has a Pred");
+   AssertThrow(LoopPred, not_found("Require Loop has a Pred"));
 	DEBUG(errs()<<"loop  depth:"<<L->getLoopDepth()<<"\n");
 	/** whats difference on use of predecessor and preheader??*/
 	//RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPreheader());
 	//assert(self->getLoopLatch() && self->getLoopPreheader() && "need loop simplify form" );
-	ret_null_fail(L->getLoopLatch(), "need loop simplify form");
+	AssertThrow(L->getLoopLatch(), not_found("need loop simplify form"));
 
 	BasicBlock* TE = NULL;//True Exit
 	SmallVector<BasicBlock*,4> Exits;
@@ -89,7 +89,7 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 	}
 
 	//process true exit
-	ret_null_fail(TE, "need have a true exit");
+	AssertThrow(TE, not_found("need have a true exit"));
 
 	Instruction* IndOrNext = NULL;
 	Value* END = NULL;
@@ -97,17 +97,17 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
    //跳转指令br bool a1,a2;condition<-->bool
 	if(isa<BranchInst>(TE->getTerminator())){
 		const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
-		Assert(EBR->isConditional(), "end branch is not conditional");
+		AssertThrow(EBR->isConditional(), not_found("end branch is not conditional"));
 		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
 		if(EC->getPredicate() == EC->ICMP_SGT){
-         Assert(!L->contains(EBR->getSuccessor(0)), *EBR<<":abnormal exit with great than");//终止块的终止指令---->跳出执行循环外的指令
+         AssertThrow(!L->contains(EBR->getSuccessor(0)), not_found(dbg()<<"abnormal exit with great than:"<<*EBR));//终止块的终止指令---->跳出执行循环外的指令
          OneStep += 1;
-      } else if(EC->getPredicate() == EC->ICMP_EQ)
-         Assert(!L->contains(EBR->getSuccessor(0)), *EBR<<":abnormal exit with great than");
-      else if(EC->getPredicate() == EC->ICMP_SLT) {
-         ret_null_fail(!L->contains(EBR->getSuccessor(1)), *EBR<<":abnormal exit with less than");
+      } else if(EC->getPredicate() == EC->ICMP_EQ) {
+         AssertThrow(!L->contains(EBR->getSuccessor(0)), not_found(dbg()<<"abnormal exit with great than:"<<*EBR));
+      } else if(EC->getPredicate() == EC->ICMP_SLT) {
+         AssertThrow(!L->contains(EBR->getSuccessor(1)), not_found(dbg()<<"abnormal exit with less than:"<<*EBR));
       } else {
-         ret_null_fail(0, *EC<<" unknow combination of end condition");
+         AssertThrow(0, not_found(dbg()<<"unknow combination of end condition:"<<*EC));
       }
 		IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));//去掉类型转化
 		END = EC->getOperand(1);
@@ -117,17 +117,16 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 		IndOrNext = dyn_cast<Instruction>(castoff(ESW->getCondition()));
 		for(auto I = ESW->case_begin(),E = ESW->case_end();I!=E;++I){
 			if(!L->contains(I.getCaseSuccessor())){
-				ret_null_fail(!END,"");
-				assert(!END && "shouldn't have two ends");
+				AssertThrow(!END, not_found("shouldn't have two ends"));
 				END = I.getCaseValue();
 			}
 		}
 		DEBUG(errs()<<"end   value:"<<*ESW<<"\n");
 	}else{
-		assert(0 && "unknow terminator type");
+		AssertThrow(0 ,not_found("unknow terminator type"));
 	}
 
-	ret_null_fail(L->isLoopInvariant(END), "end value should be loop invariant");//至此得END值
+	AssertThrow(L->isLoopInvariant(END), not_found("end value should be loop invariant"));//至此得END值
 
 	Value* start = NULL;
 	Value* ind = NULL;
@@ -158,7 +157,7 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 			}
 
 		}
-		Assert(SICount[0]==1 && SICount[1]==1, "");
+		AssertThrow(SICount[0]==1 && SICount[1]==1, not_found("should only have 1 store in/before loop"));
 		ind = IndOrNext;
 	}else{
 		if(isa<PHINode>(IndOrNext)){
@@ -171,7 +170,7 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 			next = IndOrNext;
 			addfirst = true;
 		}else{
-			Assert(0 ,"unknow how to analysis");
+			AssertThrow(0 , not_found("unknow how to analysis"));
 		}
 
 		for(auto I = H->begin();isa<PHINode>(I);++I){
@@ -189,7 +188,7 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 	}
 
 
-	Assert(start ,"couldn't find a start value");
+	AssertThrow(start , not_found("couldn't find a start value"));
 	//process complex loops later
 	//DEBUG(if(L->getLoopDepth()>1 || !L->getSubLoops().empty()) return NULL);
 	DEBUG(errs()<<"start value:"<<*start<<"\n");
@@ -200,12 +199,12 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 	//process non add later
 	unsigned next_phi_idx = 0;
 	ConstantInt* Step = NULL,*PrevStep = NULL;/*only used if next is phi node*/
-   ret_null_fail(next, "");
+   AssertThrow(next, not_found("Next not found"));
 	PHINode* next_phi = dyn_cast<PHINode>(next);
 	do{
 		if(next_phi) {
 			next = dyn_cast<Instruction>(next_phi->getIncomingValue(next_phi_idx));
-			ret_null_fail(next, "");
+			AssertThrow(next, not_found("Next not found"));
 			DEBUG(errs()<<"next phi "<<next_phi_idx<<":"<<*next<<"\n");
 			if(Step&&PrevStep){
 				Assert(Step->getSExtValue() == PrevStep->getSExtValue(),"");
@@ -256,19 +255,22 @@ bool LoopTripCount::runOnFunction(Function &F)
    LoopMap.clear();
    CycleMap.clear();
 
+   unfound<<"Function:"<<F.getName()<<"\n";
+
    for(Loop* TopL : LI){
       for(auto LIte = df_begin(TopL), E = df_end(TopL); LIte!=E; ++LIte){
          Loop* L = *LIte;
-         Value* CC = getOrInsertTripCount(L);
+         Value* CC = NULL;
+         try{
+             CC = getOrInsertTripCount(L);
+         }catch(NotFound& E){
+            ++NumUnfoundCycle;
+            unfound<<"  "<<E.get_line()<<":  "<<E.what()<<"\n";
+            unfound<<"\t"<<*L<<"\n";
+         }
          LoopMap[L] = CycleMap.size(); // write to cache
          CycleMap.push_back(CC);
          AssertRuntime(LoopMap[L] < CycleMap.size() && " should insert indeed");
-
-         if(CC != NULL){
-            ++NumUnfoundCycle;
-            unfound<<"Function:"<<F.getName()<<"\n";
-            unfound<<"\t"<<*L<<"\n";
-         }
       }
    }
 

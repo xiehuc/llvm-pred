@@ -11,6 +11,18 @@
 
 namespace lle
 {
+   class NotFound: public std::runtime_error
+   {
+      size_t line_no;
+      public:
+      explicit NotFound(size_t src_line, const std::string& what):
+         runtime_error(what), line_no(src_line) {}
+      explicit NotFound(size_t src_line, llvm::raw_ostream& what):
+         runtime_error(static_cast<llvm::raw_string_ostream&>(what).str()), line_no(src_line) {}
+      size_t get_line(){ return line_no;}
+   };
+#define not_found(what) NotFound(__LINE__, what)
+
 	class LoopTripCount:public llvm::FunctionPass
 	{
 		//statistics variable:{

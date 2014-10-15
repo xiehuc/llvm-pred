@@ -38,6 +38,17 @@
    exit(-1);\
 }
 
+class raw_temporary_string_stream: public llvm::raw_string_ostream
+{
+   std::string str;
+   public:
+   raw_temporary_string_stream():raw_string_ostream(str) {}
+};
+
+
+#define AssertThrow(expr, except) {if(!(expr)) throw except;}
+#define dbg() (raw_temporary_string_stream()<<"")
+
 #define ret_on_failed(expr,msg,ret) { if(!(expr)){errs()<<"Failed at "<<__LINE__<<":"<<msg<<"\n"; return ret;} }
 #define ret_null_fail(expr,msg) ret_on_failed(expr,msg,NULL);
 
