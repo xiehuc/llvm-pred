@@ -7,6 +7,8 @@
 #define EXEC_TIME 2
 #cmakedefine PRED_TYPE @PRED_TYPE@
 #cmakedefine NO_DEBUG
+#cmakedefine USING_TSC
+#cmakedefine USING_CLOCK_GETTIME
 
 //hide clobber result when doing memory analysis dependencies
 #define HIDE_CLOBBER 1

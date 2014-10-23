@@ -13,6 +13,7 @@ endif()
 set(LLVM_RECOMMAND_VERSION "" CACHE STRING "Switch the llvm version")
 set_property(CACHE LLVM_RECOMMAND_VERSION PROPERTY STRINGS "" "3.4")
 find_package(LLVM)
+find_package(TSC)
 
 option(DYNAMIC_LINK "Link Dynamic LLVM Libraries" ${LLVM_DYNAMIC_LIBRARY_FOUND})
 option(WITH_DEBUG "Enable Extra Debug Output" OFF)
