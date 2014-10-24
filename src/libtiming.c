@@ -12,14 +12,48 @@
  */
 
 #ifdef USING_TSC
-static uint64_t timing_res() 
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+/* We use 64bit values for the times.  */
+typedef unsigned long long int hp_timing_t;
+
+/* The "=A" constraint used in 32-bit mode does not work in 64-bit mode.  */
+#define HP_TIMING_NOW(Var) \
+  ({ unsigned int _hi, _lo; \
+     asm volatile ("rdtsc" : "=a" (_lo), "=d" (_hi)); \
+     (Var) = ((unsigned long long int) _hi << 32) | _lo; })
+
+uint64_t timing_res() 
 {
+   const char* file = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq";
+   FILE* f = fopen(file,"r");
+   if(f==NULL){
+      perror("Unable Find CPU freq sys file:");
+      exit(errno);
+   }
+   unsigned long freq = 0;
+   fscanf(f, "%lu", &freq);
+   if(freq==0){
+      perror("Unable Read CPU freq:");
+      exit(errno);
+   }
+   return 1*1000*1000*1000 /*nanosecond*/ / freq;
 }
-static uint64_t timing_err()
+uint64_t timing_err()
 {
+   hp_timing_t a = 0,b = 0;
+   HP_TIMING_NOW(a);
+   HP_TIMING_NOW(b);
+   return b-a;
 }
-static uint64_t timing()
+uint64_t timing()
 {
+   hp_timing_t t;
+   HP_TIMING_NOW(t);
+   return t;
 }
 #endif
 
