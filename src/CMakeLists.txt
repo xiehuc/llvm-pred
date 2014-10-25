@@ -29,7 +29,9 @@ add_library(LLVMPred SHARED
    ValueToEdge.cpp
    SlashShrink.cpp
    PerformPred.cpp
+   InstTiming.cpp
    Resolver.cpp
+   LockInst.cpp
    GVInfo.cpp
    Print.cpp
 	util.cpp
