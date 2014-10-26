@@ -10,15 +10,14 @@ if(NOT CMAKE_BUILD_TYPE)
    set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-set(LLVM_RECOMMAND_VERSION "" CACHE STRING "Switch the llvm version")
-set_property(CACHE LLVM_RECOMMAND_VERSION PROPERTY STRINGS "" "3.4")
 find_package(LLVM)
-find_package(TSC)
 
 option(DYNAMIC_LINK "Link Dynamic LLVM Libraries" ${LLVM_DYNAMIC_LIBRARY_FOUND})
 option(WITH_DEBUG "Enable Extra Debug Output" OFF)
 set(PRED_TYPE "BLOCK_FREQ" CACHE STRING "Select What to Predicate for Performance Model")
 set_property(CACHE PRED_TYPE PROPERTY STRINGS "BLOCK_FREQ" "EXEC_TIME")
+set(TIMING "TSC" CACHE STRINGS "Select timing implement")
+set_property(CACHE TIMING PROPERTY STRINGS "TSC" "CLOCK_GETTIME")
 
 find_package(PkgConfig)
 pkg_check_modules(LLVM_PROF llvm-prof REQUIRED)

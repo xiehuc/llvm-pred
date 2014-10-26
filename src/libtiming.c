@@ -11,7 +11,7 @@
  * return a timing, mul timing_res to calc real time
  */
 
-#ifdef USING_TSC
+#ifdef TIMING_TSC
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -57,7 +57,7 @@ uint64_t timing()
 }
 #endif
 
-#ifdef USING_CLOCK_GETTIME
+#ifdef TIMING_CLOCK_GETTIME
 static uint64_t timing_res() 
 {
 }

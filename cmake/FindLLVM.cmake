@@ -13,21 +13,27 @@
 # LLVM_DYNAMIC_LIBRARY       - A single dynamic llvm shared library
 # LLVM_DYNAMIC_LIBRARY_FOUND - Whether found the dynamic llvm shared library
 # 
-# Using Following macros to set library:
+# Using Following macros to set static library:
 # llvm_map_components_to_libraries(OUTPUT_VARIABLE ${llvm components})
 # 
-# example:
-# 
-# include_directories(${LLVM_INCLUDE_DIRS})
-# link_directories(${LLVM_LIBRARY_DIRS})
-# 
-# llvm_map_components_to_libraries(LLVM_IRREADER_LIRARY irreader)
-# 
-# add_executable(irread 1.irread.cpp)
-# target_link_libraries(target
-#     ${LLVM_LIBRARIES}
-#     ${LLVM_IRREADER_LIRARY}
-#     )
+# tutorial:
+#   1.  select default LLVM version:
+#       cmake .. -DLLVM_RECOMMEND_VERSION="3.5"
+#   2.  set include dir and link dir:
+#       include_directories(${LLVM_INCLUDE_DIRS})
+#       link_directories(${LLVM_LIBRARY_DIRS})
+#   3.a link static libraries:
+#       llvm_map_components_to_libraries(LLVM_IRREADER_LIRARY irreader)
+#       target_link_libraries(target
+#           ${LLVM_LIBRARIES}
+#           ${LLVM_IRREADER_LIRARY}
+#           )
+#   3.b link a dynamic library:
+#       target_link_libraries(target ${LLVM_DYNAMIC_LIBRARY}) 
+#
+# 14-10-26: 
+#    LLVM_RECOMMAND_VERSION --> LLVM_RECOMMEND_VERSION
+#    update tutorial
 # 
 # version: 0.9.1
 #    add LLVM_FLAGS_NDEBUG means llvm build with NDEBUG
@@ -36,19 +42,19 @@
 #    remove LLVM_{C/CPP/CXX}_FLAGS which import -DNDEBUG
 #
 #
-if(NOT DEFINED LLVM_RECOMMAND_VERSION)
-    SET(LLVM_RECOMMAND_VERSION 3.4)
+if(NOT DEFINED LLVM_RECOMMEND_VERSION)
+   set(LLVM_RECOMMEND_VERSION "" CACHE STRING "Switch the llvm version")
+   set_property(CACHE LLVM_RECOMMEND_VERSION PROPERTY STRINGS "" "3.4" "3.5")
 endif()
 
 
-#if(NOT(DEFINED LLVM_ROOT) OR NOT("${LLVM_VERSION_LAST}" VERSION_EQUAL "${LLVM_RECOMMAND_VERSION}"))
 if(NOT(DEFINED LLVM_ROOT) )
-	if(NOT "${LLVM_VERSION}" EQUAL "{LLVM_RECOMMAND_VERSION}")
+	if(NOT "${LLVM_VERSION}" EQUAL "{LLVM_RECOMMEND_VERSION}")
 		unset(LLVM_CONFIG_EXE CACHE)
 		unset(LLVM_DYNAMIC_LIBRARY CACHE)
 	endif()
 	# find llvm-config. perfers to the one with version suffix, Ex:llvm-config-3.2
-	find_program(LLVM_CONFIG_EXE NAMES "llvm-config-${LLVM_RECOMMAND_VERSION}" "llvm-config")
+	find_program(LLVM_CONFIG_EXE NAMES "llvm-config-${LLVM_RECOMMEND_VERSION}" "llvm-config")
 
 	if(NOT LLVM_CONFIG_EXE)
 		set(LLVM_FOUND False)

@@ -6,9 +6,10 @@
 #define BLOCK_FREQ 1
 #define EXEC_TIME 2
 #cmakedefine PRED_TYPE @PRED_TYPE@
+#ifndef NO_DEBUG
 #cmakedefine NO_DEBUG
-#cmakedefine USING_TSC
-#cmakedefine USING_CLOCK_GETTIME
+#endif
+#define TIMING_@TIMING@
 
 //hide clobber result when doing memory analysis dependencies
 #define HIDE_CLOBBER 1
