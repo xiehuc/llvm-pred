@@ -31,9 +31,9 @@
 #define Assert(expr, value) assert( (expr) || (errs()<<"\n>>>"<<value<<"<<<\n",0) )
 
 // a assert which always need check
-#define AssertRuntime(expr) if( !(expr) ){ \
+#define AssertRuntime(expr, msg) if( !(expr) ){ \
    errs()<<"Assert Failed:"<<__FILE__<<":"<<__LINE__<<"\n"; \
-   errs()<<#expr<<"\n";\
+   errs()<<msg<<"\n";\
    assert(#expr);\
    exit(-1);\
 }

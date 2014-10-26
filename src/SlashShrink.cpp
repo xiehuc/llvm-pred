@@ -88,7 +88,7 @@ SlashShrink::SlashShrink():FunctionPass(ID)
    }
 
    ShrinkLevel = atoi(getenv("SHRINK_LEVEL")?:"1");
-   AssertRuntime(ShrinkLevel>=0 && ShrinkLevel <=3);
+   AssertRuntime(ShrinkLevel>=0 && ShrinkLevel <=3, "");
 
 }
 

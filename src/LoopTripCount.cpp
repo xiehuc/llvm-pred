@@ -234,7 +234,7 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
       //Because Step is a Constant, so it casted is constant
 		Step = dyn_cast<ConstantInt>(Builder.CreateCast(CastInst::getCastOpcode(Step, false,
 					END->getType(), false),Step,END->getType()));
-      AssertRuntime(Step);
+      AssertRuntime(Step, "");
    }
 	if(Step->isMinusOne())
 		RES = Builder.CreateSub(start,END);
@@ -272,7 +272,7 @@ bool LoopTripCount::runOnFunction(Function &F)
          }
          LoopMap[L] = CycleMap.size(); // write to cache
          CycleMap.push_back(CC);
-         AssertRuntime(LoopMap[L] < CycleMap.size() && " should insert indeed");
+         AssertRuntime(LoopMap[L] < CycleMap.size() ," should insert indeed");
       }
    }
 

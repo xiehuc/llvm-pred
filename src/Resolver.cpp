@@ -443,7 +443,7 @@ recursive:
                   partial.insert(make_pair(res->get(),res));
                   break;
                }else
-                  AssertRuntime(0);
+                  AssertRuntime(0, "");
             }
          }
       }else

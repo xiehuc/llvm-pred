@@ -210,7 +210,7 @@ bool PerformPred::runOnFunction(Function &F)
       if(LoopTC == NULL) continue;
       // process all loops
       if(Instruction* LoopTCI = dyn_cast<Instruction>(FreqExpr.second)){
-         AssertRuntime(LoopTCI->getParent()->getParent()==&F);
+         AssertRuntime(LoopTCI->getParent()->getParent()==&F, "");
          Instruction* InsertPos = promote(LoopTCI)->getTerminator();
          // promote insert point
          Builder.SetInsertPoint(InsertPos);

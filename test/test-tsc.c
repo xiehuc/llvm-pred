@@ -1,13 +1,8 @@
 #include "../src/libtiming.c"
 
-#define R5(x) x; x; x; x; x;
-#define R25(x) R5(R5(x));
-/* Repeat Hundred */
-#define RH(x) R25(x); R25(x); R25(x); R25(x);
-/* Repeat Thousand */
-#define RT(x) R5(RH(x)); R5(RH(x));
 #define REPEAT 10
-int inst_template();
+/* use a template to generate instruction */
+int inst_template(const char* templ);
 
 int main()
 {
@@ -16,7 +11,7 @@ int main()
    uint64_t beg, end, sum = 0, ref = 0;
    for(int i=0; i<REPEAT; ++i){
       beg = timing();
-      ref += inst_template();
+      ref += inst_template("fix_add");
       end = timing();
       sum += end-beg-t_err;
    }
