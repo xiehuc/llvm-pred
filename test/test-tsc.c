@@ -15,7 +15,7 @@ int main()
       end = timing();
       sum += end-beg-t_err;
    }
-   sum /= 10;
+   sum /= REPEAT;
    printf("ref:%lu\n", ref);
    printf("%lu\n", sum);
 }
