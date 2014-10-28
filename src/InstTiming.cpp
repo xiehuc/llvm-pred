@@ -5,6 +5,7 @@
 #include <llvm/IR/Instruction.h>
 
 #include <unordered_map>
+#include <random>
 //#include "LockInst.h"
 #include "util.h"
 #include "debug.h"
@@ -87,8 +88,58 @@ static Value* fix_add(Instruction *InsPoint)
    return Lhs;
 }
 
+static Value* float_add(Instruction* InsPoint)
+{
+   Type* FTy = Type::getDoubleTy(InsPoint->getContext());
+   Value* One = ConstantFP::get(FTy, 1.0L);
+   Value* Lhs = One;
+   for(int i=0;i<100;++i){
+      Lhs = BinaryOperator::CreateFAdd(Lhs, One, "", InsPoint);
+      //Lhs = L.lock_inst(cast<Instruction>(Lhs));
+   }
+   return CastInst::Create(CastInst::FPToSI, Lhs,
+         Type::getInt32Ty(InsPoint->getContext()), "", InsPoint);
+}
+
+static Value* mix_add(Instruction* InsPoint)
+{
+   Type* FTy = Type::getDoubleTy(InsPoint->getContext());
+   Type* I32Ty = Type::getInt32Ty(InsPoint->getContext());
+   Value* F_One = ConstantFP::get(FTy, 1.0L);
+   Value* I_One = ConstantInt::get(I32Ty, 1);
+   Value* F_Lhs = F_One, *I_Lhs = I_One;
+   for(int i=0;i<100;++i){
+      I_Lhs = BinaryOperator::CreateAdd(I_Lhs, I_One, "", InsPoint);
+      F_Lhs = BinaryOperator::CreateFAdd(F_Lhs, F_One, "", InsPoint);
+   }
+   Value* I_Rhs = CastInst::Create(CastInst::FPToSI, F_Lhs, I32Ty, "", InsPoint);
+   return BinaryOperator::CreateAdd(I_Lhs, I_Rhs, "", InsPoint);
+}
+
+static Value* rand_add(Instruction* InsPoint)
+{
+   Type* FTy = Type::getDoubleTy(InsPoint->getContext());
+   Type* I32Ty = Type::getInt32Ty(InsPoint->getContext());
+   Value* F_One = ConstantFP::get(FTy, 1.0L);
+   Value* I_One = ConstantInt::get(I32Ty, 1);
+   Value* F_Lhs = F_One, *I_Lhs = I_One;
+   std::random_device rd;
+   std::mt19937 gen(rd());
+   std::bernoulli_distribution d(0.5);
+   for(int i=0;i<100;++i){
+      if(d(gen))
+         I_Lhs = BinaryOperator::CreateAdd(I_Lhs, I_One, "", InsPoint);
+      else
+         F_Lhs = BinaryOperator::CreateFAdd(F_Lhs, F_One, "", InsPoint);
+   }
+   Value* I_Rhs = CastInst::Create(CastInst::FPToSI, F_Lhs, I32Ty, "", InsPoint);
+   return BinaryOperator::CreateAdd(I_Lhs, I_Rhs, "", InsPoint);
+}
 
 std::unordered_map<std::string, lle::InstTiming::TemplateFunc> 
 lle::InstTiming::ImplMap = {
-   {"fix_add", fix_add},
+   {"fix_add",   fix_add}, 
+   {"float_add", float_add},
+   {"mix_add",   mix_add},
+   {"rand_add",  rand_add}
 };

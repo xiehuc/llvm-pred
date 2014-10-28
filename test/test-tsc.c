@@ -21,5 +21,7 @@ int main()
    }
    //sum /= 10.0;
    //printf("ref:%lu\n", ref);
+   sum /= REPEAT;
+   printf("ref:%lu\n", ref);
    printf("%lu\n", sum);
 }
