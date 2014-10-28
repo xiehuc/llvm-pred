@@ -87,6 +87,7 @@ static Value* fix_add(Instruction *InsPoint)
    return Lhs;
 }
 
+
 std::unordered_map<std::string, lle::InstTiming::TemplateFunc> 
 lle::InstTiming::ImplMap = {
    {"fix_add", fix_add},

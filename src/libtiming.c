@@ -59,6 +59,12 @@ uint64_t timing()
 #endif
 
 #ifdef TIMING_CLOCK_GETTIME
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <time.h>
+
 static uint64_t timing_res() 
 {
    return 1;
