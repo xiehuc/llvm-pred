@@ -74,6 +74,8 @@ Value* lle::InstTiming::implyTemplate(CallInst *Template) const
    return Found->second(Template);
 }
 
+#define REPEAT 10000
+
 static Value* fix_add(Instruction *InsPoint)
 {
    //Lock& L = getAnalysis<Lock>();
@@ -81,7 +83,7 @@ static Value* fix_add(Instruction *InsPoint)
    Type* I32Ty = Type::getInt32Ty(InsPoint->getContext());
    Value* One = ConstantInt::get(I32Ty, 1);
    Value* Lhs = One;
-   for(int i=0;i<100;++i){
+   for(int i=0;i<REPEAT;++i){
       Lhs = BinaryOperator::CreateAdd(Lhs, One, "", InsPoint);
       //Lhs = L.lock_inst(cast<Instruction>(Lhs));
    }
@@ -93,7 +95,7 @@ static Value* float_add(Instruction* InsPoint)
    Type* FTy = Type::getDoubleTy(InsPoint->getContext());
    Value* One = ConstantFP::get(FTy, 1.0L);
    Value* Lhs = One;
-   for(int i=0;i<100;++i){
+   for(int i=0;i<REPEAT;++i){
       Lhs = BinaryOperator::CreateFAdd(Lhs, One, "", InsPoint);
       //Lhs = L.lock_inst(cast<Instruction>(Lhs));
    }
@@ -108,7 +110,7 @@ static Value* mix_add(Instruction* InsPoint)
    Value* F_One = ConstantFP::get(FTy, 1.0L);
    Value* I_One = ConstantInt::get(I32Ty, 1);
    Value* F_Lhs = F_One, *I_Lhs = I_One;
-   for(int i=0;i<100;++i){
+   for(int i=0;i<REPEAT;++i){
       I_Lhs = BinaryOperator::CreateAdd(I_Lhs, I_One, "", InsPoint);
       F_Lhs = BinaryOperator::CreateFAdd(F_Lhs, F_One, "", InsPoint);
    }
@@ -126,7 +128,7 @@ static Value* rand_add(Instruction* InsPoint)
    std::random_device rd;
    std::mt19937 gen(rd());
    std::bernoulli_distribution d(0.5);
-   for(int i=0;i<100;++i){
+   for(int i=0;i<REPEAT;++i){
       if(d(gen))
          I_Lhs = BinaryOperator::CreateAdd(I_Lhs, I_One, "", InsPoint);
       else

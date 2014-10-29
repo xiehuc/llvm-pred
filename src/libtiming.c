@@ -65,21 +65,28 @@ uint64_t timing()
 #include <stdint.h>
 #include <time.h>
 
-static uint64_t timing_res() 
+#define CLK_ID CLOCK_PROCESS_CPUTIME_ID
+
+uint64_t timing_res() 
 {
    return 1;
 }
-static uint64_t timing_err()
+uint64_t timing_err()
 {
-   struct timespec a, b;
-   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &a);
-   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &b);
-   return (uint64_t)(b.tv_nsec-a.tv_nsec);
+   struct timespec a = {0}, b = {0};
+   long sum = 0;
+   for(int i=0;i<100;++i){
+      clock_gettime(CLK_ID, &a);
+      clock_gettime(CLK_ID, &b);
+      sum += (b.tv_sec - a.tv_sec)*10E9;
+      sum += b.tv_nsec - a.tv_nsec;
+   }
+   return sum /=100;
 }
-static uint64_t timing()
+uint64_t timing()
 {
-   struct timespec t;
-   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t);
-   return (uint64_t)t.tv_nsec;
+   struct timespec t = {0};
+   clock_gettime(CLK_ID, &t);
+   return t.tv_sec*10E9+t.tv_nsec;
 }
 #endif
