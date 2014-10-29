@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <time.h>
 
 /* We use 64bit values for the times.  */
 typedef unsigned long long int hp_timing_t;
@@ -58,13 +59,34 @@ uint64_t timing()
 #endif
 
 #ifdef TIMING_CLOCK_GETTIME
-static uint64_t timing_res() 
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <time.h>
+
+#define CLK_ID CLOCK_PROCESS_CPUTIME_ID
+
+uint64_t timing_res() 
 {
+   return 1;
 }
-static uint64_t timing_err()
+uint64_t timing_err()
 {
+   struct timespec a = {0}, b = {0};
+   long sum = 0;
+   for(int i=0;i<100;++i){
+      clock_gettime(CLK_ID, &a);
+      clock_gettime(CLK_ID, &b);
+      sum += (b.tv_sec - a.tv_sec)*10E9;
+      sum += b.tv_nsec - a.tv_nsec;
+   }
+   return sum /=100;
 }
-static uint64_t timing()
+uint64_t timing()
 {
+   struct timespec t = {0};
+   clock_gettime(CLK_ID, &t);
+   return t.tv_sec*10E9+t.tv_nsec;
 }
 #endif
