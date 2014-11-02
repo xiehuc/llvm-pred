@@ -1,6 +1,6 @@
 #include "../src/libtiming.c"
 
-#define REPEAT 10
+#define REPEAT 100
 /* use a template to generate instruction */
 int inst_template(const char* templ);
 
@@ -16,6 +16,7 @@ int main()
       sum += end-beg-t_err;
    }
    sum /= REPEAT;
+   ref /= REPEAT;
    printf("float inst T:%lu, ref:%d\n", sum, ref);
    return 0;
 }

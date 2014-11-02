@@ -8,7 +8,6 @@ int main()
 {
    uint64_t t_res = timing_res();
    uint64_t t_err = timing_err();
-   //uint64_t beg, end, sum = 0, ref = 0;
    unsigned long beg = 0, end = 0, sum = 0, ref = 0;
    for(int i=0; i<REPEAT; ++i){
       beg = timing();
@@ -17,6 +16,7 @@ int main()
       sum += end-beg-t_err;
    }
    sum /= REPEAT;
+   ref /= REPEAT;
    printf("ref:%lu\n", ref);
    printf("%lu\n", sum);
 }
