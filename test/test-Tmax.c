@@ -20,6 +20,7 @@ void test_order()
       sum += end-beg-t_err;
    }
    sum /= REPEAT;
+   ref /= REPEAT;
    printf("order inst T:%lu, ref:%d\n", sum, ref);
 }
 
@@ -35,6 +36,7 @@ void test_mix()
       sum += end-beg-t_err;
    }
    sum /= REPEAT;
+   ref /= REPEAT;
    printf("mix inst T:%lu, ref:%d\n", sum, ref);
 }
 

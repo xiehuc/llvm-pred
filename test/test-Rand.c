@@ -15,5 +15,6 @@ int main()
       sum += end - beg - t_err;
    }
    sum /= REPEAT;
+   ref /= ref;
    printf("mix inst T:%lu, ref:%d\n", sum, ref);
 }
