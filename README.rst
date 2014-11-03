@@ -31,6 +31,5 @@ performance analysis based dynamic information
 
 1. insert edge profiling into bitcode.
 2. compile program and run.
-3. output the text format profiling log using ``llvm-prof``
-4. merge multi process's log into one. using ``edge-merge``
-5. curfit ??? ``curve-fit``
+3. merge multi process's log into one: ``llvm-prof -merge -algo=avg output.out input.out*``
+4. curfit ??? ``curve-fit``

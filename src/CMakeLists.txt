@@ -43,10 +43,6 @@ target_link_libraries(LLVMPred
 	${LLVM_PROF_LIBRARIES}
 	)
 
-# mege edge profiling text out
-add_executable(edge-merge
-	edge-merge.cpp
-	)
 # count for instr type
 add_executable(inst-count
    GetOpNum.cpp
