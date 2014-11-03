@@ -7,11 +7,32 @@
 #include <gsl/gsl_multifit_nlin.h>
 #include "get_data.h"
 
+#include <llvm/Support/CommandLine.h>
+
 #define X_NUM 6   //this should not be set,it should have to be dynamaticaly decided
 #define FUNC_NUM 31
 #define PARA_MAX 10
 #define FIT(i) gsl_vector_get(s->x,i)
 #define ERR(i) sqrt(gsl_matrix_get(covar,i,i))
+
+struct Input{
+   size_t N;
+   std::string File;
+};
+
+namespace llvm{
+   struct InputParser: public cl::basic_parser<Input> {
+      bool parse(cl::Option& O, StringRef ArgName, const std::string& ArgValue, Input& Val) {
+         Val.File.resize(ArgValue.size());
+         if(sscanf(ArgValue.c_str(), "%lu:%s", &Val.N, &Val.File.front()) != 2)
+            return O.error("unexpected format of argument, need 'N:File', example: 24:llvmprof.merged.out");
+         return false;
+      }
+   };
+   cl::list<Input, bool, InputParser> Inputs(cl::Positional, cl::desc("1"), cl::OneOrMore);
+}
+
+using namespace llvm;
 
 struct data
 {
@@ -278,11 +299,10 @@ long double cal_squaresum(gsl_vector *dif,int n, int fordebug);
 
 int main(int argc, char *argv[])
 {
-	if(argc != 2)
-	{
-		cerr << "usage:"<<argv[0]<<" process_num_of_baseline" << endl;
-		return -1;
-	}
+   llvm::cl::ParseCommandLineOptions(argc, argv);
+   for(auto y : Inputs)
+      cout<<y.N<<" "<<y.File<<endl;
+   return -1;
 
    int status;
 	unsigned i, j, p, n, k=0, base_file=atoi(argv[1]), iter=0;
