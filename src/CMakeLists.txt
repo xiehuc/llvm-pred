@@ -57,6 +57,7 @@ add_executable(curve-fit
 target_link_libraries(curve-fit
    ${GSL_LIBRARIES}
    ${LLVM_DYNAMIC_LIBRARY}
+   ${LLVM_PROF_LIBRARIES}
    )
 
 if(LLVM_VERSION VERSION_EQUAL "3.4")

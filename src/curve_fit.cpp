@@ -8,8 +8,10 @@
 #include "get_data.h"
 
 #include <llvm/Support/CommandLine.h>
+#include <ProfileInfoLoader.h>
 
-#define X_NUM 6   //this should not be set,it should have to be dynamaticaly decided
+#include "debug.h"
+
 #define FUNC_NUM 31
 #define PARA_MAX 10
 #define FIT(i) gsl_vector_get(s->x,i)
@@ -48,7 +50,7 @@ struct best_fit
 };
 
 int base_index, x_start=0;
-const unsigned x_data[X_NUM]={24,36,48,96,192,384};
+std::vector<unsigned> x_data;
 const unsigned para_num[]={2,2,2,2,3,3,3,3,3,3,3,3,3,3,2,3,1,4,3,3,3,4,3,4,4,3,4,4,5,5,3};
 
 
@@ -294,46 +296,63 @@ int expb_fdf(const gsl_vector *x,void *data,gsl_vector*f,gsl_matrix *J)
 	return GSL_SUCCESS;
 }
 
-bool lessthan(long double a, long double b);
+inline bool lessthan(long double a, long double b)
+{
+   return a - b < -1e-5;
+}
 long double cal_squaresum(gsl_vector *dif,int n, int fordebug);
 
 int main(int argc, char *argv[])
 {
    llvm::cl::ParseCommandLineOptions(argc, argv);
-   for(auto y : Inputs)
-      cout<<y.N<<" "<<y.File<<endl;
-   return -1;
+   std::vector<std::vector<unsigned> > freq_ave;
+
+   for(auto input : Inputs){
+      ProfileInfoLoader PIL(argv[0], input.File);
+      auto& Counts = PIL.getRawBlockCounts();
+      AssertRuntime(Counts.size() != 0, "Block Counters shouldn't be empty");
+      if(freq_ave.size() == 0){
+         freq_ave.resize(Counts.size());
+         for(auto& v : freq_ave) 
+            v.reserve(Inputs.size());
+      }else
+         Assert(freq_ave.size() == Counts.size(), "Profile data length unmatch");
+
+      for(unsigned i=0;i<Counts.size();++i){
+         freq_ave[i].push_back(Counts[i]);
+      }
+      x_data.push_back(input.N);
+   }
+
+   unsigned X_NUM = Inputs.size();
+   errs()<<freq_ave.size()<<"\n";
 
    int status;
-	unsigned i, j, p, n, k=0, base_file=atoi(argv[1]), iter=0;
+	unsigned i, j, p, n, k=0, iter=0;
 	double para_init[PARA_MAX] = {1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0};
 	MType freq_ave_map;
-	vector<long double> *freq_vec;
 	const gsl_multifit_fdfsolver_type *T;
-	long double pre_best_squsum,cur_squsum,y_data[X_NUM];
+	long double pre_best_squsum, cur_squsum,* y_data;
+   y_data = new long double[X_NUM];
 	struct data d;
-	struct best_fit params[20];
+	best_fit* params = new best_fit[freq_ave.size()];
 	gsl_multifit_fdfsolver *s;
 	gsl_matrix *covar = NULL;
 	gsl_multifit_function_fdf f;
 	gsl_vector * dif = gsl_vector_alloc(X_NUM);
 
-	retrive_data(argc,argv,base_file,freq_ave_map);
-
-	for(i=0;i<X_NUM;i++) if(x_data[i]==base_file) { base_index = i; break; }
-
-	for(MType::iterator it=freq_ave_map.begin(); it!=freq_ave_map.end(); it++)
+   k = 0;
+	for(auto& freq_vec : freq_ave)
 	{
 		pre_best_squsum = 1.7e+308;
-		freq_vec = it->second;
-		n = freq_vec->size();
+		n = freq_vec.size();
 		x_start = base_index-n+1;
-		for(i=0; i<n; i++) y_data[i] = freq_vec->at(n-i-1);
+      std::copy_n(freq_vec.begin(), freq_vec.size(), y_data);
 		
 		for(j=0; j<FUNC_NUM; j++)
 		{
 			p = para_num[j];
-			if(n<p) {cout << it->first << "\n" << "NO." << j << " is not ok" << endl; continue;}
+			if(n<p) continue;
 			covar = gsl_matrix_alloc(p,p);
 			gsl_vector_view x = gsl_vector_view_array(para_init,p);
 
@@ -364,9 +383,6 @@ int main(int argc, char *argv[])
 			gsl_multifit_covar(s->J,0.0,covar);
 			for(i=0; i<n; i++) gsl_vector_set(dif,i,gsl_vector_get(s->f,i)-y_data[i]);
 			cur_squsum = cal_squaresum(dif,n,j);//gsl_blas_dnrm2(dif);
-			//cout << "$$$" << it->first << endl;
-			//cout << "NO." << j << endl;
-			//cout << "the cur_squsum is " << cur_squsum << endl;
 			if(lessthan(cur_squsum,pre_best_squsum))
 			{
 				params[k].id = j;
@@ -378,17 +394,20 @@ int main(int argc, char *argv[])
 			gsl_multifit_fdfsolver_free(s);
 			gsl_matrix_free(covar);
 		}
-		cout << "$$$" << it->first << endl;
-		cout << "NO." << params[k].id << endl;
+      cerr<<"block."<<k<<"    func:"<<params[k].id<<"    args: ";
 		for(i=0; i<para_num[params[k].id]; i++)
-			cout << "a[" << i << "]:" << params[k].best_par.at(i) << endl;
-		cout << "the least square is #" << pre_best_squsum << endl;
+			cerr << params[k].best_par.at(i)<<' ';
+      cerr<<std::endl;
+		DISABLE(errs()<< "the least square is #" << pre_best_squsum << endl);
 		k++;
 	}
 	gsl_vector_free(dif);
+   delete[] y_data;
+   delete[] params;
 	return 0;
 }
 
+#if 0
 bool lessthan(long double a, long double b)
 {
 	char science_a[20],science_b[20],char_a[8],char_b[8];
@@ -416,6 +435,7 @@ bool lessthan(long double a, long double b)
 	if(frac_a < frac_b) return true;
 	return false;
 }
+#endif
 
 long double cal_squaresum(gsl_vector *dif, int n, int fordebug)
 {
