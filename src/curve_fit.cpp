@@ -59,6 +59,12 @@ struct best_fit
 int base_index, x_start=0;
 std::vector<unsigned> x_data;
 const unsigned para_num[]={2,2,2,2,3,3,3,3,3,3,3,3,3,3,2,3,1,4,3,3,3,4,3,4,4,3,4,4,5,5,3};
+inline double FIT(gsl_vector* v, unsigned id)
+{
+   double ret = gsl_vector_get(v, id);
+   if(ret < DBL_EPSILON && ret > -DBL_EPSILON) return 0.0;
+   return ret;
+}
 
 
 long double cal_Yi(int id,const long double x,long double *a)
@@ -370,7 +376,7 @@ int main(int argc, char *argv[])
 	gsl_multifit_fdfsolver *s;
 	gsl_matrix *covar = NULL;
 	gsl_multifit_function_fdf f;
-	gsl_vector * dif = gsl_vector_alloc(X_NUM);
+	gsl_vector * dif;
 
    k = 0;
 	for(auto& freq_vec : freq_ave)
@@ -417,25 +423,20 @@ int main(int argc, char *argv[])
 			}while(status == GSL_CONTINUE && iter < 500);
 
 			gsl_multifit_covar(s->J,0.0,covar);
-			for(i=0; i<n; i++){
-            /**XXX what is s->f **/
-            gsl_vector_set(dif,i,gsl_vector_get(s->f,i)-y_data[i]);
-         }
-			cur_squsum = cal_squaresum(dif,n,j);//gsl_blas_dnrm2(dif);
-         if(Verbose){
+         //gsl_vector_set(dif,i,gsl_vector_get(s->f,i)-y_data[i]);
+         dif = s->f;//xiehuc: s->f = f(x) - y[i], where y[i] is real data, and f(x) is guess data.
+			cur_squsum = cal_squaresum(dif, n, j);//gsl_blas_dnrm2(dif);
+         if(Verbose) {
             cerr<<"[func."<<j<<"    ";
             print_func(j, s->x->data);
             cerr<<"    squsum:"<<cur_squsum<<"]"<<endl;
          }
-			if(lessthan(cur_squsum,pre_best_squsum))
-			{
-#define FIT(i) gsl_vector_get(s->x,i)
+			if(lessthan(cur_squsum,pre_best_squsum)) {
 				params[k].id = j;
             params[k].best_par.clear();
             for(i=0; i<p; i++)
-               params[k].best_par.push_back(FIT(i));
+               params[k].best_par.push_back(FIT(s->x, i));
             pre_best_squsum = cur_squsum;
-#undef FIT
 			}			
 			gsl_multifit_fdfsolver_free(s);
 			gsl_matrix_free(covar);
@@ -447,7 +448,6 @@ int main(int argc, char *argv[])
 		DISABLE(errs()<< "the least square is #" << pre_best_squsum << endl);
 		k++;
 	}
-	gsl_vector_free(dif);
    delete[] y_data;
    delete[] params;
 	return 0;
