@@ -52,7 +52,8 @@ target_link_libraries(inst-count
    )
 
 add_executable(curve-fit
-   curve_fit.cpp get_data.cpp)
+   curve_fit.cpp
+	)
 
 target_link_libraries(curve-fit
    ${GSL_LIBRARIES}

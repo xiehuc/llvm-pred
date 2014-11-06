@@ -5,7 +5,8 @@
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multifit_nlin.h>
-#include "get_data.h"
+#include <iostream>
+#include <iterator>
 
 #include <llvm/Support/CommandLine.h>
 #include <ProfileInfoLoader.h>
@@ -14,7 +15,6 @@
 
 #define FUNC_NUM 31
 #define PARA_MAX 10
-#define FIT(i) gsl_vector_get(s->x,i)
 #define ERR(i) sqrt(gsl_matrix_get(covar,i,i))
 
 struct Input{
@@ -31,10 +31,17 @@ namespace llvm{
          return false;
       }
    };
-   cl::list<Input, bool, InputParser> Inputs(cl::Positional, cl::desc("1"), cl::OneOrMore);
+   cl::opt<bool> Verbose("v", cl::desc("print verbose info to help debug"));
+   cl::list<Input, bool, InputParser> Inputs(cl::Positional, 
+         cl::value_desc("list of input and output files, with format: \
+            N:prof.out read prof.out as X axis is N \
+            -N:prof.out write predicted prof.out as X axis is N"), 
+         cl::desc("<inputs>"),
+         cl::OneOrMore);
 }
 
 using namespace llvm;
+using namespace std;
 
 struct data
 {
@@ -46,7 +53,7 @@ struct data
 struct best_fit
 {
 	int id;
-	vector<long double> best_par;
+   std::vector<long double> best_par;
 };
 
 int base_index, x_start=0;
@@ -90,9 +97,24 @@ long double cal_Yi(int id,const long double x,long double *a)
 		case 28: result = a[0]+a[1]*expl(-x/a[2])+a[3]*expl(-x/a[4]);         break;
 		case 29: result = a[0]+a[1]*(1-expl(-x/a[2]))+a[3]*(1-expl(-x/a[4])); break;
 		case 30: result = a[0]*a[1]*powl(x,1-a[2])/(1+a[1]*powl(x,1-a[2]));   break;
-		default: cerr << "wrong function style" << endl;                      break;
+      default: errs() << "wrong function style\n";                          break;
 	}	
 	return result;
+}
+void print_func(int id, double* para)
+{
+   switch(id){
+      case 0: printf("%lf*x^%lf",          para[0], para[1]); break;
+      case 1: printf("%lf*%lf^x",          para[0], para[1]); break;
+      case 2: printf("%lf*(1-e^{-%lf*x})", para[0], para[1]); break;
+      case 3: printf("1-1/(1+%lf*x)^%lf",  para[0], para[1]); break;
+      case 4: printf("%lf+%lf*x + %lf*x^2", para[0], para[1], para[2]); break;
+      case 5: printf("%lf*e^(%lf*x+%lf)",  para[0], para[1], para[2]); break;
+      case 6: printf("%lf-%lf*%lf^x",      para[0], para[1], para[2]); break;
+      case 7: printf("%lf+%lf*x^%lf",      para[0], para[1], para[2]); break;
+      case 8: printf("%lf+%lf*e^(-%lf*x)", para[0], para[1], para[2]); break;
+      default: break;
+   }
 }
 
 void cal_d(int id,const long double x,long double *a, gsl_matrix *J,int i)
@@ -298,9 +320,19 @@ int expb_fdf(const gsl_vector *x,void *data,gsl_vector*f,gsl_matrix *J)
 
 inline bool lessthan(long double a, long double b)
 {
-   return a - b < -1e-5;
+   return a - b < -LDBL_EPSILON;
 }
-long double cal_squaresum(gsl_vector *dif,int n, int fordebug);
+
+long double cal_squaresum(gsl_vector *dif, int n, int fordebug)
+{
+	int i;
+	long double sum=0, v_i;
+	for(i=0; i<n; i++) {
+		v_i = gsl_vector_get(dif,i);
+		sum += v_i*v_i;
+	}
+	return sqrtl(sum);
+}	
 
 int main(int argc, char *argv[])
 {
@@ -330,7 +362,6 @@ int main(int argc, char *argv[])
    int status;
 	unsigned i, j, p, n, k=0, iter=0;
 	double para_init[PARA_MAX] = {1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0};
-	MType freq_ave_map;
 	const gsl_multifit_fdfsolver_type *T;
 	long double pre_best_squsum, cur_squsum,* y_data;
    y_data = new long double[X_NUM];
@@ -346,8 +377,13 @@ int main(int argc, char *argv[])
 	{
 		pre_best_squsum = 1.7e+308;
 		n = freq_vec.size();
-		x_start = base_index-n+1;
+		//x_start = base_index-n+1;
       std::copy_n(freq_vec.begin(), freq_vec.size(), y_data);
+      if(Verbose){
+         cerr<<"[block."<<k<<"   data:    ";
+         copy(freq_vec.begin(), freq_vec.end(), ostream_iterator<unsigned>(cerr,","));
+         cerr<<"]"<<endl;
+      }
 		
 		for(j=0; j<FUNC_NUM; j++)
 		{
@@ -371,25 +407,35 @@ int main(int argc, char *argv[])
 			s = gsl_multifit_fdfsolver_alloc(T,n,p);
 			gsl_multifit_fdfsolver_set(s,&f,&x.vector);
 			iter = 0; 
-			do
-			{
+
+			do{
 				iter++;
 				status = gsl_multifit_fdfsolver_iterate(s);
 				if(status) break;
 				
 				status = gsl_multifit_test_delta(s->dx,s->x,1e-4,1e-4);
-			}
-			while(status == GSL_CONTINUE && iter < 500);
+			}while(status == GSL_CONTINUE && iter < 500);
+
 			gsl_multifit_covar(s->J,0.0,covar);
-			for(i=0; i<n; i++) gsl_vector_set(dif,i,gsl_vector_get(s->f,i)-y_data[i]);
+			for(i=0; i<n; i++){
+            /**XXX what is s->f **/
+            gsl_vector_set(dif,i,gsl_vector_get(s->f,i)-y_data[i]);
+         }
 			cur_squsum = cal_squaresum(dif,n,j);//gsl_blas_dnrm2(dif);
+         if(Verbose){
+            cerr<<"[func."<<j<<"    ";
+            print_func(j, s->x->data);
+            cerr<<"    squsum:"<<cur_squsum<<"]"<<endl;
+         }
 			if(lessthan(cur_squsum,pre_best_squsum))
 			{
+#define FIT(i) gsl_vector_get(s->x,i)
 				params[k].id = j;
-				params[k].best_par.clear();
-				for(i=0; i<p; i++)
-					params[k].best_par.push_back(FIT(i));
-				 pre_best_squsum = cur_squsum;
+            params[k].best_par.clear();
+            for(i=0; i<p; i++)
+               params[k].best_par.push_back(FIT(i));
+            pre_best_squsum = cur_squsum;
+#undef FIT
 			}			
 			gsl_multifit_fdfsolver_free(s);
 			gsl_matrix_free(covar);
@@ -437,14 +483,3 @@ bool lessthan(long double a, long double b)
 }
 #endif
 
-long double cal_squaresum(gsl_vector *dif, int n, int fordebug)
-{
-	int i;
-	long double num=0, temp;
-	for(i=0; i<n; i++)
-	{
-		temp = gsl_vector_get(dif,i);
-		num = num+temp*temp;
-	}
-	return sqrtl(num);
-}	
