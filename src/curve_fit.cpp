@@ -10,6 +10,7 @@
 
 #include <llvm/Support/CommandLine.h>
 #include <ProfileInfoLoader.h>
+#include <ProfileInfoWriter.h>
 
 #include "debug.h"
 
@@ -20,6 +21,7 @@
 struct Input{
    size_t N;
    std::string File;
+   bool output; // true --- write out predicted result, false --- read as input
 };
 
 namespace llvm{
@@ -27,7 +29,9 @@ namespace llvm{
       bool parse(cl::Option& O, StringRef ArgName, const std::string& ArgValue, Input& Val) {
          Val.File.resize(ArgValue.size());
          if(sscanf(ArgValue.c_str(), "%lu:%s", &Val.N, &Val.File.front()) != 2)
-            return O.error("unexpected format of argument, need 'N:File', example: 24:llvmprof.merged.out");
+            return O.error("unexpected format of argument, need 'N:File', example: 24:merged.out, +96:predicted.out");
+         if(ArgValue.front()=='+')
+            Val.output = true;
          return false;
       }
    };
@@ -35,7 +39,7 @@ namespace llvm{
    cl::list<Input, bool, InputParser> Inputs(cl::Positional, 
          cl::value_desc("list of input and output files, with format: \
             N:prof.out read prof.out as X axis is N \
-            -N:prof.out write predicted prof.out as X axis is N"), 
+            +N:prof.out write predicted prof.out as X axis is N"), 
          cl::desc("<inputs>"),
          cl::OneOrMore);
 }
@@ -346,6 +350,7 @@ int main(int argc, char *argv[])
    std::vector<std::vector<unsigned> > freq_ave;
 
    for(auto input : Inputs){
+      if(input.output) continue;
       ProfileInfoLoader PIL(argv[0], input.File);
       auto& Counts = PIL.getRawBlockCounts();
       AssertRuntime(Counts.size() != 0, "Block Counters shouldn't be empty");
@@ -372,7 +377,7 @@ int main(int argc, char *argv[])
 	long double pre_best_squsum, cur_squsum,* y_data;
    y_data = new long double[X_NUM];
 	struct data d;
-	best_fit* params = new best_fit[freq_ave.size()];
+   std::vector<best_fit> params(freq_ave.size());
 	gsl_multifit_fdfsolver *s;
 	gsl_matrix *covar = NULL;
 	gsl_multifit_function_fdf f;
@@ -441,45 +446,25 @@ int main(int argc, char *argv[])
 			gsl_multifit_fdfsolver_free(s);
 			gsl_matrix_free(covar);
 		}
-      cerr<<"block."<<k<<"    func:"<<params[k].id<<"    args: ";
+      cout<<"block."<<k<<"    func:"<<params[k].id<<"    args: ";
 		for(i=0; i<para_num[params[k].id]; i++)
-			cerr << params[k].best_par.at(i)<<' ';
-      cerr<<std::endl;
-		DISABLE(errs()<< "the least square is #" << pre_best_squsum << endl);
+			cout<< params[k].best_par.at(i)<<' ';
+      cout<<std::endl;
 		k++;
 	}
+
+   for(auto& input : Inputs) {
+      if(!input.output) continue;
+      ProfileInfoWriter PIW(argv[0], input.File);
+      double X = input.N;
+      vector<unsigned> Blocks;
+      Blocks.reserve(params.size());
+      for(auto& fit : params){
+         Blocks.push_back(cal_Yi(fit.id, X, fit.best_par.data()));
+      }
+      PIW.write(BlockInfo, Blocks);
+   }
    delete[] y_data;
-   delete[] params;
 	return 0;
 }
-
-#if 0
-bool lessthan(long double a, long double b)
-{
-	char science_a[20],science_b[20],char_a[8],char_b[8];
-	float frac_a,frac_b;
-	int exp_a,exp_b,i;
-
-	if(!isfinite(a)) return false; 	
-	sprintf(science_a,"%.5Le",a);
-	sprintf(science_b,"%.5Le",b);
-	sscanf(science_a+8,"%d",&exp_a);
-	sscanf(science_b+8,"%d",&exp_b);
-
-	if(exp_a < exp_b) return true;
-	else if(exp_a > exp_b) return false;
-
-	for(i=0; i<7; i++)
-	{
-		char_a[i] = science_a[i];
-		char_b[i] = science_b[i];
-	}
-	char_a[i] = '\0';
-	char_b[i] = '\0';
-	frac_a = atof(char_a);
-	frac_b = atof(char_b);
-	if(frac_a < frac_b) return true;
-	return false;
-}
-#endif
 
