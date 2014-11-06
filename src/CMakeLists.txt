@@ -43,16 +43,8 @@ target_link_libraries(LLVMPred
 	${LLVM_PROF_LIBRARIES}
 	)
 
-# count for instr type
-add_executable(inst-count
-   GetOpNum.cpp
-   )
-target_link_libraries(inst-count
-   ${LLVM_DYNAMIC_LIBRARY}
-   )
-
 add_executable(curve-fit
-   curve_fit.cpp
+   CurveFit.cpp
 	)
 
 target_link_libraries(curve-fit
