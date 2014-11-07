@@ -67,9 +67,8 @@ struct best_fit
    std::vector<long double> best_par;
 };
 
-int base_index, x_start=0;
 std::vector<unsigned> x_data;
-const unsigned para_num[]={2,2,2,2,3,3,3,3,3,3,3,3,3,3,2,3,1,4,3,3,3,4,3,4,4,3,4,4,5,5,3};
+const unsigned para_num[]={2,2,3,2,3,3,2,3,3,3,3,3,3,3,2,3,1,4,3,3,3,4,3,4,4,3,4,4,5,5,3};
 inline double FIT(gsl_vector* v, unsigned id)
 {
    double ret = gsl_vector_get(v, id);
@@ -85,11 +84,11 @@ long double cal_Yi(int id,const long double x,long double *a)
 	{
 		case 0:  result = a[0]*powl(x,a[1]);				                      break;
 		case 1:  result = a[0]*powl(a[1],x);                                  break;
-		case 2:  result = a[0]*(1-expl(-a[1]*x));                             break;
+		case 2:  result = a[0]-a[1]*powl(a[2],x);                             break;
 		case 3:  result = 1-1/powl((1+a[0]*x),a[1]);                          break;
 		case 4:  result = a[0]+a[1]*x+a[2]*powl(x,2);                         break;
 		case 5:  result = a[0]*expl(a[1]*x+a[2]);                             break;	
-		case 6:  result = a[0]-a[1]*powl(a[2],x);                             break;
+		case 6:  result = a[0]*(1-expl(-a[1]*x));                             break;
 		case 7:  result = a[0]+a[1]*powl(x,a[2]);                             break;	
 		case 8:  result = a[0]+a[1]*expl(-a[2]*x);                            break;
 		case 9:  result = a[0]+a[1]*expl(-x/a[2]);                            break;
@@ -123,11 +122,11 @@ void print_func(int id, double* para)
    switch(id){
       case 0: printf("%lf*x^%lf",          para[0], para[1]); break;
       case 1: printf("%lf*%lf^x",          para[0], para[1]); break;
-      case 2: printf("%lf*(1-e^{-%lf*x})", para[0], para[1]); break;
+      case 2: printf("%lf-%lf*%lf^x",      para[0], para[1], para[2]); break;
       case 3: printf("1-1/(1+%lf*x)^%lf",  para[0], para[1]); break;
       case 4: printf("%lf+%lf*x + %lf*x^2", para[0], para[1], para[2]); break;
       case 5: printf("%lf*e^(%lf*x+%lf)",  para[0], para[1], para[2]); break;
-      case 6: printf("%lf-%lf*%lf^x",      para[0], para[1], para[2]); break;
+      case 6: printf("%lf*(1-e^{-%lf*x})", para[0], para[1]); break;
       case 7: printf("%lf+%lf*x^%lf",      para[0], para[1], para[2]); break;
       case 8: printf("%lf+%lf*e^(-%lf*x)", para[0], para[1], para[2]); break;
       default: break;
@@ -147,8 +146,9 @@ void cal_d(int id,const long double x,long double *a, gsl_matrix *J,int i)
 		gsl_matrix_set(J,i,1,a[0]*powl(a[1],-1+x)*x);
 		break;
 	case 2:
-		gsl_matrix_set(J,i,0,1-expl(-a[1]*x));
-		gsl_matrix_set(J,i,1,a[0]*expl(-a[1]*x)*x);
+		gsl_matrix_set(J,i,0,1);
+		gsl_matrix_set(J,i,1,-powl(a[2],x));
+		gsl_matrix_set(J,i,2,-a[1]*powl(a[2],-1+x)*x);
 		break;
 	case 3:
 		gsl_matrix_set(J,i,0,a[1]*x*powl(1+a[0]*x,-1-a[1]));
@@ -165,9 +165,8 @@ void cal_d(int id,const long double x,long double *a, gsl_matrix *J,int i)
 		gsl_matrix_set(J,i,2,a[0]*expl(a[2]+a[1]*x));
 		break;
 	case 6:
-		gsl_matrix_set(J,i,0,1);
-		gsl_matrix_set(J,i,1,-powl(a[2],x));
-		gsl_matrix_set(J,i,2,-a[1]*powl(a[2],-1+x)*x);
+		gsl_matrix_set(J,i,0,1-expl(-a[1]*x));
+		gsl_matrix_set(J,i,1,a[0]*expl(-a[1]*x)*x);
 		break;
 	case 7:
 		gsl_matrix_set(J,i,0,1);
@@ -308,7 +307,7 @@ int expb_f(const gsl_vector *x,void *data,gsl_vector *f)
 
 	for(i=0;i<n;i++)
 	{
-		Yi = cal_Yi(id,x_data[i+x_start],a);
+		Yi = cal_Yi(id,x_data[i],a);
 		gsl_vector_set(f,i,Yi-y[i]);
 	}
 	return GSL_SUCCESS;
@@ -324,7 +323,7 @@ int expb_df(const gsl_vector *x, void *data, gsl_matrix *J)
 		a[i] = gsl_vector_get(x,i);
 
 	for(i=0;i<n;i++)
-		cal_d(id,x_data[i+x_start],a,J,i);
+		cal_d(id,x_data[i],a,J,i);
 	return GSL_SUCCESS;
 }
 
@@ -337,7 +336,7 @@ int expb_fdf(const gsl_vector *x,void *data,gsl_vector*f,gsl_matrix *J)
 
 inline bool lessthan(long double a, long double b)
 {
-   return a - b < -LDBL_EPSILON;
+   return a - b < -DBL_EPSILON;
 }
 
 long double cal_squaresum(gsl_vector *dif, int n, int fordebug)
@@ -426,10 +425,9 @@ int main(int argc, char *argv[])
 	{
 		pre_best_squsum = 1.7e+308;
 		n = freq_vec.size();
-		//x_start = base_index-n+1;
       std::copy_n(freq_vec.begin(), freq_vec.size(), y_data);
       if(Verbose){
-         cerr<<"[block."<<k<<"   data:    ";
+         cerr<<"[block."<<BlockNames[k]<<"   data:    ";
          copy(freq_vec.begin(), freq_vec.end(), ostream_iterator<unsigned>(cerr,","));
          cerr<<"]"<<endl;
       }
