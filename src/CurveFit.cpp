@@ -1,14 +1,20 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <iostream>
+#include <iterator>
+
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_multifit_nlin.h>
-#include <iostream>
-#include <iterator>
 
+#include <llvm/IR/Module.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/Support/CommandLine.h>
+#include <llvm/Bitcode/ReaderWriter.h>
+#include <llvm/Support/MemoryBuffer.h>
+#include <llvm/Support/ManagedStatic.h>
 #include <ProfileInfoLoader.h>
 #include <ProfileInfoWriter.h>
 
@@ -36,6 +42,7 @@ namespace llvm{
       }
    };
    cl::opt<bool> Verbose("v", cl::desc("print verbose info to help debug"));
+   cl::opt<std::string> BitcodeFile(cl::Positional, cl::desc("<bitcode>"));
    cl::list<Input, bool, InputParser> Inputs(cl::Positional, 
          cl::value_desc("list of input and output files, with format: \
             N:prof.out read prof.out as X axis is N \
@@ -348,6 +355,36 @@ int main(int argc, char *argv[])
 {
    llvm::cl::ParseCommandLineOptions(argc, argv);
    std::vector<std::vector<unsigned> > freq_ave;
+   std::vector<std::string> BlockNames;
+
+   // read bitcode;
+   LLVMContext &Context = getGlobalContext();
+   llvm_shutdown_obj Y;  // Call llvm_shutdown() on exit.
+   std::string ErrorMessage;
+   error_code ec;
+   Module *M = 0;
+   auto Buffer = MemoryBuffer::getFileOrSTDIN(BitcodeFile);
+   if (!(ec = Buffer.getError())){
+      auto R = parseBitcodeFile(&**Buffer, Context);
+      if(R.getError()){
+         M = NULL;
+         ErrorMessage = R.getError().message();
+      }else
+         M = R.get();
+   } else
+      ErrorMessage = ec.message();
+   if (M == 0) {
+      errs() << argv[0] << ": " << BitcodeFile << ": "
+         << ErrorMessage << "\n";
+      return 1;
+   }
+
+   // get block names
+   for(auto& Func: *M){
+      for(auto& Block : Func){
+         BlockNames.push_back((Func.getName()+"() - "+Block.getName()).str());
+      }
+   }
 
    for(auto input : Inputs){
       if(input.output) continue;
@@ -366,9 +403,10 @@ int main(int argc, char *argv[])
       }
       x_data.push_back(input.N);
    }
+   AssertRuntime(BlockNames.size() == freq_ave.size(), 
+         "Module length not match, are u use before instrumented module?")
 
    unsigned X_NUM = Inputs.size();
-   errs()<<freq_ave.size()<<"\n";
 
    int status;
 	unsigned i, j, p, n, k=0, iter=0;
@@ -446,10 +484,10 @@ int main(int argc, char *argv[])
 			gsl_multifit_fdfsolver_free(s);
 			gsl_matrix_free(covar);
 		}
-      cout<<"block."<<k<<"    func:"<<params[k].id<<"    args: ";
+      cout<<"func:"<<params[k].id<<"    args: ";
 		for(i=0; i<para_num[params[k].id]; i++)
 			cout<< params[k].best_par.at(i)<<' ';
-      cout<<std::endl;
+      cout<<"    "<<BlockNames[k]<<std::endl;
 		k++;
 	}
 
@@ -465,6 +503,7 @@ int main(int argc, char *argv[])
       PIW.write(BlockInfo, Blocks);
    }
    delete[] y_data;
-	return 0;
+
+   return 0;
 }
 
