@@ -501,7 +501,9 @@ int main(int argc, char *argv[])
       vector<unsigned> Blocks;
       Blocks.reserve(params.size());
       for(auto& fit : params){
-         Blocks.push_back(cal_Yi(fit.id, X, fit.best_par.data()));
+         double y = cal_Yi(fit.id, X, fit.best_par.data());
+         if(y < 0) cerr<<"Warning: "<<input.File<<" would overflow "<<y<<"\n";
+         Blocks.push_back(y);
       }
       PIW.write(BlockInfo, Blocks);
    }
