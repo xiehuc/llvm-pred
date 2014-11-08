@@ -22,6 +22,7 @@
 
 #define FUNC_NUM 31
 #define PARA_MAX 10
+#define EPSILON DBL_EPSILON
 #define ERR(i) sqrt(gsl_matrix_get(covar,i,i))
 
 struct Input{
@@ -336,7 +337,7 @@ int expb_fdf(const gsl_vector *x,void *data,gsl_vector*f,gsl_matrix *J)
 
 inline bool lessthan(long double a, long double b)
 {
-   return a - b < -DBL_EPSILON;
+   return a - b < -EPSILON;
 }
 
 long double cal_squaresum(gsl_vector *dif, int n, int fordebug)
@@ -482,7 +483,7 @@ int main(int argc, char *argv[])
 			gsl_multifit_fdfsolver_free(s);
 			gsl_matrix_free(covar);
 
-         if(pre_best_squsum < DBL_EPSILON)
+         if(pre_best_squsum < EPSILON)
             // we have found best fit, no need calc rest function
             break;
 		}

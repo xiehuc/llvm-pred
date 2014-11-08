@@ -12,10 +12,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       196,          9]
-NotebookDataLength[     41770,       1135]
-NotebookOptionsPosition[     41168,       1113]
-NotebookOutlinePosition[     41501,       1128]
-CellTagsIndexPosition[     41458,       1125]
+NotebookDataLength[     43239,       1158]
+NotebookOptionsPosition[     42635,       1136]
+NotebookOutlinePosition[     42970,       1151]
+CellTagsIndexPosition[     42927,       1148]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -224,38 +224,16 @@ Cell[BoxData[{
     "\"\<Get block names from ProfileLoad or FitLoad\>\""}], ";"}], 
   "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
  RowBox[{
-  RowBox[{
-   RowBox[{"GetAxis", "[", 
-    RowBox[{"P_", ",", "Name_String"}], "]"}], ":=", 
-   RowBox[{"{", 
+  RowBox[{"GetAxis", "[", 
+   RowBox[{"P_", ",", "Name_String"}], "]"}], ":=", 
+  RowBox[{"{", 
+   RowBox[{
+    RowBox[{"P", "[", 
+     RowBox[{"[", "1", "]"}], "]"}], ",", 
     RowBox[{
      RowBox[{"P", "[", 
-      RowBox[{"[", "1", "]"}], "]"}], ",", 
-     RowBox[{
-      RowBox[{"P", "[", 
-       RowBox[{"[", "2", "]"}], "]"}], "[", "Name", "]"}]}], "}"}]}], 
-  "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
- RowBox[{
-  RowBox[{
-   RowBox[{"Draw", "[", 
-    RowBox[{"L_", ",", "Block_String"}], "]"}], ":=", 
-   RowBox[{
-    RowBox[{
-     RowBox[{
-      RowBox[{"GetAxis", "[", 
-       RowBox[{"#", ",", "Block"}], "]"}], "&"}], "/@", "L"}], "//", 
-    "ListLinePlot"}]}], "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
- RowBox[{
-  RowBox[{"count", "=", 
-   RowBox[{"{", 
-    RowBox[{
-    "5", ",", "5", ",", "5", ",", "5", ",", "7", ",", "7", ",", "7", ",", "7",
-      ",", "7", ",", "7", ",", "7", ",", "7", ",", "7", ",", "7", ",", "7", 
-     ",", "7", ",", "7", ",", "7", ",", "7", ",", "6"}], "}"}]}], ";", 
-  RowBox[{
-  "(*", "\:6bcf\:4e2a\:57fa\:672c\:5757\:7684\:5bf9\:5e94\:7684\:51fd\:6570\
-\:5f62\:5f0f\:7684\:53c2\:6570\:4e2a\:6570", "*)"}], 
-  "\[IndentingNewLine]"}]}], "Input",
+      RowBox[{"[", "2", "]"}], "]"}], "[", "Name", "]"}]}], 
+   "}"}]}], "\[IndentingNewLine]"}], "Input",
  InitializationCell->True,
  CellChangeTimes->{
   3.6239326675027456`*^9, {3.6243087410625753`*^9, 3.6243087756534986`*^9}, {
@@ -279,7 +257,8 @@ Cell[BoxData[{
    3.624394459434774*^9, 3.624394493544856*^9}, {3.624394557248137*^9, 
    3.62439457369405*^9}, {3.624394604273929*^9, 3.624394722100935*^9}, {
    3.624394887825842*^9, 3.624394894138626*^9}, {3.624395263434718*^9, 
-   3.6243953393522673`*^9}, {3.624395413753389*^9, 3.624395433893614*^9}}],
+   3.6243953393522673`*^9}, {3.624395413753389*^9, 3.624395433893614*^9}, {
+   3.624399955881402*^9, 3.6243999609711637`*^9}}],
 
 Cell[BoxData[
  RowBox[{
@@ -299,8 +278,8 @@ Cell[BoxData[
     RowBox[{"func", "[", 
      RowBox[{
       RowBox[{"{", 
-       RowBox[{"1.0", ",", "a_", ",", "b_", ",", "c_", ",", "___"}], "}"}], 
-      ",", "x_"}], "]"}], ":=", 
+       RowBox[{"1.0", ",", "a_", ",", "b_", ",", "___"}], "}"}], ",", "x_"}], 
+     "]"}], ":=", 
     RowBox[{"a", "*", 
      SuperscriptBox["b", "x"]}]}], "\n", 
    RowBox[{
@@ -653,7 +632,7 @@ Cell[BoxData[
  CellChangeTimes->{
   3.623932671257128*^9, {3.624313691897634*^9, 3.624313692682499*^9}, {
    3.624318482884309*^9, 3.624318526053092*^9}, {3.6243609031985607`*^9, 
-   3.624360918942155*^9}}],
+   3.624360918942155*^9}, {3.624398569197919*^9, 3.624398569847636*^9}}],
 
 Cell[BoxData[
  RowBox[{
@@ -747,32 +726,43 @@ Cell[BoxData[
    RowBox[{
     RowBox[{"table", "[", 
      RowBox[{
-     "N_", ",", "PALL_List", ",", "Predicted_List", ",", "fit_Association"}], 
+     "N_", ",", "Train_List", ",", "Test_List", ",", "fit_Association"}], 
      "]"}], ":=", 
     RowBox[{"Module", "[", 
      RowBox[{
       RowBox[{"{", 
-       RowBox[{"XY", ",", "y", ",", "PPL"}], "}"}], ",", 
-      "\[IndentingNewLine]", 
+       RowBox[{"PAll$XY", ",", "PAll$Y", ",", "Pred$XY", ",", "Pred$Y"}], 
+       "}"}], ",", "\[IndentingNewLine]", 
       RowBox[{
-       RowBox[{"PPL", "=", 
-        RowBox[{"Length", "[", "Predicted", "]"}]}], ";", 
-       "\[IndentingNewLine]", 
-       RowBox[{"XY", "=", 
+       RowBox[{"PAll$XY", "=", 
         RowBox[{
          RowBox[{
           RowBox[{"GetAxis", "[", 
-           RowBox[{"#", ",", "N"}], "]"}], "&"}], "/@", 
-         RowBox[{"(", 
-          RowBox[{"PAll", "\[Union]", "Predicted"}], ")"}]}]}], ";", 
+           RowBox[{"#", ",", "N"}], "]"}], "&"}], "/@", "Train"}]}], ";", 
        "\[IndentingNewLine]", 
-       RowBox[{"y", "=", 
+       RowBox[{"PAll$Y", "=", 
         RowBox[{
          RowBox[{
           RowBox[{"func", "[", 
            RowBox[{
             RowBox[{"fit", "[", "N", "]"}], ",", "#"}], "]"}], "&"}], "/@", 
-         RowBox[{"XY", "[", 
+         RowBox[{"PAll$XY", "[", 
+          RowBox[{"[", 
+           RowBox[{"All", ",", "1"}], "]"}], "]"}]}]}], ";", 
+       "\[IndentingNewLine]", 
+       RowBox[{"Pred$XY", "=", 
+        RowBox[{
+         RowBox[{
+          RowBox[{"GetAxis", "[", 
+           RowBox[{"#", ",", "N"}], "]"}], "&"}], "/@", "Test"}]}], ";", 
+       "\[IndentingNewLine]", 
+       RowBox[{"Pred$Y", "=", 
+        RowBox[{
+         RowBox[{
+          RowBox[{"func", "[", 
+           RowBox[{
+            RowBox[{"fit", "[", "N", "]"}], ",", "#"}], "]"}], "&"}], "/@", 
+         RowBox[{"Pred$XY", "[", 
           RowBox[{"[", 
            RowBox[{"All", ",", "1"}], "]"}], "]"}]}]}], ";", 
        "\[IndentingNewLine]", 
@@ -786,30 +776,38 @@ Cell[BoxData[
               RowBox[{"ConstantArray", "[", 
                RowBox[{"SpanFromLeft", ",", 
                 RowBox[{
-                 RowBox[{"Length", "[", "PALL", "]"}], "-", "1"}]}], "]"}], 
+                 RowBox[{"Length", "[", "Train", "]"}], "-", "1"}]}], "]"}], 
               ",", "\"\<Prediction Data\>\"", ",", 
               RowBox[{"ConstantArray", "[", 
                RowBox[{"SpanFromLeft", ",", 
-                RowBox[{"PPL", "-", "1"}]}], "]"}]}], "}"}], "]"}], ",", 
-           "\[IndentingNewLine]", 
+                RowBox[{
+                 RowBox[{"Length", "[", "Test", "]"}], "-", "1"}]}], "]"}]}], 
+             "}"}], "]"}], ",", "\[IndentingNewLine]", 
            RowBox[{"Flatten", "[", 
             RowBox[{"{", 
              RowBox[{"\"\<ProcessNum\>\"", ",", 
-              RowBox[{"XY", "[", 
+              RowBox[{"PAll$XY", "[", 
+               RowBox[{"[", 
+                RowBox[{"All", ",", "1"}], "]"}], "]"}], ",", 
+              RowBox[{"Pred$XY", "[", 
                RowBox[{"[", 
                 RowBox[{"All", ",", "1"}], "]"}], "]"}]}], "}"}], "]"}], ",", 
            "\[IndentingNewLine]", 
            RowBox[{"Flatten", "[", 
             RowBox[{"{", 
              RowBox[{"\"\<ActualValue\>\"", ",", 
-              RowBox[{"XY", "[", 
+              RowBox[{"PAll$XY", "[", 
+               RowBox[{"[", 
+                RowBox[{"All", ",", "2"}], "]"}], "]"}], ",", 
+              RowBox[{"Pred$XY", "[", 
                RowBox[{"[", 
                 RowBox[{"All", ",", "2"}], "]"}], "]"}]}], "}"}], "]"}], ",", 
            "\[IndentingNewLine]", 
            RowBox[{"Flatten", "[", 
             RowBox[{"{", 
              RowBox[{"\"\<FuncValue\>\"", ",", 
-              RowBox[{"IntegerPart", "/@", "y"}]}], "}"}], "]"}], ",", 
+              RowBox[{"IntegerPart", "/@", "PAll$Y"}], ",", 
+              RowBox[{"IntegerPart", "/@", "Pred$Y"}]}], "}"}], "]"}], ",", 
            "\[IndentingNewLine]", 
            RowBox[{"Flatten", "[", 
             RowBox[{"{", 
@@ -819,9 +817,18 @@ Cell[BoxData[
                 RowBox[{
                  RowBox[{"{", 
                   RowBox[{
-                   RowBox[{"XY", "[", 
+                   RowBox[{"PAll$XY", "[", 
                     RowBox[{"[", 
-                    RowBox[{"All", ",", "2"}], "]"}], "]"}], ",", "y"}], 
+                    RowBox[{"All", ",", "2"}], "]"}], "]"}], ",", "PAll$Y"}], 
+                  "}"}], "\[Transpose]"}], ")"}]}], ",", 
+              RowBox[{"Rel", "@@@", 
+               RowBox[{"(", 
+                RowBox[{
+                 RowBox[{"{", 
+                  RowBox[{
+                   RowBox[{"Pred$XY", "[", 
+                    RowBox[{"[", 
+                    RowBox[{"All", ",", "2"}], "]"}], "]"}], ",", "Pred$Y"}], 
                   "}"}], "\[Transpose]"}], ")"}]}]}], "}"}], "]"}], ",", 
            "\[IndentingNewLine]", 
            RowBox[{"Flatten", "[", 
@@ -829,15 +836,19 @@ Cell[BoxData[
              RowBox[{"\"\<\!\(\*SuperscriptBox[\(R\), \(2\)]\)\>\"", ",", 
               RowBox[{"Decision", "[", 
                RowBox[{
-                RowBox[{"XY", "[", 
-                 RowBox[{"[", 
-                  RowBox[{"All", ",", "2"}], "]"}], "]"}], ",", "y"}], "]"}], 
-              ",", 
+                RowBox[{
+                 RowBox[{"PAll$XY", "[", 
+                  RowBox[{"[", 
+                   RowBox[{"All", ",", "2"}], "]"}], "]"}], "\[Union]", 
+                 RowBox[{"Pred$XY", "[", 
+                  RowBox[{"[", 
+                   RowBox[{"All", ",", "2"}], "]"}], "]"}]}], ",", 
+                RowBox[{"PAll$Y", "\[Union]", "Pred$Y"}]}], "]"}], ",", 
               RowBox[{"ConstantArray", "[", 
                RowBox[{"SpanFromLeft", ",", 
                 RowBox[{
-                 RowBox[{"Length", "[", "PALL", "]"}], "-", "2"}]}], "]"}]}], 
-             "}"}], "]"}]}], "\[IndentingNewLine]", "}"}], ",", 
+                 RowBox[{"Length", "[", "Train", "]"}], "-", "2"}]}], "]"}]}],
+              "}"}], "]"}]}], "\[IndentingNewLine]", "}"}], ",", 
          RowBox[{"Frame", "\[Rule]", "All"}]}], "]"}]}]}], 
      "\[IndentingNewLine]", "]"}]}], "\[IndentingNewLine]", 
    "\[IndentingNewLine]", 
@@ -850,7 +861,8 @@ Cell[BoxData[
       "]"}], ":=", 
     RowBox[{"Module", "[", 
      RowBox[{
-      RowBox[{"{", "XY", "}"}], ",", "\[IndentingNewLine]", 
+      RowBox[{"{", 
+       RowBox[{"XY", ",", "fitFunc"}], "}"}], ",", "\[IndentingNewLine]", 
       RowBox[{
        RowBox[{"XY", "=", 
         RowBox[{
@@ -860,13 +872,15 @@ Cell[BoxData[
          RowBox[{"(", 
           RowBox[{"PAll", "\[Union]", "Pd"}], ")"}]}]}], ";", 
        "\[IndentingNewLine]", 
+       RowBox[{"fitFunc", "=", 
+        RowBox[{"func", "[", 
+         RowBox[{
+          RowBox[{"fit", "[", "N", "]"}], ",", "x"}], "]"}]}], ";", 
+       "\[IndentingNewLine]", 
        RowBox[{"Show", "[", "\[IndentingNewLine]", 
         RowBox[{
          RowBox[{"Plot", "[", 
-          RowBox[{
-           RowBox[{"func", "[", 
-            RowBox[{
-             RowBox[{"fit", "[", "N", "]"}], ",", "x"}], "]"}], ",", 
+          RowBox[{"fitFunc", ",", 
            RowBox[{"{", 
             RowBox[{"x", ",", 
              RowBox[{"Min", "[", 
@@ -880,8 +894,15 @@ Cell[BoxData[
            
            RowBox[{"PlotRange", "\[Rule]", "All"}], ",", 
            RowBox[{"PlotStyle", "\[Rule]", "4"}], ",", 
-           RowBox[{"PlotLabel", "\[Rule]", "N"}]}], "]"}], ",", 
-         "\[IndentingNewLine]", 
+           RowBox[{"PlotLabel", "\[Rule]", 
+            RowBox[{"N", "<>", "\"\<\\nfunc.\>\"", "<>", 
+             RowBox[{"ToString", "[", 
+              RowBox[{"First", "[", 
+               RowBox[{"fit", "[", "N", "]"}], "]"}], "]"}], "<>", 
+             "\"\<   \>\"", "<>", 
+             RowBox[{"ToString", "[", 
+              RowBox[{"fitFunc", ",", "TraditionalForm"}], "]"}]}]}]}], "]"}],
+          ",", "\[IndentingNewLine]", 
          RowBox[{"ListLinePlot", "[", 
           RowBox[{
            RowBox[{"{", 
@@ -939,13 +960,16 @@ Cell[BoxData[
    3.6243572435852757`*^9, 3.624357283923601*^9}, {3.624357368437821*^9, 
    3.6243574233982267`*^9}, {3.624357463794117*^9, 3.624357491948555*^9}, {
    3.624357583154378*^9, 3.624357586584035*^9}, {3.624362433226262*^9, 
-   3.6243624382213173`*^9}}],
+   3.6243624382213173`*^9}, {3.624397744311956*^9, 3.624398021737981*^9}, {
+   3.6243980848108873`*^9, 3.624398181033285*^9}, {3.624398301401956*^9, 
+   3.624398418672469*^9}, {3.624398650426689*^9, 3.624398662112002*^9}, {
+   3.6243986951107073`*^9, 3.624398778451647*^9}, {3.624399032218852*^9, 
+   3.624399039310712*^9}, {3.624399087969818*^9, 3.6243991387971907`*^9}}],
 
 Cell[BoxData[{
  RowBox[{
-  RowBox[{
-  "bitcode", "=", "\"\<../build/180x120/cgpop_db.bc.linux.180x120\>\""}], 
-  ";"}], "\[IndentingNewLine]", 
+  RowBox[{"bitcode", "=", "\"\<../build/180x120/cgpop.bc.linux.180x120\>\""}],
+   ";"}], "\[IndentingNewLine]", 
  RowBox[{
   RowBox[{"P360", "=", 
    RowBox[{"ProfileLoad", "[", 
@@ -984,13 +1008,12 @@ Cell[BoxData[{
  RowBox[{
   RowBox[{"PAll", "=", 
    RowBox[{"{", 
-    RowBox[{"P360", ",", "P180", ",", "P120", ",", "P96"}], "}"}]}], 
-  ";"}], "\[IndentingNewLine]", 
+    RowBox[{"P48", ",", "P96", ",", "P120", ",", "P180", ",", "P360"}], 
+    "}"}]}], ";"}], "\[IndentingNewLine]", 
  RowBox[{
   RowBox[{"PPAll", "=", 
    RowBox[{"{", 
-    RowBox[{"P48", ",", "P36", ",", "P24"}], "}"}]}], 
-  ";"}], "\[IndentingNewLine]", 
+    RowBox[{"P24", ",", "P36"}], "}"}]}], ";"}], "\[IndentingNewLine]", 
  RowBox[{
   RowBox[{"blocks", "=", 
    RowBox[{"BlockName", "[", 
@@ -1002,13 +1025,13 @@ Cell[BoxData[{
    RowBox[{"FitLoad", "[", 
     RowBox[{"bitcode", ",", "PAll"}], "]"}]}], ";"}]}], "Input",
  CellChangeTimes->CompressedData["
-1:eJxTTMoPSmViYGAQA2IQ/UNbbe8VhteOkdVW+0H0JrnpSVeBtGxqchaIXsTz
+1:eJxTTMoPSmViYGCQAGIQ/UNbbe8VhteOkdVW+0H0JrnpSVeBtGxqchaIXsTz
 oBNEz9ax6AbRZx6ozAXRp8ylloDodUe/vgLR9UvqPoDobZOTGK8B6T+1P8B0
 lrc9J4g+d6eKC0R3np8lD6Jd2tYrgGghPaG6G0D6QuqmehDdlKR2D0QfUzpx
 H0TvnO367yaQvr2lkvcWkA67ecMKRB9bdsQaRMc7L3MB0SZzDrqCaO2crL3P
 gfTKqW9Ogeh1xxSYXwDptzrpLCC6QqZVBURvY72mBqKlTrdrg+iwnm96IPpd
 vHQQiH4zQxdM70qrqgOrn3a8HkTv7/m9AEQneSxaCKKvv4y+CqKrPqdfB9FL
-Vm4K/wOkv+UYRIBoAAnStQE=
+Vm4K/wOkv+UYRIDomrjcsL9AWqHzSCSIbmhpSgXRTorT0kA0AKuDxFQ=
   "]],
 
 Cell[BoxData[
@@ -1111,8 +1134,8 @@ Cell[BoxData[
    3.624360182844572*^9}, {3.624360220012785*^9, 3.624360282253525*^9}, {
    3.6243619013867683`*^9, 3.624361927395666*^9}}]
 },
-WindowSize->{1366, 702},
-WindowMargins->{{0, Automatic}, {Automatic, 0}},
+WindowSize->{1022, 515},
+WindowMargins->{{69, Automatic}, {Automatic, 61}},
 FrontEndVersion->"10.0 for Linux x86 (64-bit) (June 27, 2014)",
 StyleDefinitions->"Default.nb"
 ]
@@ -1127,18 +1150,18 @@ CellTagsIndex->{}
 *)
 (*NotebookFileOutline
 Notebook[{
-Cell[596, 22, 10277, 259, 1111, "Input",
+Cell[596, 22, 9508, 238, 1089, "Input",
  InitializationCell->True],
-Cell[10876, 283, 11783, 372, 1123, "Input",
+Cell[10107, 262, 11817, 372, 1123, "Input",
  InitializationCell->True],
-Cell[22662, 657, 3240, 81, 416, "Input",
+Cell[21927, 636, 3240, 81, 438, "Input",
  InitializationCell->True],
-Cell[25905, 740, 8770, 201, 605, "Input",
+Cell[25170, 719, 10947, 247, 742, "Input",
  InitializationCell->True],
-Cell[34678, 943, 2542, 68, 275, "Input"],
-Cell[37223, 1013, 1213, 25, 32, "Input"],
-Cell[38439, 1040, 1950, 50, 231, "Input"],
-Cell[40392, 1092, 772, 19, 32, "Input"]
+Cell[36120, 968, 2567, 66, 275, "Input"],
+Cell[38690, 1036, 1213, 25, 55, "Input"],
+Cell[39906, 1063, 1950, 50, 231, "Input"],
+Cell[41859, 1115, 772, 19, 55, "Input"]
 }
 ]
 *)
