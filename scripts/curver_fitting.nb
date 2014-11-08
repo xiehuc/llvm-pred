@@ -12,10 +12,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       196,          9]
-NotebookDataLength[     40027,       1096]
-NotebookOptionsPosition[     39429,       1074]
-NotebookOutlinePosition[     39762,       1089]
-CellTagsIndexPosition[     39719,       1086]
+NotebookDataLength[     41770,       1135]
+NotebookOptionsPosition[     41168,       1113]
+NotebookOutlinePosition[     41501,       1128]
+CellTagsIndexPosition[     41458,       1125]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -80,11 +80,13 @@ Cell[BoxData[{
         ",", "\[IndentingNewLine]", 
         RowBox[{"r", "[", "\"\<StandardError\>\"", "]"}], ",", 
         "\[IndentingNewLine]", 
-        RowBox[{"ProfileLoad", "[", 
-         RowBox[{"X", ",", 
-          RowBox[{"r", "[", "\"\<StandardOutput\>\"", "]"}]}], "]"}]}], 
-       "\[IndentingNewLine]", "]"}]}]}], "\[IndentingNewLine]", "]"}]}], 
-  ";"}], "\[IndentingNewLine]", 
+        RowBox[{"Append", "[", 
+         RowBox[{
+          RowBox[{"ProfileLoad", "[", 
+           RowBox[{"X", ",", 
+            RowBox[{"r", "[", "\"\<StandardOutput\>\"", "]"}]}], "]"}], ",", 
+          "Out"}], "]"}]}], "\[IndentingNewLine]", "]"}]}]}], 
+    "\[IndentingNewLine]", "]"}]}], ";"}], "\[IndentingNewLine]", 
  RowBox[{
   RowBox[{"ProfileLoad", "[", 
    RowBox[{
@@ -168,6 +170,41 @@ Cell[BoxData[{
     "]"}]}], ";"}], "\[IndentingNewLine]", 
  RowBox[{
   RowBox[{
+   RowBox[{"FitLoad", "[", 
+    RowBox[{"Bitcode_String", ",", "Profile_List"}], "]"}], ":=", 
+   RowBox[{"Module", "[", 
+    RowBox[{
+     RowBox[{"{", "r", "}"}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+      RowBox[{"r", "=", 
+       RowBox[{"RunProcess", "[", 
+        RowBox[{"Flatten", "[", 
+         RowBox[{"{", 
+          RowBox[{"\"\<../build/src/curve-fit\>\"", ",", "Bitcode", ",", 
+           RowBox[{"Table", "[", 
+            RowBox[{
+             RowBox[{
+              RowBox[{"ToString", "[", 
+               RowBox[{"i", "[", 
+                RowBox[{"[", "1", "]"}], "]"}], "]"}], "<>", "\"\<:\>\"", "<>", 
+              RowBox[{"i", "[", 
+               RowBox[{"[", "3", "]"}], "]"}]}], ",", 
+             RowBox[{"{", 
+              RowBox[{"i", ",", "Profile"}], "}"}]}], "]"}]}], "}"}], "]"}], 
+        "]"}]}], ";", "\[IndentingNewLine]", 
+      RowBox[{"If", "[", 
+       RowBox[{
+        RowBox[{
+         RowBox[{"r", "[", "\"\<ExitCode\>\"", "]"}], "\[NotEqual]", "0"}], 
+        ",", "\[IndentingNewLine]", 
+        RowBox[{"r", "[", "\"\<StandardError\>\"", "]"}], ",", 
+        "\[IndentingNewLine]", 
+        RowBox[{"FitLoad", "[", 
+         RowBox[{"r", "[", "\"\<StandardOutput\>\"", "]"}], "]"}]}], 
+       "\[IndentingNewLine]", "]"}]}]}], "\[IndentingNewLine]", "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
    RowBox[{
     RowBox[{"FitLoad", "::", "usage"}], " ", "=", " ", 
     "\"\<Load Result from curve-fit Text Output\>\""}], ";"}], 
@@ -238,7 +275,11 @@ Cell[BoxData[{
    3.6243184062663097`*^9, {3.624325323013669*^9, 3.624325338952395*^9}, {
    3.624325389290594*^9, 3.624325471387513*^9}, {3.6243255127981377`*^9, 
    3.624325533677661*^9}, 3.624359806186482*^9, {3.624359949744924*^9, 
-   3.624359950895145*^9}, {3.6243623119502583`*^9, 3.6243623150695868`*^9}}],
+   3.624359950895145*^9}, {3.6243623119502583`*^9, 3.6243623150695868`*^9}, {
+   3.624394459434774*^9, 3.624394493544856*^9}, {3.624394557248137*^9, 
+   3.62439457369405*^9}, {3.624394604273929*^9, 3.624394722100935*^9}, {
+   3.624394887825842*^9, 3.624394894138626*^9}, {3.624395263434718*^9, 
+   3.6243953393522673`*^9}, {3.624395413753389*^9, 3.624395433893614*^9}}],
 
 Cell[BoxData[
  RowBox[{
@@ -685,7 +726,7 @@ Cell[BoxData[
     RowBox[{"Rel", "[", 
      RowBox[{"Y_", ",", "y_"}], "]"}], ":=", 
     RowBox[{"0", "/;", 
-     RowBox[{"Y", "\[Equal]", "0", "\[IndentingNewLine]"}]}]}]}]}]], "Input",
+     RowBox[{"Y", "\[Equal]", "0"}]}]}], "\[IndentingNewLine]"}]}]], "Input",
  InitializationCell->True,
  CellChangeTimes->{
   3.6239326738684797`*^9, {3.6243236480771227`*^9, 3.6243236483713923`*^9}, {
@@ -959,17 +1000,15 @@ Cell[BoxData[{
  RowBox[{
   RowBox[{"fit", "=", 
    RowBox[{"FitLoad", "[", 
-    RowBox[{"Import", "[", 
-     RowBox[{"\"\<../build/180x120/Fit.log\>\"", ",", "\"\<Text\>\""}], "]"}],
-     "]"}]}], ";"}]}], "Input",
+    RowBox[{"bitcode", ",", "PAll"}], "]"}]}], ";"}]}], "Input",
  CellChangeTimes->CompressedData["
-1:eJxTTMoPSmViYGAQBWIQ/UNbbe8VhteOkdVW+0H0JrnpSVeBtGxqchaIXsTz
+1:eJxTTMoPSmViYGAQA2IQ/UNbbe8VhteOkdVW+0H0JrnpSVeBtGxqchaIXsTz
 oBNEz9ax6AbRZx6ozAXRp8ylloDodUe/vgLR9UvqPoDobZOTGK8B6T+1P8B0
 lrc9J4g+d6eKC0R3np8lD6Jd2tYrgGghPaG6G0D6QuqmehDdlKR2D0QfUzpx
 H0TvnO367yaQvr2lkvcWkA67ecMKRB9bdsQaRMc7L3MB0SZzDrqCaO2crL3P
 gfTKqW9Ogeh1xxSYXwDptzrpLCC6QqZVBURvY72mBqKlTrdrg+iwnm96IPpd
-vHQQiH4zQxdM70qrqgOrn3a8HkTv7/m9AEQneSxaCKKvv4y+CqKrPqdfB9EA
-856scA==
+vHQQiH4zQxdM70qrqgOrn3a8HkTv7/m9AEQneSxaCKKvv4y+CqKrPqdfB9FL
+Vm4K/wOkv+UYRIBoAAnStQE=
   "]],
 
 Cell[BoxData[
@@ -1045,11 +1084,11 @@ Cell[BoxData[{
  RowBox[{
   RowBox[{"fit", "=", 
    RowBox[{"FitLoad", "[", 
-    RowBox[{"Import", "[", 
-     RowBox[{"\"\<../build/120x80/Fit.log\>\"", ",", "\"\<Text\>\""}], "]"}], 
-    "]"}]}], ";"}]}], "Input",
+    RowBox[{"bitcode", ",", "PAll"}], "]"}]}], ";"}]}], "Input",
  CellChangeTimes->{{3.6243591342992887`*^9, 3.624359336474868*^9}, {
-   3.624359403188675*^9, 3.624359403704049*^9}, 3.624359494227994*^9}],
+   3.624359403188675*^9, 3.624359403704049*^9}, 3.624359494227994*^9, {
+   3.624394737344046*^9, 3.624394742009334*^9}, {3.624395391592514*^9, 
+   3.6243954017449617`*^9}, 3.6243955074861803`*^9}],
 
 Cell[BoxData[
  RowBox[{
@@ -1088,18 +1127,18 @@ CellTagsIndex->{}
 *)
 (*NotebookFileOutline
 Notebook[{
-Cell[596, 22, 8533, 218, 957, "Input",
+Cell[596, 22, 10277, 259, 1111, "Input",
  InitializationCell->True],
-Cell[9132, 242, 11783, 372, 1123, "Input",
+Cell[10876, 283, 11783, 372, 1123, "Input",
  InitializationCell->True],
-Cell[20918, 616, 3240, 81, 416, "Input",
+Cell[22662, 657, 3240, 81, 416, "Input",
  InitializationCell->True],
-Cell[24161, 699, 8770, 201, 605, "Input",
+Cell[25905, 740, 8770, 201, 605, "Input",
  InitializationCell->True],
-Cell[32934, 902, 2600, 70, 275, "Input"],
-Cell[35537, 974, 1213, 25, 32, "Input"],
-Cell[36753, 1001, 1897, 50, 231, "Input"],
-Cell[38653, 1053, 772, 19, 32, "Input"]
+Cell[34678, 943, 2542, 68, 275, "Input"],
+Cell[37223, 1013, 1213, 25, 32, "Input"],
+Cell[38439, 1040, 1950, 50, 231, "Input"],
+Cell[40392, 1092, 772, 19, 32, "Input"]
 }
 ]
 *)

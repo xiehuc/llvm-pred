@@ -478,14 +478,18 @@ int main(int argc, char *argv[])
             for(i=0; i<p; i++)
                params[k].best_par.push_back(FIT(s->x, i));
             pre_best_squsum = cur_squsum;
-			}			
+			}
 			gsl_multifit_fdfsolver_free(s);
 			gsl_matrix_free(covar);
+
+         if(pre_best_squsum < DBL_EPSILON)
+            // we have found best fit, no need calc rest function
+            break;
 		}
       cout<<"func:"<<params[k].id<<"    args:";
 		for(i=0; i<para_num[params[k].id]; i++)
 			cout<< params[k].best_par.at(i) <<' ';
-      cout<<"    "<<BlockNames[k]<<std::endl;
+      cout<<"    "<<BlockNames[k]<<"\n";
 		k++;
 	}
 
