@@ -12,10 +12,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       196,          9]
-NotebookDataLength[     43239,       1158]
-NotebookOptionsPosition[     42635,       1136]
-NotebookOutlinePosition[     42970,       1151]
-CellTagsIndexPosition[     42927,       1148]
+NotebookDataLength[     45576,       1221]
+NotebookOptionsPosition[     44814,       1195]
+NotebookOutlinePosition[     45149,       1210]
+CellTagsIndexPosition[     45106,       1207]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -212,7 +212,7 @@ Cell[BoxData[{
  RowBox[{
   RowBox[{"BlockName", "[", 
    RowBox[{"{", 
-    RowBox[{"X_", ",", "A_Association"}], "}"}], "]"}], ":=", 
+    RowBox[{"X_", ",", "A_Association", ",", "___"}], "}"}], "]"}], ":=", 
   RowBox[{"Keys", "[", "A", "]"}]}], "\[IndentingNewLine]", 
  RowBox[{
   RowBox[{"BlockName", "[", "A_Association", "]"}], ":=", 
@@ -258,7 +258,8 @@ Cell[BoxData[{
    3.62439457369405*^9}, {3.624394604273929*^9, 3.624394722100935*^9}, {
    3.624394887825842*^9, 3.624394894138626*^9}, {3.624395263434718*^9, 
    3.6243953393522673`*^9}, {3.624395413753389*^9, 3.624395433893614*^9}, {
-   3.624399955881402*^9, 3.6243999609711637`*^9}}],
+   3.624399955881402*^9, 3.6243999609711637`*^9}, {3.624602411944993*^9, 
+   3.624602420651*^9}}],
 
 Cell[BoxData[
  RowBox[{
@@ -968,8 +969,8 @@ Cell[BoxData[
 
 Cell[BoxData[{
  RowBox[{
-  RowBox[{"bitcode", "=", "\"\<../build/180x120/cgpop.bc.linux.180x120\>\""}],
-   ";"}], "\[IndentingNewLine]", 
+  RowBox[{"bitcode", "=", "\"\<../build/180x120/cgpop.bc.llvm.180x120\>\""}], 
+  ";"}], "\[IndentingNewLine]", 
  RowBox[{
   RowBox[{"P360", "=", 
    RowBox[{"ProfileLoad", "[", 
@@ -1025,13 +1026,14 @@ Cell[BoxData[{
    RowBox[{"FitLoad", "[", 
     RowBox[{"bitcode", ",", "PAll"}], "]"}]}], ";"}]}], "Input",
  CellChangeTimes->CompressedData["
-1:eJxTTMoPSmViYGCQAGIQ/UNbbe8VhteOkdVW+0H0JrnpSVeBtGxqchaIXsTz
-oBNEz9ax6AbRZx6ozAXRp8ylloDodUe/vgLR9UvqPoDobZOTGK8B6T+1P8B0
-lrc9J4g+d6eKC0R3np8lD6Jd2tYrgGghPaG6G0D6QuqmehDdlKR2D0QfUzpx
-H0TvnO367yaQvr2lkvcWkA67ecMKRB9bdsQaRMc7L3MB0SZzDrqCaO2crL3P
-gfTKqW9Ogeh1xxSYXwDptzrpLCC6QqZVBURvY72mBqKlTrdrg+iwnm96IPpd
-vHQQiH4zQxdM70qrqgOrn3a8HkTv7/m9AEQneSxaCKKvv4y+CqKrPqdfB9FL
-Vm4K/wOkv+UYRIDomrjcsL9AWqHzSCSIbmhpSgXRTorT0kA0AKuDxFQ=
+1:eJwdyjtIQmEAhuFjl6GwxanspiEumjQEhQ1lKQRtDpYESSeOkhitaaUhXZDc
+IossKBHBxUBCKBAJ7CQW1ZC3inLrokUQiZBF/3eGl2d5xfSslqmiKKqJBMsy
+afSWKqj088oYDLdt0SliKzNlhj5+3gW98t51eJmX7MFkj9APQ2ffb9Dht3/C
+yAbNSxMri2VO80h/Hbx6sNVD1/VOO1SvHoqgQCGwZ4k3TNgBnbT0EbIdiSd4
+7NX85Yj3R9aGO6Iul1VCNhDvg4ahgBp2755qoMxijj4Tg5vFJAyxouoX4rvc
+VAPnWlYkMFKblkLhxZoM6twlBfwwNGthcbuT88Ros3O/59wBY+6ffUgP+w5g
+5nU8BW1fpgz0B8OjFWLJ0jUGFyZmdL9EkSuuh0vLTgYOij1GOE3xByZ5BZUk
+0cj5DxmqyWo=
   "]],
 
 Cell[BoxData[
@@ -1061,57 +1063,85 @@ Cell[BoxData[
   3.6243584128390217`*^9}, {3.624358490327786*^9, 3.62435849054949*^9}, {
   3.624361952898507*^9, 3.624361955495194*^9}}],
 
+Cell["\<\
+open a new document and input <<\[CloseCurlyDoubleQuote]/tmp/180x120.m\
+\[CloseCurlyDoubleQuote] to get result.\
+\>", "Text",
+ CellChangeTimes->{{3.624602150162798*^9, 3.6246021669569607`*^9}}],
+
 Cell[BoxData[{
  RowBox[{
-  RowBox[{"bitcode", "=", "\"\<../build/120x80/cgpop.bc.linux.120x80\>\""}], 
-  ";"}], "\[IndentingNewLine]", 
+  RowBox[{"$cgpop", "=", "\"\<cgpop\>\""}], ";"}], "\[IndentingNewLine]", 
  RowBox[{
-  RowBox[{"P96", "=", 
-   RowBox[{"ProfileLoad", "[", 
-    RowBox[{"96", ",", "bitcode", ",", "\"\<../build/120x80/96.out\>\""}], 
-    "]"}]}], ";"}], "\[IndentingNewLine]", 
+  RowBox[{"$archdir", "=", "\"\<llvm\>\""}], ";"}], "\[IndentingNewLine]", 
  RowBox[{
-  RowBox[{"P192", "=", 
-   RowBox[{"ProfileLoad", "[", 
-    RowBox[{"192", ",", "bitcode", ",", "\"\<../build/120x80/192.out\>\""}], 
-    "]"}]}], ";"}], "\[IndentingNewLine]", 
+  RowBox[{"$pe", "=", "\"\<120x80\>\""}], ";"}], "\[IndentingNewLine]", 
  RowBox[{
-  RowBox[{"P264", "=", 
-   RowBox[{"ProfileLoad", "[", 
-    RowBox[{"264", ",", "bitcode", ",", "\"\<../build/120x80/264.out\>\""}], 
-    "]"}]}], ";"}], "\[IndentingNewLine]", 
- RowBox[{
-  RowBox[{"P384", "=", 
-   RowBox[{"ProfileLoad", "[", 
-    RowBox[{"384", ",", "bitcode", ",", "\"\<../build/120x80/384.out\>\""}], 
-    "]"}]}], ";"}], "\[IndentingNewLine]", 
- RowBox[{
-  RowBox[{"P768", "=", 
-   RowBox[{"ProfileLoad", "[", 
-    RowBox[{"768", ",", "bitcode", ",", "\"\<../build/120x80/768.out\>\""}], 
-    "]"}]}], ";"}], "\[IndentingNewLine]", 
- RowBox[{
-  RowBox[{"PAll", "=", 
+  RowBox[{"$train", "=", 
    RowBox[{"{", 
-    RowBox[{"P96", ",", "P192", ",", "P264", ",", "P384"}], "}"}]}], 
+    RowBox[{"48", ",", "96"}], "}"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"$test", "=", 
+   RowBox[{"{", "1416", "}"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Dir", "=", 
+   RowBox[{"\"\<../build/\>\"", "<>", "$pe", "<>", "\"\</\>\""}]}], 
   ";"}], "\[IndentingNewLine]", 
  RowBox[{
-  RowBox[{"PPAll", "=", 
-   RowBox[{"{", "P768", "}"}]}], ";"}], "\[IndentingNewLine]", 
+  RowBox[{"bitcode", "=", 
+   RowBox[{
+   "Dir", "<>", "$cgpop", "<>", "\"\<.bc.\>\"", "<>", "$archdir", "<>", 
+    "\"\<.\>\"", "<>", "$pe"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Train", "=", 
+   RowBox[{"Table", "[", 
+    RowBox[{
+     RowBox[{"ProfileLoad", "[", 
+      RowBox[{"sz", ",", "bitcode", ",", 
+       RowBox[{"Dir", "<>", 
+        RowBox[{"ToString", "[", "sz", "]"}], "<>", "\"\<.out\>\""}]}], "]"}],
+      ",", 
+     RowBox[{"{", 
+      RowBox[{"sz", ",", "$train"}], "}"}]}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Test", "=", 
+   RowBox[{"Table", "[", 
+    RowBox[{
+     RowBox[{"ProfileLoad", "[", 
+      RowBox[{"sz", ",", "bitcode", ",", 
+       RowBox[{"Dir", "<>", 
+        RowBox[{"ToString", "[", "sz", "]"}], "<>", "\"\<.out\>\""}]}], "]"}],
+      ",", 
+     RowBox[{"{", 
+      RowBox[{"sz", ",", "$test"}], "}"}]}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
  RowBox[{
   RowBox[{"blocks", "=", 
    RowBox[{"BlockName", "[", 
     RowBox[{"ProfileHotLoad", "[", 
-     RowBox[{"384", ",", "bitcode", ",", "\"\<../build/120x80/384.out\>\""}], 
-     "]"}], "]"}]}], ";"}], "\[IndentingNewLine]", 
+     RowBox[{
+      RowBox[{"First", "[", "$test", "]"}], ",", "bitcode", ",", 
+      RowBox[{"Dir", "<>", 
+       RowBox[{"ToString", "[", 
+        RowBox[{"First", "[", "$test", "]"}], "]"}], "<>", "\"\<.out\>\""}]}],
+      "]"}], "]"}]}], ";"}], "\[IndentingNewLine]", 
  RowBox[{
   RowBox[{"fit", "=", 
    RowBox[{"FitLoad", "[", 
-    RowBox[{"bitcode", ",", "PAll"}], "]"}]}], ";"}]}], "Input",
+    RowBox[{"bitcode", ",", "Train"}], "]"}]}], ";"}]}], "Input",
  CellChangeTimes->{{3.6243591342992887`*^9, 3.624359336474868*^9}, {
    3.624359403188675*^9, 3.624359403704049*^9}, 3.624359494227994*^9, {
    3.624394737344046*^9, 3.624394742009334*^9}, {3.624395391592514*^9, 
-   3.6243954017449617`*^9}, 3.6243955074861803`*^9}],
+   3.6243954017449617`*^9}, 3.6243955074861803`*^9, {3.624603624843896*^9, 
+   3.6246039792427807`*^9}, {3.624617624233851*^9, 3.624617651578835*^9}}],
+
+Cell["\<\
+run following code to get a report for top 20 fit result
+open a new document and input <<\[CloseCurlyDoubleQuote]/tmp/$pe.m\
+\[CloseCurlyDoubleQuote] to read result.\
+\>", "Text",
+ CellChangeTimes->{{3.624604246154087*^9, 3.6246042759411707`*^9}}],
 
 Cell[BoxData[
  RowBox[{
@@ -1122,20 +1152,49 @@ Cell[BoxData[
       RowBox[{"{", 
        RowBox[{
         RowBox[{"graph", "[", 
-         RowBox[{"i", ",", "PAll", ",", "PPAll", ",", "fit"}], "]"}], ",", 
+         RowBox[{"i", ",", "Train", ",", "Test", ",", "fit"}], "]"}], ",", 
         RowBox[{"table", "[", 
-         RowBox[{"i", ",", "PAll", ",", "PPAll", ",", "fit"}], "]"}]}], "}"}],
+         RowBox[{"i", ",", "Train", ",", "Test", ",", "fit"}], "]"}]}], "}"}],
        ",", 
       RowBox[{"{", 
        RowBox[{"i", ",", "blocks"}], "}"}]}], "]"}], "//", "Flatten"}], "//", 
-   "Column"}], ">>", "\"\</tmp/120x80.m\>\""}]], "Input",
+   "Column"}], ">>", 
+  RowBox[{"\"\</tmp/\>\"", "<>", "$pe", "<>", "\"\<.m\>\""}]}]], "Input",
  CellChangeTimes->{{3.624359359250301*^9, 3.624359382782988*^9}, 
    3.624359725272799*^9, 3.624360120512759*^9, {3.624360178538711*^9, 
    3.624360182844572*^9}, {3.624360220012785*^9, 3.624360282253525*^9}, {
-   3.6243619013867683`*^9, 3.624361927395666*^9}}]
+   3.6243619013867683`*^9, 3.624361927395666*^9}, {3.624603985445448*^9, 
+   3.624604009915984*^9}}],
+
+Cell["run following code to generat all fit graph for all blocks", "Text",
+ CellChangeTimes->{{3.624602150162798*^9, 3.624602180808979*^9}, {
+  3.624604016921036*^9, 3.624604017426824*^9}, {3.624604270077697*^9, 
+  3.624604298258513*^9}}],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"ParallelDo", "[", "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{
+     RowBox[{"CreateDirectory", "[", "\"\</tmp/png/\>\"", "]"}], ";", 
+     "\[IndentingNewLine]", 
+     RowBox[{"Export", "[", 
+      RowBox[{
+       RowBox[{"\"\</tmp/png/\>\"", "<>", "i", "<>", "\"\<.png\>\""}], ",", 
+       RowBox[{"graph", "[", 
+        RowBox[{"i", ",", "Train", ",", "Test", ",", "fit"}], "]"}], ",", 
+       "\"\<PNG\>\""}], "]"}]}], "\[IndentingNewLine]", ",", 
+    RowBox[{"{", 
+     RowBox[{"i", ",", 
+      RowBox[{"BlockName", "[", 
+       RowBox[{"First", "[", "Test", "]"}], "]"}]}], "}"}]}], "]"}], 
+  ";"}]], "Input",
+ CellChangeTimes->{{3.624604303523902*^9, 3.6246043549565973`*^9}, {
+  3.6246043858516073`*^9, 3.6246043899110813`*^9}, {3.624616948915784*^9, 
+  3.624616980605867*^9}}]
 },
 WindowSize->{1022, 515},
-WindowMargins->{{69, Automatic}, {Automatic, 61}},
+WindowMargins->{{Automatic, 91}, {Automatic, 62}},
 FrontEndVersion->"10.0 for Linux x86 (64-bit) (June 27, 2014)",
 StyleDefinitions->"Default.nb"
 ]
@@ -1150,18 +1209,22 @@ CellTagsIndex->{}
 *)
 (*NotebookFileOutline
 Notebook[{
-Cell[596, 22, 9508, 238, 1089, "Input",
+Cell[596, 22, 9567, 239, 1089, "Input",
  InitializationCell->True],
-Cell[10107, 262, 11817, 372, 1123, "Input",
+Cell[10166, 263, 11817, 372, 1123, "Input",
  InitializationCell->True],
-Cell[21927, 636, 3240, 81, 438, "Input",
+Cell[21986, 637, 3240, 81, 438, "Input",
  InitializationCell->True],
-Cell[25170, 719, 10947, 247, 742, "Input",
+Cell[25229, 720, 10947, 247, 742, "Input",
  InitializationCell->True],
-Cell[36120, 968, 2567, 66, 275, "Input"],
-Cell[38690, 1036, 1213, 25, 55, "Input"],
-Cell[39906, 1063, 1950, 50, 231, "Input"],
-Cell[41859, 1115, 772, 19, 55, "Input"]
+Cell[36179, 969, 2583, 67, 275, "Input"],
+Cell[38765, 1038, 1213, 25, 55, "Input"],
+Cell[39981, 1065, 203, 4, 31, "Text"],
+Cell[40187, 1071, 2433, 65, 253, "Input"],
+Cell[42623, 1138, 257, 5, 51, "Text"],
+Cell[42883, 1145, 860, 21, 55, "Input"],
+Cell[43746, 1168, 238, 3, 31, "Text"],
+Cell[43987, 1173, 823, 20, 99, "Input"]
 }
 ]
 *)
