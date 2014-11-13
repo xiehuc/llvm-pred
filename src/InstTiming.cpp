@@ -1,9 +1,11 @@
 #include "preheader.h"
+#include <llvm/Support/raw_ostream.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instruction.h>
-
+#include <llvm/IR/Value.h>
+#include <llvm/IR/ValueSymbolTable.h>
 #include <unordered_map>
 #include <random>
 //#include "LockInst.h"
@@ -22,6 +24,7 @@ namespace lle{
       typedef llvm::Value* (*TemplateFunc)(llvm::Instruction* InsPoint);
       static std::unordered_map<std::string, TemplateFunc> ImplMap;
       llvm::Value* implyTemplate(llvm::CallInst* Template) const;
+	  llvm::Value* implyLoadTemplate(llvm::CallInst* Template, llvm::Value* var) const;
    };
 };
 
@@ -46,17 +49,59 @@ bool lle::InstTiming::runOnModule(Module &M)
    Assert(F, "unable find @timing_res function");
    F->addFnAttr(Attribute::AlwaysInline);
 
-   F = M.getFunction("inst_template");
-   Assert(F, "unable find @inst_template function");
-   for(auto Ite = user_begin(F), E = user_end(F); Ite!=E; ++Ite){
-      CallInst* Template = dyn_cast<CallInst>(*Ite);
-      Value* R = implyTemplate(Template);
-      Template->replaceAllUsesWith(R);
-      Template->eraseFromParent();
+   if((F = M.getFunction("inst_template")))
+   {
+	   for(auto Ite = user_begin(F), E = user_end(F); Ite!=E; ++Ite){
+		  CallInst* Template = dyn_cast<CallInst>(*Ite);
+		  Value* R = implyTemplate(Template);
+		  Template->replaceAllUsesWith(R);
+		  Template->eraseFromParent();
+	   }
    }
+   else if((F = M.getFunction("load_template")))
+   {
+        Function* mainf = M.getFunction("main");
+        Assert(mainf,"can not find main");
+        ValueSymbolTable& symboltable = mainf->getValueSymbolTable();
+        StringRef str("loadvar");
+        Value* var = symboltable.lookup(str);
+        for(auto Ite = user_begin(F), E = user_end(F); Ite!=E; ++Ite)
+        {
+           CallInst* Template = dyn_cast<CallInst>(*Ite);
+           Value* R = implyLoadTemplate(Template,var);
+           Template->replaceAllUsesWith(R);
+           Template->eraseFromParent();
+        }
+   }
+   Assert(F, "can not find load_template");  
    return true;
 }
 
+static Value* load(Instruction *InstPoint, Value* var)
+{
+	for(int i=0;i<10000;++i)
+	{
+		LoadInst* newload = new LoadInst(var,"",InstPoint);
+        newload->setVolatile(true);
+	}	
+	return var;
+}
+Value* lle::InstTiming::implyLoadTemplate(CallInst *Template, Value *var) const
+{
+   Assert(Template,"Template is empty");
+   ConstantExpr* Arg0 = dyn_cast<ConstantExpr>(Template->getArgOperand(0));
+   Assert(Arg0,"");
+   GlobalVariable* Global = dyn_cast<GlobalVariable>(Arg0->getOperand(0));
+   Assert(Global,"");
+   ConstantDataArray* Const = dyn_cast<ConstantDataArray>(Global->getInitializer());
+   Assert(Const,"");
+   //StringRef Selector = Const->getAsCString();
+
+   //auto Found = ImplMap.find(Selector.str());
+   //AssertRuntime(Found != ImplMap.end(), "unknow template keyword: "<<Selector);
+
+   return load(Template,var);
+}
 Value* lle::InstTiming::implyTemplate(CallInst *Template) const
 {
    Assert(Template,"");
