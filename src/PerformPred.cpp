@@ -107,7 +107,7 @@ static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbabilit
    Type* I32Ty = Type::getInt32Ty(TripCount->getContext());
    Type* FloatTy = Type::getFloatTy(TripCount->getContext());
    Value* Ret = TripCount;
-   constexpr double square = std::sqrt(INT32_MAX);
+   double square = std::sqrt(INT32_MAX);
    if(n>square){
       // it may overflow, use float to caculate
       Ret = Builder.CreateFMul(Builder.CreateSIToFP(Ret, FloatTy), ConstantFP::get(FloatTy, (double)n/d));
