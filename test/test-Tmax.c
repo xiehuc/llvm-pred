@@ -5,7 +5,7 @@
  * 1. T = max(T_float, T_fix)
  * 2. T = T_float + T_fix
  */
-int inst_template(const char*);
+int inst_template(const char*, ...);
 
 void test_order()
 {

@@ -1,7 +1,7 @@
 #include "../src/libtiming.c"
 #define REPEAT 100
 
-int inst_template(const char*);
+int inst_template(const char*, ...);
 
 int main()
 {
