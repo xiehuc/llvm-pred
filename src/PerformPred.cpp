@@ -34,19 +34,20 @@ class lle::PerformPred : public llvm::FunctionPass
    };
    struct Classify {
       Classify(ClassifyType t, llvm::BasicBlock* b, llvm::BranchProbability p):type(t),block(b) {
+         Assert(t<DYNAMIC_LOOP_CONST, " only accept static prediction type");
          data.freq = (double)p.getNumerator()/p.getDenominator();
       }
-      Classify(ClassifyType t, llvm::BasicBlock* b, int64_t v):type(t),block(b) { data.ext_val = v;}
-      Classify(ClassifyType t, llvm::BasicBlock* b, llvm::Value* v):type(t),block(b) { data.value = v;}
+      Classify(llvm::BasicBlock* b, int64_t v):type(DYNAMIC_LOOP_CONST),block(b) { data.ext_val = v;}
+      Classify(llvm::BasicBlock* b, llvm::Value* v):type(DYNAMIC_LOOP_INST),block(b) { data.value = v;}
       ClassifyType type;
       llvm::BasicBlock* block;
       union {
-         double freq;
-         int64_t ext_val;
-         llvm::Value* value;
+         double freq; // 静态预测会给出频率
+         int64_t ext_val; // 动态预测常量比静态预测更准确
+         llvm::Value* value; // 动态预测变量是一个Value
       }data;
    };
-   std::vector<Classify> pred_cls;
+   std::vector<Classify> pred_cls; // 对每个block进行分类, 并且储存关键的属性.
 
    public:
    static char ID;
@@ -182,7 +183,6 @@ bool PerformPred::runOnFunction(Function &F)
    auto I32Ty = Type::getInt32Ty(F.getContext());
    Value* SumLhs = ConstantInt::get(I32Ty, 0), *SumRhs;
    BlockFrequency EntryFreq = BFE.getBlockFreq(&F.getEntryBlock());
-   errs()<<EntryFreq.getFrequency()<<"\n";
    for(auto& BB : F){
       auto FreqExpr = BFE.getBlockFreqExpr(&BB);
       if(FreqExpr.second != NULL) continue;
@@ -219,13 +219,13 @@ bool PerformPred::runOnFunction(Function &F)
       SumRhs = cost(BB, Builder);
       if(LoopTC->getType()!= I32Ty)
          LoopTC = Builder.CreateCast(Instruction::SExt, LoopTC, I32Ty);
-      Value* freq = CreateMul(Builder, LoopTC, FreqExpr.first); // a scale mul
+      Value* freq = CreateMul(Builder, LoopTC, FreqExpr.first); // trip_count * prob = freq
       SumRhs = Builder.CreateMul(freq, SumRhs);
       SumRhs->setName(BB.getName()+".bfreq");
       if(ConstantInt* CI = dyn_cast<ConstantInt>(SumRhs)){
-         pred_cls.emplace_back(DYNAMIC_LOOP_CONST, &BB, CI->getSExtValue());
+         pred_cls.emplace_back(&BB, CI->getSExtValue()); /* DYNAMIC_LOOP_CONST */
       }else
-         pred_cls.emplace_back(DYNAMIC_LOOP_INST, &BB, SumRhs);
+         pred_cls.emplace_back(&BB, SumRhs); /* DYNAMIC_LOOP_INST */
 
 #if PRED_TYPE == EXEC_TIME
       Instruction* SumLI = dyn_cast<Instruction>(SumLhs);
@@ -254,7 +254,7 @@ bool PerformPred::runOnFunction(Function &F)
       }
 
       SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
-      SumLhs->setName(BB.getName()+".sfreq");
+      SumLhs->setName(BB.getName()+".sfreq");/* sum freq */
       BfreqStack.push_back(dyn_cast<Instruction>(SumLhs));
 #else
       force_insert(SumRhs, Builder, BB.getName()+".bfreq");
