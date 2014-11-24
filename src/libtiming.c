@@ -11,7 +11,8 @@
  * return a timing, mul timing_res to calc real time
  */
 
-#ifdef TIMING_TSC
+#if (defined TIMING_TSC) || (defined TIMING_TSCP)
+
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -21,11 +22,34 @@
 /* We use 64bit values for the times.  */
 typedef unsigned long long int hp_timing_t;
 
-/* The "=A" constraint used in 32-bit mode does not work in 64-bit mode.  */
-#define HP_TIMING_NOW(Var) \
-  ({ unsigned int _hi, _lo; \
-     asm volatile ("rdtsc" : "=a" (_lo), "=d" (_hi)); \
-     (Var) = ((unsigned long long int) _hi << 32) | _lo; })
+#ifdef TIMING_TSC
+/** copy code from simple-pmu:cycles.h (http://halobates.de/simple-pmu) **/
+static inline hp_timing_t _timing(void)
+{
+#ifdef __i386__
+	unsigned long long s;
+	asm volatile("rdtsc" : "=A" (s) :: "memory");
+	return s;
+#else
+	unsigned low, high;
+	asm volatile("rdtsc" : "=a" (low), "=d" (high) :: "memory");
+	return ((unsigned long long)high << 32) | low;
+#endif
+}
+#else /*TIMING_TSC*/
+static inline hp_timing_t _timing(void)
+{
+#ifdef __i386__
+	unsigned long long s;
+	asm volatile("rdtscp" : "=A" (s) :: "ecx", "memory");
+	return s;
+#else
+	unsigned low, high;
+	asm volatile("rdtscp" : "=a" (low), "=d" (high) :: "ecx", "memory");
+	return ((unsigned long long)high << 32) | low;
+#endif
+}
+#endif /*TIMING_TSC*/
 
 uint64_t timing_res() 
 {
@@ -46,16 +70,19 @@ uint64_t timing_res()
 uint64_t timing_err()
 {
    hp_timing_t a = 0,b = 0;
-   HP_TIMING_NOW(a);
-   HP_TIMING_NOW(b);
+   a=_timing();
+   b=_timing();
    return b-a;
 }
 uint64_t timing()
 {
-   hp_timing_t t;
-   HP_TIMING_NOW(t);
-   return t;
+   return _timing();
 }
+
+
+#endif
+
+#ifdef TIMING_TSCP
 #endif
 
 #ifdef TIMING_CLOCK_GETTIME
@@ -90,3 +117,4 @@ uint64_t timing()
    return t.tv_sec*10E9+t.tv_nsec;
 }
 #endif
+
