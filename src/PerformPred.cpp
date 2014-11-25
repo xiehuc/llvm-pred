@@ -13,6 +13,7 @@
 #include <ValueProfiling.h>
 
 #include "BlockFreqExpr.h"
+#include "TimingSource.h"
 #include "Resolver.h"
 #include "ddg.h"
 #include "debug.h"
@@ -48,6 +49,7 @@ class lle::PerformPred : public llvm::FunctionPass
       }data;
    };
    std::vector<Classify> pred_cls; // 对每个block进行分类, 并且储存关键的属性.
+   TimingSource source;
 
    public:
    static char ID;
@@ -58,6 +60,7 @@ class lle::PerformPred : public llvm::FunctionPass
    void print(llvm::raw_ostream&,const llvm::Module*) const override;
 
    private:
+   void insert_timing_source(llvm::Function* Main);
    llvm::Value* cost(llvm::BasicBlock& BB, llvm::IRBuilder<>& Builder);
    llvm::BasicBlock* promote(llvm::Instruction* LoopTC);
 };
@@ -67,32 +70,10 @@ using namespace lle;
 
 char PerformPred::ID = 0;
 static RegisterPass<PerformPred> X("PerfPred", "get Performance Predication Model");
-enum InstTypes
-{
-   AddSubType, MulDivType, LSType, IgnoreType, NumTypes
-};
+
 static const char* const TypeNames[] = {"AddSub", "MulDiv", "Mem", "Save"};
-static const std::unordered_map<int, InstTypes>  InstTMap = {
-   {Instruction::Add,  AddSubType},
-   {Instruction::Sub,  AddSubType},
-   {Instruction::Mul,  MulDivType},
-   {Instruction::UDiv, MulDivType},
-   {Instruction::Load, LSType},
-   {Instruction::Store,LSType}
-};
-static Value* Loads[NumTypes] = {NULL};
+static Value* Loads[NumGroups] = {NULL};
 
-
-inline void count(llvm::BasicBlock &BB, unsigned int *counter)
-{
-   for(auto& I : BB){
-      try{
-         ++counter[InstTMap.at(I.getOpcode())];
-      }catch(std::out_of_range e){
-         //ignore exception
-      }
-   }
-}
 
 inline Value* force_insert(llvm::Value* V, IRBuilder<>& Builder, const Twine& Name="")
 {
@@ -175,7 +156,7 @@ bool PerformPred::runOnFunction(Function &F)
 
    if(cpu_times == NULL){
       Type* ETy = Type::getInt32Ty(F.getContext());
-      Type* ATy = ArrayType::get(ETy, NumTypes);
+      Type* ATy = ArrayType::get(ETy, NumGroups);
       cpu_times = new GlobalVariable(ATy, false, GlobalValue::InternalLinkage, ConstantFP::get(ETy, 1.0L), "cpuTime");
    }
 
@@ -192,7 +173,7 @@ bool PerformPred::runOnFunction(Function &F)
       BranchProbability freq = BFE.getBlockFreq(&BB)/EntryFreq;
       SumRhs = CreateMul(Builder, SumRhs, freq);
       SumRhs->setName(BB.getName()+".bfreq");
-#if PRED_TYPE == EXEC_TIME
+#ifdef PRED_TYPE_exec_time
       SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
       SumLhs->setName(BB.getName()+".sfreq");
 #else
@@ -227,7 +208,7 @@ bool PerformPred::runOnFunction(Function &F)
       }else
          pred_cls.emplace_back(&BB, SumRhs); /* DYNAMIC_LOOP_INST */
 
-#if PRED_TYPE == EXEC_TIME
+#ifdef PRED_TYPE_exec_time
       Instruction* SumLI = dyn_cast<Instruction>(SumLhs);
       BasicBlock* InsertB = Builder.GetInsertBlock();
       if(DomT.dominates(InsertB, SumLI->getParent())){ 
@@ -262,13 +243,18 @@ bool PerformPred::runOnFunction(Function &F)
 #endif
    }
    PrintSum = SumLhs;
-   memset(Loads, 0, sizeof(Value*)*NumTypes);
+   memset(Loads, 0, sizeof(Value*)*NumGroups);
 
    if(Ddg){
       lle::Resolver<NoResolve> R;
       auto Res = R.resolve(PrintSum);
       DDGraph ddg(Res, PrintSum);
       WriteGraph(&ddg, F.getName()+"-ddg");
+   }
+
+   if(F.getName() == "main"){
+      // this is main function
+      //insert_timing_source();
    }
 
    return true;
@@ -308,10 +294,16 @@ void PerformPred::print(llvm::raw_ostream & OS, const llvm::Module * M) const
 llvm::Value* PerformPred::cost(BasicBlock& BB, IRBuilder<>& Builder)
 {
    auto I32Ty = Type::getInt32Ty(BB.getContext());
-#if PRED_TYPE == EXEC_TIME
+#ifdef PRED_TYPE_exec_time
    unsigned InstCounts[NumTypes] = {0};
 
-   count(BB, InstCounts);
+   for(auto& I : BB){
+      try{
+         ++InstCounts[source.instGroup(I)];
+      }catch(std::out_of_range e){
+         //ignore exception
+      }
+   }
    Value* Sum = ConstantInt::get(I32Ty, 0);
 
    for(unsigned Idx = 0; Idx<NumTypes; ++Idx){
@@ -322,7 +314,7 @@ llvm::Value* PerformPred::cost(BasicBlock& BB, IRBuilder<>& Builder)
          Value* C = Builder.CreateGEP(cpu_times, Arg);
          Loads[Idx] = Builder.CreateLoad(C, TypeNames[Idx]);
       }
-      Value* S = Builder.CreateMul(ConstantInt::get(I32Ty, Num), Loads[Idx]/*ConstantInt::get(I32Ty,1)*/);
+      Value* S = Builder.CreateMul(ConstantInt::get(I32Ty, Num), Loads[Idx]);
       Sum = Builder.CreateAdd(Sum, S);
    }
    return Sum;

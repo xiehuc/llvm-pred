@@ -11,7 +11,7 @@
  * return a timing, mul timing_res to calc real time
  */
 
-#if (defined TIMING_TSC) || (defined TIMING_TSCP)
+#if (defined TIMING_tsc) || (defined TIMING_tscp)
 
 #include <stdio.h>
 #include <errno.h>
@@ -22,7 +22,7 @@
 /* We use 64bit values for the times.  */
 typedef unsigned long long int hp_timing_t;
 
-#ifdef TIMING_TSC
+#ifdef TIMING_tsc
 /** copy code from simple-pmu:cycles.h (http://halobates.de/simple-pmu) **/
 static inline hp_timing_t _timing(void)
 {
@@ -82,10 +82,7 @@ uint64_t timing()
 
 #endif
 
-#ifdef TIMING_TSCP
-#endif
-
-#ifdef TIMING_CLOCK_GETTIME
+#ifdef TIMING_clock_gettime
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>

@@ -28,12 +28,12 @@
 #define DISABLE(expr) 
 
 // a assert with output llvm values
-#define Assert(expr, value) assert( (expr) || (errs()<<"\n>>>"<<value<<"<<<\n",0) )
+#define Assert(expr, value) assert( (expr) || (llvm::errs()<<"\n>>>"<<value<<"<<<\n",0) )
 
 // a assert which always need check
 #define AssertRuntime(expr, msg) if( !(expr) ){ \
-   errs()<<"Assert Failed:"<<__FILE__<<":"<<__LINE__<<"\n"; \
-   errs()<<msg<<"\n";\
+   llvm::errs()<<"Assert Failed:"<<__FILE__<<":"<<__LINE__<<"\n"; \
+   llvm::errs()<<msg<<"\n";\
    assert(#expr);\
    exit(-1);\
 }
@@ -49,13 +49,7 @@ class raw_temporary_string_stream: public llvm::raw_string_ostream
 #define AssertThrow(expr, except) {if(!(expr)) throw except;}
 #define dbg() (raw_temporary_string_stream()<<"")
 
-#define ret_on_failed(expr,msg,ret) { if(!(expr)){errs()<<"Failed at "<<__LINE__<<":"<<msg<<"\n"; return ret;} }
+#define ret_on_failed(expr,msg,ret) { if(!(expr)){llvm::errs()<<"Failed at "<<__LINE__<<":"<<msg<<"\n"; return ret;} }
 #define ret_null_fail(expr,msg) ret_on_failed(expr,msg,NULL);
-
-// ==========================================
-//                 Duplicated
-// ==========================================
-
-#define VERBOSE(expr,verb) ( (expr) || (errs()<<"<<HERE>>:"<<*verb<<"\n",0))
 
 #endif

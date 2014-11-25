@@ -3,13 +3,12 @@
 
 #cmakedefine LLVM_VERSION_MAJOR @LLVM_VERSION_MAJOR@
 #cmakedefine LLVM_VERSION_MINOR @LLVM_VERSION_MINOR@
-#define BLOCK_FREQ 1
-#define EXEC_TIME 2
-#cmakedefine PRED_TYPE @PRED_TYPE@
 #ifndef NO_DEBUG
 #cmakedefine NO_DEBUG
 #endif
+#define PRED_TYPE_@PRED_TYPE@
 #define TIMING_@TIMING@
+#define TIMING_SOURCE_@TIMING_SOURCE@
 
 //hide clobber result when doing memory analysis dependencies
 #define HIDE_CLOBBER 1
