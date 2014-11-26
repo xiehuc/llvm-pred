@@ -143,12 +143,16 @@ BasicBlock* PerformPred::promote(Instruction* LoopTC)
       ++Ite;
    }
 
-   BasicBlock* InsertInto = NULL;
+   BasicBlock* InsertInto, *dep;
    Assert(depends.size() > 0,"");
    InsertInto = depends.front()->getParent();
    if(depends.size()>1){
-      for(auto Ite = depends.begin()+1, E = depends.end(); Ite != E; ++Ite)
-         InsertInto = DomT.findNearestCommonDominator(InsertInto, (*Ite)->getParent());
+      /* let C is insert point, 
+       * dep1 dom C, dep2 dom C => dep1 dom dep2 or dep2 dom dep1 */
+      for(auto Ite = depends.begin()+1, E = depends.end(); Ite != E; ++Ite){
+         dep = (*Ite)->getParent();
+         InsertInto = DomT.dominates(InsertInto, dep)?dep:InsertInto;
+      }
    }
    if(LoopTC->getParent() == InsertInto) return InsertInto;
 
@@ -222,7 +226,7 @@ bool PerformPred::runOnFunction(Function &F)
       InsertB = Builder.GetInsertBlock();
       if(DomT.dominates(InsertB, SumLP))
          //if promote too much, Insert before SumLI, we should demote it.
-         InsertB = (DomT.dominates(SumLP, &BB)?SumLP:&BB;
+         InsertB = DomT.dominates(SumLP, &BB)?SumLP:&BB;
       if(!DomT.dominates(SumLP, InsertB)){
          //still couldn't dominate all, try create phi instruction
          BasicBlock* PhiBB = findCriticalBlock(SumLP, InsertB);
