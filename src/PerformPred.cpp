@@ -103,20 +103,18 @@ void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
    AU.addRequired<RegionInfoPass>();
    AU.setPreservesCFG();
 }
-
 BasicBlock* PerformPred::findCriticalBlock(BasicBlock *From, BasicBlock *To)
 {
-   RegionInfo& RI = getAnalysis<RegionInfoPass>().getRegionInfo();
+   /** From !dom \phi
+    *  \phi^-1 dom From where \phi^-1 == idom \phi
+    */
    DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-   Region* FromR = RI.getRegionFor(From);
-   if(FromR->contains(To)) return To;
-   while(!FromR->contains(To)){
-      if(DomT.dominates(FromR->getExit(), To)) 
-         return FromR->getExit();
-      FromR = FromR->getParent();
-   }
-   if(FromR->getExit() == To) return To;
-   else return NULL;
+   BasicBlock* Last = NULL;
+   do{
+      Last = To;
+      To = DomT.getNode(To)->getIDom()->getBlock();
+   }while(!DomT.dominates(To, From));
+   return Last;
 }
 
 BasicBlock* PerformPred::promote(Instruction* LoopTC)
@@ -224,18 +222,18 @@ bool PerformPred::runOnFunction(Function &F)
       if(!isa<Instruction>(SumLhs)) goto non_inst;
       SumLP = cast<Instruction>(SumLhs)->getParent();
       InsertB = Builder.GetInsertBlock();
-      if(DomT.dominates(InsertB, SumLP))
-         //if promote too much, Insert before SumLI, we should demote it.
-         InsertB = DomT.dominates(SumLP, &BB)?SumLP:&BB;
-      if(!DomT.dominates(SumLP, InsertB)){
+
+      if(DomT.dominates(SumLP, &BB)){
+         InsertB = DomT.dominates(SumLP, InsertB)?InsertB:SumLP;
+      }else{
          //still couldn't dominate all, try create phi instruction
-         BasicBlock* PhiBB = findCriticalBlock(SumLP, InsertB);
+         BasicBlock* PhiBB = findCriticalBlock(SumLP, &BB);
          Assert(PhiBB,"Couldn't find Critical Block in "<<
                SumLP->getParent()->getName()<<
                " from:"<<SumLP->getName()<<
-               " to:"<<InsertB->getName());
+               " to:"<<BB.getName());
          Builder.SetInsertPoint(PhiBB->getFirstNonPHI());
-         PHINode* Phi = Builder.CreatePHI(SumLhs->getType(), InsertB->getNumUses());
+         PHINode* Phi = Builder.CreatePHI(SumLhs->getType(), PhiBB->getNumUses());
          for(auto PI = pred_begin(PhiBB), PE = pred_end(PhiBB); PI!=PE; ++PI){
             BasicBlock* BB = *PI;
             auto Found = find_if(BfreqStack.rbegin(), BfreqStack.rend(), [BB,&DomT](Instruction* I){
@@ -245,6 +243,7 @@ bool PerformPred::runOnFunction(Function &F)
             Assert(Found != BfreqStack.rend(), "");
             Phi->addIncoming(*Found, BB);
          }
+         InsertB = DomT.dominates(PhiBB, InsertB)?InsertB:PhiBB;
          SumLhs = Phi;
       }
       Builder.SetInsertPoint(InsertB->getTerminator());
