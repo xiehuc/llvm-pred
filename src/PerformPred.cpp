@@ -1,6 +1,6 @@
 #include "preheader.h"
-#include <llvm/Analysis/PostDominators.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Analysis/RegionInfo.h>
 #include <llvm/Support/GraphWriter.h>
 #include <llvm/Analysis/LoopInfo.h>
 #include <llvm/IR/GlobalVariable.h>
@@ -25,7 +25,6 @@ namespace lle {
 
 class lle::PerformPred : public llvm::FunctionPass
 {
-   llvm::GlobalVariable* cpu_times = NULL;
    llvm::Value* PrintSum; // a sum value used for print
    enum ClassifyType {
       STATIC_BLOCK,        // 静态预测的普通基本块
@@ -55,14 +54,13 @@ class lle::PerformPred : public llvm::FunctionPass
    static char ID;
    PerformPred():llvm::FunctionPass(ID) {}
    bool runOnFunction(llvm::Function& F) override;
-   //bool runOnSCC(llvm::CallGraphSCC& SCC) override;
    void getAnalysisUsage(llvm::AnalysisUsage& AU) const override;
    void print(llvm::raw_ostream&,const llvm::Module*) const override;
 
    private:
-   void insert_timing_source(llvm::Function* Main);
-   llvm::Value* cost(llvm::BasicBlock& BB, llvm::IRBuilder<>& Builder);
+   llvm::Value* count(llvm::BasicBlock& BB, llvm::IRBuilder<>& Builder);
    llvm::BasicBlock* promote(llvm::Instruction* LoopTC);
+   llvm::BasicBlock* findCriticalBlock(llvm::BasicBlock* From, llvm::BasicBlock* To);
 };
 
 using namespace llvm;
@@ -71,7 +69,6 @@ using namespace lle;
 char PerformPred::ID = 0;
 static RegisterPass<PerformPred> X("PerfPred", "get Performance Predication Model");
 
-static const char* const TypeNames[] = {"AddSub", "MulDiv", "Mem", "Save"};
 static Value* Loads[NumGroups] = {NULL};
 
 
@@ -101,11 +98,25 @@ static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbabilit
 
 void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
 {
-   //CallGraphSCCPass::getAnalysisUsage(AU);
    AU.addRequired<BlockFreqExpr>();
    AU.addRequired<DominatorTreeWrapperPass>();
-   //AU.addRequired<PostDominatorTree>();
+   AU.addRequired<RegionInfoPass>();
    AU.setPreservesCFG();
+}
+
+BasicBlock* PerformPred::findCriticalBlock(BasicBlock *From, BasicBlock *To)
+{
+   RegionInfo& RI = getAnalysis<RegionInfoPass>().getRegionInfo();
+   DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+   Region* FromR = RI.getRegionFor(From);
+   if(FromR->contains(To)) return To;
+   while(!FromR->contains(To)){
+      if(DomT.dominates(FromR->getExit(), To)) 
+         return FromR->getExit();
+      FromR = FromR->getParent();
+   }
+   if(FromR->getExit() == To) return To;
+   else return NULL;
 }
 
 BasicBlock* PerformPred::promote(Instruction* LoopTC)
@@ -151,24 +162,21 @@ bool PerformPred::runOnFunction(Function &F)
    if( F.isDeclaration() ) return false;
    BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
    DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-   //PostDominatorTree& PDomT = getAnalysis<PostDominatorTree>();
    pred_cls.clear();
+   BasicBlock* SumLP, *InsertB;
+   Type* I32Ty = Type::getInt32Ty(F.getContext());
 
-   if(cpu_times == NULL){
-      Type* ETy = Type::getInt32Ty(F.getContext());
-      Type* ATy = ArrayType::get(ETy, NumGroups);
-      cpu_times = new GlobalVariable(ATy, false, GlobalValue::InternalLinkage, ConstantFP::get(ETy, 1.0L), "cpuTime");
-   }
+   source.initArray(F.getParent(), I32Ty);
 
    IRBuilder<> Builder(F.getEntryBlock().getTerminator());
-   auto I32Ty = Type::getInt32Ty(F.getContext());
    Value* SumLhs = ConstantInt::get(I32Ty, 0), *SumRhs;
    BlockFrequency EntryFreq = BFE.getBlockFreq(&F.getEntryBlock());
+
    for(auto& BB : F){
       auto FreqExpr = BFE.getBlockFreqExpr(&BB);
       if(FreqExpr.second != NULL) continue;
       // process other blocks outside loops
-      SumRhs = cost(BB, Builder);
+      SumRhs = count(BB, Builder);
       // XXX use scale in caculate
       BranchProbability freq = BFE.getBlockFreq(&BB)/EntryFreq;
       SumRhs = CreateMul(Builder, SumRhs, freq);
@@ -197,11 +205,11 @@ bool PerformPred::runOnFunction(Function &F)
          Builder.SetInsertPoint(InsertPos);
       }else
          Builder.SetInsertPoint(F.getEntryBlock().getTerminator());
-      SumRhs = cost(BB, Builder);
+      SumRhs = count(BB, Builder);
       if(LoopTC->getType()!= I32Ty)
          LoopTC = Builder.CreateCast(Instruction::SExt, LoopTC, I32Ty);
-      Value* freq = CreateMul(Builder, LoopTC, FreqExpr.first); // trip_count * prob = freq
-      SumRhs = Builder.CreateMul(freq, SumRhs);
+      Value* freq = CreateMul(Builder, LoopTC, FreqExpr.first); // \psi * \frac {bfreq_LLVM(N)} {bfreq_LLVM(H)}
+      SumRhs = Builder.CreateMul(freq, SumRhs); // cost = freq * count
       SumRhs->setName(BB.getName()+".bfreq");
       if(ConstantInt* CI = dyn_cast<ConstantInt>(SumRhs)){
          pred_cls.emplace_back(&BB, CI->getSExtValue()); /* DYNAMIC_LOOP_CONST */
@@ -209,20 +217,22 @@ bool PerformPred::runOnFunction(Function &F)
          pred_cls.emplace_back(&BB, SumRhs); /* DYNAMIC_LOOP_INST */
 
 #ifdef PRED_TYPE_exec_time
-      Instruction* SumLI = dyn_cast<Instruction>(SumLhs);
-      BasicBlock* InsertB = Builder.GetInsertBlock();
-      if(DomT.dominates(InsertB, SumLI->getParent())){ 
+      if(!isa<Instruction>(SumLhs)) goto non_inst;
+      SumLP = cast<Instruction>(SumLhs)->getParent();
+      InsertB = Builder.GetInsertBlock();
+      if(DomT.dominates(InsertB, SumLP))
          //if promote too much, Insert before SumLI, we should demote it.
-         Builder.SetInsertPoint(SumLI->getParent()->getTerminator());
-         InsertB = Builder.GetInsertBlock();
-      }
-      if(SumLI && !DomT.dominates(SumLI->getParent(), InsertB) && InsertB->getNumUses()>1){
+         InsertB = (DomT.dominates(SumLP, &BB)?SumLP:&BB;
+      if(!DomT.dominates(SumLP, InsertB)){
          //still couldn't dominate all, try create phi instruction
-         auto save = Builder.saveIP();
-         Builder.SetInsertPoint(InsertB->getFirstNonPHI());
-         PHINode* Phi = Builder.CreatePHI(SumLI->getType(), InsertB->getNumUses());
-         Builder.restoreIP(save);
-         for(auto PI = pred_begin(InsertB), PE = pred_end(InsertB); PI!=PE; ++PI){
+         BasicBlock* PhiBB = findCriticalBlock(SumLP, InsertB);
+         Assert(PhiBB,"Couldn't find Critical Block in "<<
+               SumLP->getParent()->getName()<<
+               " from:"<<SumLP->getName()<<
+               " to:"<<InsertB->getName());
+         Builder.SetInsertPoint(PhiBB->getFirstNonPHI());
+         PHINode* Phi = Builder.CreatePHI(SumLhs->getType(), InsertB->getNumUses());
+         for(auto PI = pred_begin(PhiBB), PE = pred_end(PhiBB); PI!=PE; ++PI){
             BasicBlock* BB = *PI;
             auto Found = find_if(BfreqStack.rbegin(), BfreqStack.rend(), [BB,&DomT](Instruction* I){
                   return DomT.dominates(I->getParent(), BB);
@@ -233,7 +243,9 @@ bool PerformPred::runOnFunction(Function &F)
          }
          SumLhs = Phi;
       }
+      Builder.SetInsertPoint(InsertB->getTerminator());
 
+non_inst:
       SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
       SumLhs->setName(BB.getName()+".sfreq");/* sum freq */
       BfreqStack.push_back(dyn_cast<Instruction>(SumLhs));
@@ -254,7 +266,7 @@ bool PerformPred::runOnFunction(Function &F)
 
    if(F.getName() == "main"){
       // this is main function
-      //insert_timing_source();
+      source.insert_load_source(F);
    }
 
    return true;
@@ -291,28 +303,29 @@ void PerformPred::print(llvm::raw_ostream & OS, const llvm::Module * M) const
 }
 
 
-llvm::Value* PerformPred::cost(BasicBlock& BB, IRBuilder<>& Builder)
+llvm::Value* PerformPred::count(BasicBlock& BB, IRBuilder<>& Builder)
 {
    auto I32Ty = Type::getInt32Ty(BB.getContext());
 #ifdef PRED_TYPE_exec_time
-   unsigned InstCounts[NumTypes] = {0};
+   unsigned InstCounts[NumGroups] = {0};
 
    for(auto& I : BB){
       try{
-         ++InstCounts[source.instGroup(I)];
+         ++InstCounts[source.instGroup(&I)];
       }catch(std::out_of_range e){
          //ignore exception
       }
    }
    Value* Sum = ConstantInt::get(I32Ty, 0);
 
-   for(unsigned Idx = 0; Idx<NumTypes; ++Idx){
+   for(unsigned Idx = 0; Idx<NumGroups; ++Idx){
       unsigned Num = InstCounts[Idx];
       if(Num == 0) continue;
       if(Loads[Idx]==NULL){
-         Value* Arg[2] = {ConstantInt::get(I32Ty,0), ConstantInt::get(I32Ty, Idx)};
-         Value* C = Builder.CreateGEP(cpu_times, Arg);
-         Loads[Idx] = Builder.CreateLoad(C, TypeNames[Idx]);
+         auto save = Builder.saveIP();
+         Builder.SetInsertPoint(BB.getParent()->getEntryBlock().getFirstNonPHI());
+         Loads[Idx] = source.createLoad(Builder, (InstGroups)Idx);
+         Builder.restoreIP(save);
       }
       Value* S = Builder.CreateMul(ConstantInt::get(I32Ty, Num), Loads[Idx]);
       Sum = Builder.CreateAdd(Sum, S);
