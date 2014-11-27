@@ -264,6 +264,7 @@ non_inst:
 #endif
    }
    PrintSum = SumLhs;
+   ValueProfiler::insertValueTrap(PrintSum, Builder.GetInsertPoint());
    memset(Loads, 0, sizeof(Value*)*NumGroups);
 
    if(Ddg){
