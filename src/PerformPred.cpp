@@ -95,6 +95,12 @@ static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbabilit
    if(n!=1) Ret = Builder.CreateMul(Ret, ConstantInt::get(I32Ty, n));
    return Builder.CreateSDiv(Ret, ConstantInt::get(I32Ty, d));
 }
+static Value* CreateAdd(IRBuilder<>& Builder, Value* LHS, Value* RHS)
+{
+   if(LHS == NULL) return RHS;
+   if(RHS == NULL) return LHS;
+   return Builder.CreateAdd(LHS, RHS);
+}
 
 void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
 {
@@ -171,7 +177,7 @@ bool PerformPred::runOnFunction(Function &F)
    source.initArray(F.getParent(), I32Ty);
 
    IRBuilder<> Builder(F.getEntryBlock().getTerminator());
-   Value* SumLhs = ConstantInt::get(I32Ty, 0), *SumRhs;
+   Value* SumLhs = NULL, *SumRhs = NULL;
    BlockFrequency EntryFreq = BFE.getBlockFreq(&F.getEntryBlock());
 
    for(auto& BB : F){
@@ -184,7 +190,7 @@ bool PerformPred::runOnFunction(Function &F)
       SumRhs = CreateMul(Builder, SumRhs, freq);
       SumRhs->setName(BB.getName()+".bfreq");
 #ifdef PRED_TYPE_exec_time
-      SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
+      SumLhs = CreateAdd(Builder, SumLhs, SumRhs);
       SumLhs->setName(BB.getName()+".sfreq");
 #else
       SumRhs = force_insert(SumRhs, Builder, BB.getName()+".bfreq");
@@ -219,7 +225,7 @@ bool PerformPred::runOnFunction(Function &F)
          pred_cls.emplace_back(&BB, SumRhs); /* DYNAMIC_LOOP_INST */
 
 #ifdef PRED_TYPE_exec_time
-      if(!isa<Instruction>(SumLhs)) goto non_inst;
+      if(SumLhs==NULL) goto non_inst;
       SumLP = cast<Instruction>(SumLhs)->getParent();
       InsertB = Builder.GetInsertBlock();
 
@@ -249,7 +255,7 @@ bool PerformPred::runOnFunction(Function &F)
       Builder.SetInsertPoint(InsertB->getTerminator());
 
 non_inst:
-      SumLhs = Builder.CreateAdd(SumLhs, SumRhs);
+      SumLhs = CreateAdd(Builder, SumLhs, SumRhs);
       SumLhs->setName(BB.getName()+".sfreq");/* sum freq */
       BfreqStack.push_back(dyn_cast<Instruction>(SumLhs));
 #else
@@ -298,11 +304,15 @@ void PerformPred::print(llvm::raw_ostream & OS, const llvm::Module * M) const
             break;
       }
    }
+   OS<<"# Block Sum:"<<*PrintSum<<"\n";
+   OS<<"\n";
 
+   /*
    lle::Resolver<NoResolve> R;
    auto Res = R.resolve(PrintSum);
    DDGraph ddg(Res, PrintSum);
    OS<<ddg.expr()<<"\n";
+   */
 }
 
 
@@ -319,7 +329,7 @@ llvm::Value* PerformPred::count(BasicBlock& BB, IRBuilder<>& Builder)
          //ignore exception
       }
    }
-   Value* Sum = ConstantInt::get(I32Ty, 0);
+   Value* Sum = NULL;
 
    for(unsigned Idx = 0; Idx<NumGroups; ++Idx){
       unsigned Num = InstCounts[Idx];
@@ -331,9 +341,9 @@ llvm::Value* PerformPred::count(BasicBlock& BB, IRBuilder<>& Builder)
          Builder.restoreIP(save);
       }
       Value* S = Builder.CreateMul(ConstantInt::get(I32Ty, Num), Loads[Idx]);
-      Sum = Builder.CreateAdd(Sum, S);
+      Sum = CreateAdd(Builder, Sum, S);
    }
-   return Sum;
+   return Sum?:ConstantInt::get(I32Ty,0);
 #else
    return ConstantInt::get(I32Ty,1);
 #endif

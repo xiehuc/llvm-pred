@@ -59,10 +59,18 @@ InstGroups TimingSource::instGroup(Instruction* I) const throw(std::out_of_range
    else throw e;
 
    switch(Op){
+      case Instruction::FAdd:
+      case Instruction::FSub:
+      case Instruction::Sub:
       case Instruction::Add: op = Add;break;
+      case Instruction::FMul:
       case Instruction::Mul: op = Mul;break;
-      /*case Instruction::Div: op = Div;break;
-      case Instruction::Mod: op = Mod;break;*/
+      case Instruction::FDiv:
+      case Instruction::UDiv:
+      case Instruction::SDiv: op = Div;break;
+      case Instruction::FRem:
+      case Instruction::SRem:
+      case Instruction::URem: op = Mod;break;
       default: throw e;
    }
 
