@@ -11,9 +11,9 @@
 
 #include <deque>
 #include <ValueProfiling.h>
+#include <TimingSource.h>
 
 #include "BlockFreqExpr.h"
-#include "TimingSource.h"
 #include "Resolver.h"
 #include "ddg.h"
 #include "debug.h"
@@ -48,7 +48,7 @@ class lle::PerformPred : public llvm::FunctionPass
       }data;
    };
    std::vector<Classify> pred_cls; // 对每个block进行分类, 并且储存关键的属性.
-   TimingSource source;
+   llvm::TimingSource source;
 
    public:
    static char ID;
@@ -174,7 +174,7 @@ bool PerformPred::runOnFunction(Function &F)
    BasicBlock* SumLP, *InsertB;
    Type* I32Ty = Type::getInt32Ty(F.getContext());
 
-   source.initArray(F.getParent(), I32Ty);
+   source.init(F.getParent(), I32Ty);
 
    IRBuilder<> Builder(F.getEntryBlock().getTerminator());
    Value* SumLhs = NULL, *SumRhs = NULL;

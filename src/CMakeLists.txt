@@ -26,9 +26,7 @@ add_library(LLVMPred SHARED
    BlockFreqExpr.cpp
 	LoopTripCount.cpp
    LoopSimplify.cpp
-   TimingSource.cpp
    LibFReshape.cpp
-   ValueToEdge.cpp
    SlashShrink.cpp
    PerformPred.cpp
    InstTiming.cpp
