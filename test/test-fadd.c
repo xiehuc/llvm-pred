@@ -2,7 +2,7 @@
 
 #define REPEAT 100
 /* use a template to generate instruction */
-int inst_template(const char* templ);
+int inst_template(const char* templ, ...);
 
 int main()
 {
