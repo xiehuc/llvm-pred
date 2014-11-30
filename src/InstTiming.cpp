@@ -147,68 +147,68 @@ static Value* rand_add(Instruction* InsPoint)
    return BinaryOperator::CreateAdd(I_Lhs, I_Rhs, "", InsPoint);
 }
 
-static Value* loadwithorder(Instruction* InsPoint)
+//This type of load instruction will get the value form the same memory address
+static Value* load(Instruction* InsPoint)
 {
-   int i;
-   LoadInst* l;
-   CallInst* Template = dyn_cast<CallInst>(InsPoint);
-   Value* vars = Template->getArgOperand(1);
-   Value* vare = Template->getArgOperand(2);
-
-   Type* FTy = Type::getDoubleTy(InsPoint->getContext());
-   Type* I32Ty = Type::getInt32Ty(InsPoint->getContext());
-   Value* F_One = ConstantFP::get(FTy, 1.0L);
-   Value* I_One = ConstantInt::get(I32Ty, 1);
-   Value* F_Lhs = F_One, *I_Lhs = I_One;
-
-   for(i=0;i<REPEAT;++i)
-      I_Lhs = BinaryOperator::CreateAdd(I_Lhs, I_One, "", InsPoint);
-   for(i=0;i<REPEAT;++i)
-      F_Lhs = BinaryOperator::CreateFAdd(F_Lhs, F_One, "", InsPoint);
-   for(i=0;i<REPEAT/2;++i){
-      l = new LoadInst(vars,"",true,InsPoint);
-      l = new LoadInst(vare,"",true,InsPoint);
-   }
-
-   Value* I_Rhs = CastInst::Create(CastInst::FPToSI, F_Lhs, I32Ty, "", InsPoint);
-   return BinaryOperator::CreateAdd(I_Lhs, I_Rhs, "", InsPoint);
-}
-
-static Value* loadcwithorder(Instruction* InsPoint)
-{
-   int i;
    LoadInst* l;
    CallInst* Template = dyn_cast<CallInst>(InsPoint);
    Value* var = Template->getArgOperand(1);
-   Type* i32ty = Type::getInt32Ty(InsPoint->getContext());
+   
+   for(int i=0;i<REPEAT;++i)
+      l = new LoadInst(var,"",true,InsPoint);	
 
-   Type* FTy = Type::getDoubleTy(InsPoint->getContext());
-   Type* I32Ty = Type::getInt32Ty(InsPoint->getContext());
-   Value* F_One = ConstantFP::get(FTy, 1.0L);
-   Value* I_One = ConstantInt::get(I32Ty, 1);
-   Value* F_Lhs = F_One, *I_Lhs = I_One;
-
-   for(i=0;i<REPEAT;++i)
-      I_Lhs = BinaryOperator::CreateAdd(I_Lhs, I_One, "", InsPoint);
-   for(i=0;i<REPEAT;++i)
-      F_Lhs = BinaryOperator::CreateFAdd(F_Lhs, F_One, "", InsPoint);
-   for(i=0;i<REPEAT;++i){
-      Constant* int32 = ConstantInt::get(i32ty,i);
-      ArrayRef<Value*> oneele(int32);
-      Value* addr = GetElementPtrInst::CreateInBounds(var,oneele,"",InsPoint);
-      l = new LoadInst(addr,"",true,InsPoint);
-   }
-
-   Value* I_Rhs = CastInst::Create(CastInst::FPToSI, F_Lhs, I32Ty, "", InsPoint);
-   return BinaryOperator::CreateAdd(I_Lhs, I_Rhs, "", InsPoint);
+   return l;
 }
 
-static Value* loadwithmix(Instruction* InsPoint)
+/*
+ * This type of load instruction will first get the value from the first place
+ * of the array, and then last, and then first, and so on...
+ */
+static Value* loadse(Instruction* InsPoint)
 {
    LoadInst* l;
    CallInst* Template = dyn_cast<CallInst>(InsPoint);
    Value* vars = Template->getArgOperand(1);
    Value* vare = Template->getArgOperand(2);
+   Assert(vare, "Missing one parameter");
+
+   for(int i=0;i<REPEAT;++i){
+       l = new LoadInst(vars,"",true,InsPoint);
+       l = new LoadInst(vare,"",true,InsPoint);
+   }
+
+   return l;  
+}
+
+/*
+ * This type of load instruction will take take value from the array in order,
+ * like, the first, second, third, ...
+ */
+static Value* loadc(Instruction* InsPoint)
+{
+   CallInst* Template = dyn_cast<CallInst>(InsPoint);
+   Value* var = Template->getArgOperand(1);
+   LoadInst* l;
+   Type* i32ty = Type::getInt32Ty(InsPoint->getContext());
+
+   for(int i=0;i<REPEAT;i++)
+   {
+        Constant* int32 = ConstantInt::get(i32ty,i);
+        ArrayRef<Value*> oneele(int32);
+        Value* addr = GetElementPtrInst::CreateInBounds(var,oneele,"",InsPoint);
+        l = new LoadInst(addr,"",InsPoint);
+        l->setVolatile(true);
+   }
+   return l;
+}
+
+static Value* loadsewithmix(Instruction* InsPoint)
+{
+   LoadInst* l;
+   CallInst* Template = dyn_cast<CallInst>(InsPoint);
+   Value* vars = Template->getArgOperand(1);
+   Value* vare = Template->getArgOperand(2);
+   Assert(vare, "Missing one parameter");
 
    Type* FTy = Type::getDoubleTy(InsPoint->getContext());
    Type* I32Ty = Type::getInt32Ty(InsPoint->getContext());
@@ -254,13 +254,15 @@ static Value* loadcwithmix(Instruction* InsPoint)
    Value* I_Rhs = CastInst::Create(CastInst::FPToSI, F_Lhs, I32Ty, "", InsPoint);
    return BinaryOperator::CreateAdd(I_Lhs, I_Rhs, "", InsPoint);
 }
-static Value* loadwithrand(Instruction* InsPoint)
+
+static Value* loadsewithrand(Instruction* InsPoint)
 {
    int rand, j=0;
    LoadInst* l;
    CallInst* Template = dyn_cast<CallInst>(InsPoint);
    Value* vars = Template->getArgOperand(1);
    Value* vare = Template->getArgOperand(2);
+   Assert(vare, "Missing one parameter");
 
    Type* FTy = Type::getDoubleTy(InsPoint->getContext());
    Type* I32Ty = Type::getInt32Ty(InsPoint->getContext());
@@ -291,6 +293,7 @@ static Value* loadwithrand(Instruction* InsPoint)
    Value* I_Rhs = CastInst::Create(CastInst::FPToSI, F_Lhs, I32Ty, "", InsPoint);
    return BinaryOperator::CreateAdd(I_Lhs, I_Rhs, "", InsPoint);
 }
+
 static Value* loadcwithrand(Instruction* InsPoint)
 {
    int rand, j=0;
@@ -327,50 +330,7 @@ static Value* loadcwithrand(Instruction* InsPoint)
    return BinaryOperator::CreateAdd(I_Lhs, I_Rhs, "", InsPoint);
 }
 
-static Value* loadse(Instruction* InsPoint)
-{
-   LoadInst* l;
-   CallInst* Template = dyn_cast<CallInst>(InsPoint);
-   Value* vars = Template->getArgOperand(1);
-   Value* vare = Template->getArgOperand(2);
 
-   for(int i=0;i<REPEAT;++i){
-       l = new LoadInst(vars,"",true,InsPoint);
-       l = new LoadInst(vare,"",true,InsPoint);
-   }
-
-   return l;  
-}
-
-static Value* loadc(Instruction* InsPoint)
-{
-   CallInst* Template = dyn_cast<CallInst>(InsPoint);
-   Value* var = Template->getArgOperand(1);
-   LoadInst* l;
-   Type* i32ty = Type::getInt32Ty(InsPoint->getContext());
-
-   for(int i=0;i<REPEAT;i++)
-   {
-        Constant* int32 = ConstantInt::get(i32ty,i);
-        ArrayRef<Value*> oneele(int32);
-        Value* addr = GetElementPtrInst::CreateInBounds(var,oneele,"",InsPoint);
-        l = new LoadInst(addr,"",InsPoint);
-        l->setVolatile(true);
-   }
-   return l;
-}
-
-static Value* load(Instruction* InsPoint)
-{
-   LoadInst* l;
-   CallInst* Template = dyn_cast<CallInst>(InsPoint);
-   Value* var = Template->getArgOperand(1);
-   
-   for(int i=0;i<REPEAT;++i)
-      l = new LoadInst(var,"",true,InsPoint);	
-
-   return l;
-}
 
 std::unordered_map<std::string, lle::InstTiming::TemplateFunc> 
 lle::InstTiming::ImplMap = {
@@ -381,10 +341,8 @@ lle::InstTiming::ImplMap = {
    {"float_add",     float_add      },
    {"mix_add",       mix_add        },
    {"rand_add",      rand_add       },
-   {"loadwithmix",   loadwithmix    },
-   {"loadwithrand",  loadwithrand   },
-   {"loadwithorder", loadwithorder  },
+   {"loadsewithmix", loadsewithmix  },
+   {"loadsewithrand",loadsewithrand },
    {"loadcwithmix",  loadcwithmix   },
-   {"loadcwithrand", loadcwithrand  },
-   {"loadcwithorder",loadcwithorder }
+   {"loadcwithrand", loadcwithrand  }
 };

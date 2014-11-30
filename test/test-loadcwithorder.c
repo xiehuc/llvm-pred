@@ -11,7 +11,9 @@ int main()
    for(int i=0;i<REPEAT;i++){
       uint64_t t_err = timing_err();
       beg = timing();
-      ref += inst_template("loadcwithorder",loadvar);
+      ref += inst_template("fix_add");
+      ref += inst_template("float_add");
+      ref += inst_template("loadc",loadvar);
       end = timing();
       sum += end-beg-t_err;
    }
