@@ -95,12 +95,14 @@ static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbabilit
    if(n!=1) Ret = Builder.CreateMul(Ret, ConstantInt::get(I32Ty, n));
    return Builder.CreateSDiv(Ret, ConstantInt::get(I32Ty, d));
 }
+#ifdef PRED_TYPE_exec_time
 static Value* CreateAdd(IRBuilder<>& Builder, Value* LHS, Value* RHS)
 {
    if(LHS == NULL) return RHS;
    if(RHS == NULL) return LHS;
    return Builder.CreateAdd(LHS, RHS);
 }
+#endif
 
 void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
 {
@@ -171,7 +173,6 @@ bool PerformPred::runOnFunction(Function &F)
    BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
    DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
    pred_cls.clear();
-   BasicBlock* SumLP, *InsertB;
    Type* I32Ty = Type::getInt32Ty(F.getContext());
 
    source.init(F.getParent(), I32Ty);
@@ -226,8 +227,8 @@ bool PerformPred::runOnFunction(Function &F)
 
 #ifdef PRED_TYPE_exec_time
       if(SumLhs==NULL) goto non_inst;
-      SumLP = cast<Instruction>(SumLhs)->getParent();
-      InsertB = Builder.GetInsertBlock();
+      BasicBlock* SumLP = cast<Instruction>(SumLhs)->getParent();
+      BasicBlock* InsertB = Builder.GetInsertBlock();
 
       if(DomT.dominates(SumLP, &BB)){
          InsertB = DomT.dominates(SumLP, InsertB)?InsertB:SumLP;
