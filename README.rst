@@ -25,6 +25,7 @@ script
 drawline.py : used to draw lines from value profiling
 dirdiff.sh  : compare two dir's llvmprof.out file and report whether they are
 same
+gettime.sh  : Used to build test files. Put this file in the build directory
 
 performance analysis based dynamic information
 -----------------------------------------------
