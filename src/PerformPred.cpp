@@ -10,7 +10,7 @@
 #include <llvm/IR/CFG.h>
 
 #include <deque>
-#include <ValueProfiling.h>
+#include <PredBlockProfiling.h>
 #include <TimingSource.h>
 
 #include "BlockFreqExpr.h"
@@ -195,13 +195,13 @@ bool PerformPred::runOnFunction(Function &F)
       SumLhs->setName(BB.getName()+".sfreq");
 #else
       SumRhs = force_insert(SumRhs, Builder, BB.getName()+".bfreq");
-      ValueProfiler::insertValueTrap(SumRhs, Builder.GetInsertPoint());
+      PredBlockProfiler::increaseBlockCounter(&BB, SumRhs, Builder.GetInsertPoint());
 #endif
       pred_cls.emplace_back(BFE.inLoop(&BB)?STATIC_LOOP:STATIC_BLOCK, &BB, freq);
    }
 
    SmallVector<Instruction*, 20> BfreqStack;
-   BfreqStack.push_back(dyn_cast<Instruction>(SumLhs)); // the last instr in entry block
+   if(SumLhs)BfreqStack.push_back(dyn_cast<Instruction>(SumLhs)); // the last instr in entry block
    for(auto& BB : F){
       auto FreqExpr = BFE.getBlockFreqExpr(&BB);
       Value* LoopTC = FreqExpr.second;
@@ -261,11 +261,11 @@ non_inst:
       BfreqStack.push_back(dyn_cast<Instruction>(SumLhs));
 #else
       force_insert(SumRhs, Builder, BB.getName()+".bfreq");
-      ValueProfiler::insertValueTrap(SumRhs, Builder.GetInsertPoint());
+      PredBlockProfiler::increaseBlockCounter(&BB, SumRhs, Builder.GetInsertPoint());
 #endif
    }
    PrintSum = SumLhs;
-   ValueProfiler::insertValueTrap(PrintSum, Builder.GetInsertPoint());
+   //ValueProfiler::insertValueTrap(PrintSum, Builder.GetInsertPoint());
    memset(Loads, 0, sizeof(Value*)*NumGroups);
 
    if(Ddg){
@@ -275,10 +275,12 @@ non_inst:
       WriteGraph(&ddg, F.getName()+"-ddg");
    }
 
+#ifdef PRED_TYPE_exec_time
    if(F.getName() == "main"){
       // this is main function
       source.insert_load_source(F);
    }
+#endif
 
    return true;
 }
