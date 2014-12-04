@@ -139,6 +139,8 @@ class lle::ResolverBase
    // and return true
    bool resolve_if(llvm::Value* V, std::function<bool(llvm::Value*)> lambda);
 
+   //llvm::Value* find_store(llvm::Use* V)
+
 };
 
 template<typename Impl = lle::NoResolve>

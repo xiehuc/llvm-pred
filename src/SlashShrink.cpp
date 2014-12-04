@@ -179,3 +179,31 @@ bool SlashShrink::runOnFunction(Function &F)
 
    return true;
 }
+
+char ReduceCode::ID = 0;
+
+static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
+{
+   Use& st_parameter = CI->getArgOperandUse(0);
+   //find_element_store(st_parameter, 0, 0, 1);
+   return IsPrint;
+}
+
+ReduceCode::ReduceCode():ModulePass(ID)
+{
+   Attributes["_gfortran_transfer_character_write"] = gfortran_write_stdout;
+   Attributes["_gfortran_transfer_integer_write"] = gfortran_write_stdout;
+   Attributes["_gfortran_transfer_real_write"] = gfortran_write_stdout;
+   Attributes["_gfortran_st_write"] = gfortran_write_stdout;
+   Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
+}
+
+void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
+{
+   AU.setPreservesAll();
+}
+
+bool ReduceCode::runOnModule(Module &M)
+{
+   return true;
+}

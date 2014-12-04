@@ -5,11 +5,18 @@
 #include <llvm/IR/Metadata.h>
 #include <llvm/Pass.h>
 
+#include <unordered_map>
 #include "Resolver.h"
+#include "util.h"
 
 namespace lle {
    struct MarkPreserve;
    class SlashShrink;
+   class ReduceCode;
+   enum AttributeFlags {
+      IsDeletable = 0,
+      IsPrint = IsDeletable
+   };
 };
 
 struct lle::MarkPreserve
@@ -51,10 +58,21 @@ class lle::SlashShrink: public llvm::FunctionPass
    llvm::SmallSet<std::string, 8> IgnoreFunc;
    int ShrinkLevel;
    public:
-      static char ID;
-      SlashShrink();
-      void getAnalysisUsage(llvm::AnalysisUsage& AU) const;
+   static char ID;
+   SlashShrink();
+   void getAnalysisUsage(llvm::AnalysisUsage& AU) const;
 
-      bool runOnFunction(llvm::Function& F);
+   bool runOnFunction(llvm::Function& F);
+};
+
+class lle::ReduceCode: public llvm::ModulePass
+{
+   typedef union_pair<AttributeFlags, AttributeFlags(*)(llvm::CallInst*)> Attribute_;
+   std::unordered_map<std::string, Attribute_> Attributes;
+   public:
+   static char ID;
+   ReduceCode();
+   void getAnalysisUsage(llvm::AnalysisUsage& AU) const override;
+   bool runOnModule(llvm::Module& M) override;
 };
 #endif

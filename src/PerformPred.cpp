@@ -14,6 +14,7 @@
 #include <TimingSource.h>
 
 #include "BlockFreqExpr.h"
+#include "SlashShrink.h"
 #include "Resolver.h"
 #include "ddg.h"
 #include "debug.h"
@@ -196,6 +197,7 @@ bool PerformPred::runOnFunction(Function &F)
 #else
       SumRhs = force_insert(SumRhs, Builder, BB.getName()+".bfreq");
       PredBlockProfiler::increaseBlockCounter(&BB, SumRhs, Builder.GetInsertPoint());
+      MarkPreserve::mark(dyn_cast<Instruction>(SumRhs));
 #endif
       pred_cls.emplace_back(BFE.inLoop(&BB)?STATIC_LOOP:STATIC_BLOCK, &BB, freq);
    }
@@ -262,6 +264,7 @@ non_inst:
 #else
       force_insert(SumRhs, Builder, BB.getName()+".bfreq");
       PredBlockProfiler::increaseBlockCounter(&BB, SumRhs, Builder.GetInsertPoint());
+      MarkPreserve::mark(dyn_cast<Instruction>(SumRhs));
 #endif
    }
    PrintSum = SumLhs;
