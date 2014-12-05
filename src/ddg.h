@@ -13,15 +13,18 @@
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/GraphTraits.h>
+#include <llvm/ADT/PointerUnion.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/DOTGraphTraits.h>
 #include <llvm/Support/CommandLine.h>
 
 #include "Resolver.h"
+#include "util.h"
 
 namespace lle{
    struct DDGNode;
-   typedef llvm::DenseMap<llvm::Value*, DDGNode > DDGraphImpl;
+   typedef llvm::PointerUnion<llvm::Value*, llvm::Use*> DDGraphKeyTy;
+   typedef llvm::DenseMap<DDGraphKeyTy, DDGNode > DDGraphImpl;
    typedef DDGraphImpl::value_type DDGValue;
    struct DDGraph;
    extern llvm::cl::opt<bool> Ddg;
@@ -89,6 +92,7 @@ struct lle::DDGraph :
 
    DDGValue* root; // the root for graph
    DDGraph(lle::ResolveResult& RR, llvm::Value* root);
+   DDGraph() {};
    expr_type expr(); 
 };
 

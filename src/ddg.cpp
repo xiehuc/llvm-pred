@@ -80,7 +80,8 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
       this->insert(make_value(I,DDGNode::UNSOLVED));
    }
    for(auto& N : *this){
-      auto found = c.find(N.first);
+      auto first = N.first.dyn_cast<Value*>();
+      auto found = c.find(first);
       DDGNode& node = N.second;
       if(node.flags() & DDGNode::UNSOLVED) continue;
       Use* implicity = (found == c.end())?nullptr:found->second;
@@ -91,7 +92,7 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
          ++v.second.ref_count;
          node.flags_ = DDGNode::IMPLICITY;
          if(auto CI = dyn_cast<CallInst>(implicity->getUser())){
-            Instruction* NI = dyn_cast<Instruction>(N.first);
+            Instruction* NI = dyn_cast<Instruction>(first);
             if(NI && CI->getCalledFunction() != NI->getParent()->getParent()){
                Argument* arg = findCallInstArgument(implicity);
                if(!arg) continue;
@@ -118,16 +119,17 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
    }
    for(auto& N : *this){
       // for stability, make sure all implicity marked over before this.
-      auto found = c.find(N.first);
+      auto first = N.first.dyn_cast<Value*>();
+      auto found = c.find(first);
       if(found != c.end()) continue;
 
-      Instruction* Inst = dyn_cast<llvm::Instruction>(N.first);
+      Instruction* Inst = dyn_cast<llvm::Instruction>(first);
       DDGNode& node = N.second;
       if(!Inst) continue;
       if(isa<CallInst>(Inst) && (N.second.flags_ & DDGNode::IMPLICITY))
          continue; // implicity callinst never can be direct solve
       for(auto O = Inst->op_begin(),E=Inst->op_end();O!=E;++O){
-         auto Target = this->find(*O);
+         auto Target = this->find(O->get());
          if(Target != this->end()){
             DDGValue* v = &*Target;
             ++v->second.ref_count;
@@ -146,7 +148,7 @@ static void to_expr(LoadInst* LI, DDGNode* N, int& R)
       N->set_expr(O.str());
    }else{
       Assert(N->impl().size()==1,"");
-      if(isa<CallInst>(N->impl().front()->first)){
+      if(isa<CallInst>(N->impl().front()->first.dyn_cast<Value*>())){
          N->set_expr(LHS(N).expr()+"{", N->load_inst()->second.expr()+"}");
       }else{
          N->set_expr(LHS(N).expr());
@@ -238,9 +240,9 @@ expr_type DDGraph::expr()
    int ref_num = 0;
    vector<DDGNode*> refs;
    for(auto I = po_begin(this), E = po_end(this); I!=E; ++I){
-      to_expr(I->first,&I->second,ref_num);
+      to_expr(I->first.dyn_cast<Value*>(),&I->second,ref_num);
 #ifdef EXPR_ENABLE_REF
-      if(I->second.ref_count>2 && !isa<Constant>(I->first)){
+      if(I->second.ref_count>2 && !isa<Constant>(I->first.dyn_cast<Value*>())){
          I->second.ref(++ref_num);
          refs.push_back(&I->second);
       }
@@ -261,8 +263,8 @@ string llvm::DOTGraphTraits<DDGraph*>::getNodeLabel(DDGValue* N,DDGraph* G)
 {
    std::string ret;
    llvm::raw_string_ostream os(ret);
-   N->first->print(os);
-   if(auto CI = dyn_cast<CallInst>(N->first)){
+   N->first.dyn_cast<Value*>()->print(os);
+   if(auto CI = dyn_cast<CallInst>(N->first.dyn_cast<Value*>())){
       Function* F = CI->getCalledFunction();
       if(!F) return ret;
       os<<"\n\t Argument Names: [ ";
