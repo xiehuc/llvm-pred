@@ -160,39 +160,6 @@ Use* SpecialResolve::operator()(Value *V, ResolverBase* RB)
    return NULL;
 }
 
-#if 0
-Use* GlobalResolve::findWriteOnGV(GlobalVariable *G)
-{
-   CacheType::iterator Ite;
-   if((Ite = Cache.find(G)) != Cache.end()) 
-      return Ite->second;
-
-   unsigned Nwrite = 0;
-   Use* last_write = nullptr;
-   for(auto I = G->use_begin(), E = G->use_end(); I != E; ++I){
-      if(isa<StoreInst>(*I) && I->getOperand(1) == G){
-         Nwrite++;
-         last_write = &I->getOperandUse(0);
-      }else if(CallInst* CI = dyn_cast<CallInst>(*I)){
-         Use *U = findOpUseOnInstruction(CI, *I);
-         if(!U) continue;
-         Argument* A = findCallInstArgument(U);
-         if(MayWriteToArgument(A)){
-            Nwrite++;
-            last_write = U;
-         }
-      }
-   }
-   if(Nwrite != 1){
-      //there a more than 2 or 0 times write , so we didn't sure about the
-      //result.
-      last_write = nullptr;
-   }
-   Cache.insert(make_pair(G,last_write));
-   return last_write;
-}
-#endif
-
 /**
  * find where store to a global variable. 
  * require there a only store inst on this global variable.
@@ -483,9 +450,9 @@ ResolverPass::~ResolverPass(){
 void ResolveEngine::do_solve(DDGraph& G, CallBack& C)
 {
    while(Use* un = G.popUnsolved()){
+      if(C(un)) continue;
       for(auto r = rules.rbegin(), e = rules.rend(); r!=e; ++r){
-         if(C(un)) continue;
-         if((*r)(un, G)) continue;
+         if((*r)(un, G)) break;
       }
    }
 }
@@ -529,21 +496,63 @@ const ResolveEngine::SolveRule ResolveEngine::direct_rule = [](Use* U, DDGraph& 
 };
 
 const ResolveEngine::SolveRule ResolveEngine::useonly_rule = [](Use* U, DDGraph& G){
-   LoadInst* LI = dyn_cast<LoadInst>(U->getUser());
-   if(LI == NULL) return false;
+   User* V = U->getUser();
    Use* Tg = U;
-   while( (Tg = Tg->getNext()) ){
+   if(isa<LoadInst>(V))
+      Tg = U; // if is load, find after use
+   else if(isa<GetElementPtrInst>(V))
+      Tg = &*V->use_begin(); // if is GEP, find all use @example : %5 = [GEP] ; store %6, %5
+   else return false;
+
+   do{
       //seems all things who use target is after target
       auto V = Tg->getUser();
       if(isa<StoreInst>(V) && V->getOperand(1) == Tg->get()){
+         DEBUG(errs()<<"UseOnly Rule:"<<*V<<"\n");
          G.addSolved(U, V->getOperandUse(0));
          return true;
       }
-   }
+   } while( (Tg = Tg->getNext()) );
    return false;
 };
 
+void GEPRule::operator()(ResolveEngine& RE)
+{
+   ResolveEngine::SolveRule S = [](Use* U, DDGraph& G){
+      // if isa GEP, means we already have solved before.
+      if(isa<GetElementPtrInst>(U->getUser())) return false;
+      Type* Ty = U->get()->getType();
+      if(Ty->isPointerTy()) Ty = Ty->getPointerElementType();
+      // only struct or array can have GEP
+      if(!Ty->isStructTy() && !Ty->isArrayTy()) return false;
+      Use* Tg = U;
+      bool ret = false;
+      while( (Tg = Tg->getNext()) ){
+         auto V = Tg->getUser();
+         if(isa<GetElementPtrInst>(V) && V->getOperand(0) == Tg->get() ){
+            // add all GEP to Unsolved
+            DEBUG(errs()<<"GEP Rule:"<<*V<<"\n");
+            G.addSolved(U, V->getOperandUse(0));
+            ret = true;
+         }
+      }
+      return ret;
+   };
+   RE.addRule(S);
+}
 const ResolveEngine::CallBack ResolveEngine::always_false = [](Use* U){
    return false;
 };
 
+Value* ResolveEngine::find_store(Use& Tg, CallBack C)
+{
+   Value* ret = NULL;
+   resolve(Tg, [&ret, &C](Use* U){
+         User* Ur = U->getUser();
+         if(isa<StoreInst>(Ur))
+            ret=Ur->getOperand(0);
+         bool res = C(U);
+         return res;
+      });
+   return ret;
+}

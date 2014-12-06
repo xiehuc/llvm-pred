@@ -1,6 +1,5 @@
 #include "preheader.h"
 #include "Resolver.h"
-#include "SlashShrink.h"
 #include "KnownLibCallInfo.h"
 
 #include <fstream>
@@ -10,13 +9,16 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/Dominators.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/CommandLine.h>
+#include <llvm/Support/GraphWriter.h>
 #include <llvm/Analysis/LibCallAliasAnalysis.h>
 
 #include <ValueProfiling.h>
 
-#include "util.h"
+#include "ddg.h"
+#include "SlashShrink.h"
 #include "debug.h"
 
 using namespace std;
@@ -181,13 +183,32 @@ bool SlashShrink::runOnFunction(Function &F)
 }
 
 char ReduceCode::ID = 0;
+static RegisterPass<ReduceCode> Y("Reduce", "Slash and Shrink Code to make a minicore program");
+
 
 static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
 {
    Use& st_parameter = CI->getArgOperandUse(0);
-   //find_element_store(st_parameter, 0, 0, 1);
-   return IsPrint;
+   ResolveEngine RE;
+   RE.addRule(GEPRule());
+   RE.addRule(RE.useonly_rule);
+   Value* Store = RE.find_store(st_parameter, [](Use* U){
+         if(auto GEP = dyn_cast<GetElementPtrInst>(U->getUser())){
+            if(GEP->getOperand(0) == U->get() && GEP->getNumIndices() == 3){
+               if(equal(dyn_cast<ConstantInt>(GEP->getOperand(1)), 0) &&
+                     equal(dyn_cast<ConstantInt>(GEP->getOperand(2)), 0) &&
+                     equal(dyn_cast<ConstantInt>(GEP->getOperand(3)), 1) )
+                  return false;
+            }
+            return true;
+         }
+         return false;
+         });
+   if(equal(dyn_cast<ConstantInt>(Store), 6)) // only 6 means write to stdout
+      return IsPrint;
+   return AttributeFlags::None;
 }
+
 
 ReduceCode::ReduceCode():ModulePass(ID)
 {
@@ -200,10 +221,21 @@ ReduceCode::ReduceCode():ModulePass(ID)
 
 void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
 {
+   AU.addRequired<DominatorTreeWrapperPass>();
    AU.setPreservesAll();
 }
 
 bool ReduceCode::runOnModule(Module &M)
 {
+   Function* F = M.getFunction("print_results_");
+   for(auto& B : *F){
+      for(auto& I: B){
+         if(auto CI = dyn_cast<CallInst>(&I)){
+            if(Attributes.count(CI->getCalledFunction()->getName()))
+               gfortran_write_stdout(dyn_cast<CallInst>(&I));
+         }
+      }
+   }
+
    return true;
 }

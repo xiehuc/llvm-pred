@@ -6,6 +6,7 @@
 #include <llvm/Pass.h>
 
 #include <unordered_map>
+
 #include "Resolver.h"
 #include "util.h"
 
@@ -14,7 +15,8 @@ namespace lle {
    class SlashShrink;
    class ReduceCode;
    enum AttributeFlags {
-      IsDeletable = 0,
+      None = 0,
+      IsDeletable = 1,
       IsPrint = IsDeletable
    };
 };

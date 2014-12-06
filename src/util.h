@@ -5,6 +5,7 @@
 #include <vector>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Argument.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/ADT/GraphTraits.h>
 #include <llvm/Support/raw_ostream.h>
@@ -45,6 +46,10 @@ namespace lle
          if(O->get() == V) return &*O;
       }
       return nullptr;
+   }
+
+   inline bool equal(llvm::ConstantInt* I, uint64_t V){
+      return I && I->equalsInt(V);
    }
 
    // inspired from llvm::ErrorOr<>

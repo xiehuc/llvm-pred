@@ -36,6 +36,7 @@ namespace lle{
 
    struct DDGraph;
    class ResolveEngine;
+   struct GEPRule;
 };
 
 /**
@@ -245,6 +246,13 @@ class lle::ResolveEngine
 
    // a public service used for solve simple load.
    static const SolveRule useonly_rule;
+   llvm::Value* find_store(llvm::Use&, CallBack C);
+};
+
+struct lle::GEPRule
+{
+   GEPRule() {}
+   void operator()(ResolveEngine& RE);
 };
 
 #endif
