@@ -47,6 +47,7 @@ namespace lle
       return nullptr;
    }
 
+   // inspired from llvm::ErrorOr<>
    template<typename FirstT, typename SecondT>
    class union_pair
    {

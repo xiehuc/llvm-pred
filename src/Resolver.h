@@ -33,6 +33,9 @@ namespace lle{
          >
       ResolveResult;
 	typedef std::pair<llvm::MemDepResult,llvm::BasicBlock*> FindedDependenciesType;
+
+   struct DDGraph;
+   class ResolveEngine;
 };
 
 /**
@@ -50,7 +53,6 @@ struct lle::UseOnlyResolve
 {
    llvm::Use* operator()(llvm::Value*, lle::ResolverBase*);
 };
-
 
 /**
  * solve some special global variable situation
@@ -139,7 +141,7 @@ class lle::ResolverBase
    // and return true
    bool resolve_if(llvm::Value* V, std::function<bool(llvm::Value*)> lambda);
 
-   //llvm::Value* find_store(llvm::Use* V)
+   llvm::Value* find_store(llvm::Use& V);
 
 };
 
@@ -208,9 +210,41 @@ class lle::ResolverPass: public llvm::FunctionPass
    }
    void getAnalysisUsage(llvm::AnalysisUsage& AU) const;
    bool runOnFunction(llvm::Function& F) {return false;}
-
 };
 
+// a redesigned new resolve engine. 
+// support Use* 
+// support CallBack
+class lle::ResolveEngine
+{
+   public:
+   // if return true, means found a solve.
+   typedef std::function<bool(llvm::Use*, DDGraph&)> SolveRule;
+   // if return true, stop solve in current branch
+   typedef std::function<bool(llvm::Use*)> CallBack;
 
+   private:
+   static const CallBack always_false;
+   static const SolveRule direct_rule;
+   static bool implicity_rule(llvm::Instruction*, DDGraph& G);
+   std::vector<SolveRule> rules;
+   void do_solve(DDGraph& G, CallBack& C);
+
+   public:
+   ResolveEngine():rules(1, direct_rule) {}
+   // add a rule in engine
+   void addRule(SolveRule rule){
+      rules.push_back(rule);
+   }
+   template<typename R>
+   void addRule(R rule){
+      rule(*this);
+   }
+   DDGraph resolve(llvm::Instruction* I, CallBack C = always_false);
+   DDGraph resolve(llvm::Use& U, CallBack C = always_false);
+
+   // a public service used for solve simple load.
+   static const SolveRule useonly_rule;
+};
 
 #endif

@@ -3,9 +3,6 @@
 
 // Data Dependence Graph Representation
 
-#include <list>
-#include <unordered_set>
-#include <unordered_map>
 #include <llvm/IR/User.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Function.h>
@@ -18,6 +15,11 @@
 #include <llvm/Support/DOTGraphTraits.h>
 #include <llvm/Support/CommandLine.h>
 
+#include <list>
+#include <deque>
+#include <unordered_set>
+#include <unordered_map>
+
 #include "Resolver.h"
 #include "util.h"
 
@@ -26,7 +28,7 @@ namespace lle{
    typedef llvm::PointerUnion<llvm::Value*, llvm::Use*> DDGraphKeyTy;
    typedef llvm::DenseMap<DDGraphKeyTy, DDGNode > DDGraphImpl;
    typedef DDGraphImpl::value_type DDGValue;
-   struct DDGraph;
+   class DDGraph;
    extern llvm::cl::opt<bool> Ddg;
 }
 namespace llvm{
@@ -41,7 +43,7 @@ class lle::DDGNode{
    typedef llvm::SmallVector<DDGValue*, 3> DDGNodeImpl;
    typedef DDGNodeImpl::iterator iterator;
    enum Flags{
-      NORMAL = 0,
+      SOLVED = 0,
       UNSOLVED = 1,
       IMPLICITY = 2,
    };
@@ -66,6 +68,7 @@ class lle::DDGNode{
                            target(argument) for load. */
 
    public:
+   DDGNode(Flags = UNSOLVED);
    std::string expr_buf; /* a buffer hold complex expression. because twine
                             doesn't hold memory target. */
    void set_expr(const expr_type& lhs,const expr_type& rhs = "", int prio = 0);
@@ -83,16 +86,43 @@ class lle::DDGNode{
 /** never tring modify the data content
  *  never tring copy it
  */
-struct lle::DDGraph : 
+class lle::DDGraph : 
    public lle::DDGraphImpl
 {
-   typedef DDGNode::expr_type expr_type;
    // a helper function to make a DDGValue with initialed DDGNode structure
-   DDGValue make_value(llvm::Value* root, DDGNode::Flags flags);
-
+   DDGValue make_value(DDGraphKeyTy root, DDGNode::Flags flags);
+   std::deque<llvm::Use*> unsolved;
+   public:
    DDGValue* root; // the root for graph
+   typedef DDGNode::expr_type expr_type;
+
    DDGraph(lle::ResolveResult& RR, llvm::Value* root);
    DDGraph() {};
+   void addUnsolved(llvm::Use& U){
+      unsolved.push_back(&U);
+   }
+   void addUnsolved(llvm::Use*, llvm::Use*);
+   // add a solved node.
+   // @K is a solved Value* or Use*
+   // @U is a unsolved Use, there a link K -> U
+   void addSolved(DDGraphKeyTy K, llvm::Use& U){
+      addSolved(K, &U, (&U)+1);
+   }
+   // add a solved node.
+   // @F @T is a iterator from to.
+   // which \forall V in [F,T) there a link K->V
+   void addSolved(DDGraphKeyTy K, llvm::Use* F, llvm::Use* T);
+   llvm::Use* popUnsolved(){
+      if(unsolved.empty()) return NULL;
+      llvm::Use* ret = unsolved.front();
+      unsolved.pop_front();
+      return ret;
+   }
+   // add a solved constant value
+   // @K isa solved Value* or Use*
+   // @C isa constant, which naturally solved.
+   void addSolved(DDGraphKeyTy K, llvm::Value* C);
+
    expr_type expr(); 
 };
 

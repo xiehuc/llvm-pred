@@ -57,15 +57,18 @@ void DDGNode::ref(int R)
    root = "#"+std::to_string(ref_num_);
 }
 
-DDGValue DDGraph::make_value(Value *root, DDGNode::Flags flags)
+DDGNode::DDGNode(Flags flags)
 {
-   DDGNode n;
-   n.flags_ = flags;
-   n.load_tg_ = nullptr;
-   n.ref_num_ = 0;
-   n.ref_count = 0;
-   n.root="";
-   return make_pair(root,n);
+   flags_ = flags;
+   load_tg_ = nullptr;
+   ref_num_ = 0;
+   ref_count = 0;
+   root="";
+}
+
+DDGValue DDGraph::make_value(DDGraphKeyTy root, DDGNode::Flags flags)
+{
+   return make_pair(root,DDGNode(flags));
 }
 
 DDGraph::DDGraph(ResolveResult& RR,Value* root) 
@@ -74,7 +77,7 @@ DDGraph::DDGraph(ResolveResult& RR,Value* root)
    auto& u = get<1>(RR);
    auto& c = get<2>(RR);
    for(auto I : r){
-      this->insert(make_value(I,DDGNode::NORMAL));
+      this->insert(make_value(I,DDGNode::SOLVED));
    }
    for(auto I : u){
       this->insert(make_value(I,DDGNode::UNSOLVED));
@@ -235,6 +238,35 @@ static void to_expr(Value* V, DDGNode* N, int& ref_num)
       Assert(0,"unreachable");
 }
 
+void DDGraph::addUnsolved(llvm::Use *beg, llvm::Use *end)
+{
+   auto& un = unsolved;
+   for_each(beg, end, [&un](Use& U){
+         un.push_back(&U);
+         });
+}
+
+void DDGraph::addSolved(DDGraphKeyTy K, Use* F, Use* T)
+{
+   auto& N = (*this)[K];
+   N.flags_ = DDGNode::SOLVED;
+   for(auto U = F; U!=T; ++U){
+      auto Found = &this->FindAndConstruct(U);
+      N.impl().push_back(Found);
+      if(Found->second.flags() == DDGNode::UNSOLVED) 
+         unsolved.push_back(U);
+   }
+}
+
+void DDGraph::addSolved(DDGraphKeyTy K, Value* C)
+{
+   auto& N = (*this)[K];
+   N.flags_ = DDGNode::SOLVED;
+   auto Found = &this->FindAndConstruct(C);
+   Found->second.flags_ = DDGNode::SOLVED;
+   N.impl().push_back(Found);
+}
+
 expr_type DDGraph::expr()
 {
    int ref_num = 0;
@@ -263,14 +295,19 @@ string llvm::DOTGraphTraits<DDGraph*>::getNodeLabel(DDGValue* N,DDGraph* G)
 {
    std::string ret;
    llvm::raw_string_ostream os(ret);
-   N->first.dyn_cast<Value*>()->print(os);
-   if(auto CI = dyn_cast<CallInst>(N->first.dyn_cast<Value*>())){
-      Function* F = CI->getCalledFunction();
-      if(!F) return ret;
-      os<<"\n\t Argument Names: [ ";
-      for(auto& Arg : F->getArgumentList())
-         os<<Arg.getName()<<"  ";
-      os<<"]";
+   if(Use* U = N->first.dyn_cast<Use*>()){
+      U->getUser()->print(os);
+   }else{
+      Value* V = N->first.get<Value*>();
+      V->print(os);
+      if(auto CI = dyn_cast<CallInst>(V)){
+         Function* F = CI->getCalledFunction();
+         if(!F) return ret;
+         os<<"\n\t Argument Names: [ ";
+         for(auto& Arg : F->getArgumentList())
+            os<<Arg.getName()<<"  ";
+         os<<"]";
+      }
    }
    return ret;
 }

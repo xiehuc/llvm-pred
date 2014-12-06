@@ -7,6 +7,7 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include "ddg.h"
 #include "util.h"
 #include "debug.h"
 
@@ -478,3 +479,71 @@ ResolverPass::~ResolverPass(){
    for(auto I : impls)
       delete I.second;
 }
+
+void ResolveEngine::do_solve(DDGraph& G, CallBack& C)
+{
+   while(Use* un = G.popUnsolved()){
+      for(auto r = rules.rbegin(), e = rules.rend(); r!=e; ++r){
+         if(C(un)) continue;
+         if((*r)(un, G)) continue;
+      }
+   }
+}
+
+DDGraph ResolveEngine::resolve(Use& U, CallBack C)
+{
+   DDGraph G;
+   G.addUnsolved(U);
+   do_solve(G, C);
+   return G;
+}
+
+DDGraph ResolveEngine::resolve(Instruction* I, CallBack C)
+{
+   DDGraph G;
+   implicity_rule(I, G);
+   do_solve(G, C);
+   return G;
+}
+bool ResolveEngine::implicity_rule(Instruction* I, DDGraph& G)
+{
+   if(isa<StoreInst>(I)){
+      G.addUnsolved(I->getOperandUse(0));
+      return false;
+   }else{
+      G.addUnsolved(I->op_begin(), I->op_end());
+      return true;
+   }
+}
+
+const ResolveEngine::SolveRule ResolveEngine::direct_rule = [](Use* U, DDGraph& G){
+   Value* V = U->get();
+   if(auto I = dyn_cast<Instruction>(V)){
+      G.addSolved(U, I->op_begin(), I->op_end());
+      return true;
+   }else if(auto C = dyn_cast<Constant>(V)){
+      G.addSolved(U, C);
+      return true;
+   }
+   return false;
+};
+
+const ResolveEngine::SolveRule ResolveEngine::useonly_rule = [](Use* U, DDGraph& G){
+   LoadInst* LI = dyn_cast<LoadInst>(U->getUser());
+   if(LI == NULL) return false;
+   Use* Tg = U;
+   while( (Tg = Tg->getNext()) ){
+      //seems all things who use target is after target
+      auto V = Tg->getUser();
+      if(isa<StoreInst>(V) && V->getOperand(1) == Tg->get()){
+         G.addSolved(U, V->getOperandUse(0));
+         return true;
+      }
+   }
+   return false;
+};
+
+const ResolveEngine::CallBack ResolveEngine::always_false = [](Use* U){
+   return false;
+};
+
