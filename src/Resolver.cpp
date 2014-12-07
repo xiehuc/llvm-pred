@@ -447,6 +447,8 @@ ResolverPass::~ResolverPass(){
       delete I.second;
 }
 
+
+
 void ResolveEngine::do_solve(DDGraph& G, CallBack& C)
 {
    while(Use* un = G.popUnsolved()){
@@ -472,30 +474,25 @@ DDGraph ResolveEngine::resolve(Instruction* I, CallBack C)
    do_solve(G, C);
    return G;
 }
-bool ResolveEngine::implicity_rule(Instruction* I, DDGraph& G)
+
+Value* ResolveEngine::find_store(Use& Tg, CallBack C)
 {
-   if(isa<StoreInst>(I)){
-      G.addUnsolved(I->getOperandUse(0));
-      return false;
-   }else{
-      G.addUnsolved(I->op_begin(), I->op_end());
-      return true;
-   }
+   Value* ret = NULL;
+   resolve(Tg, [&ret, &C](Use* U){
+         User* Ur = U->getUser();
+         if(isa<StoreInst>(Ur))
+            ret=Ur->getOperand(0);
+         bool res = C(U);
+         return res;
+      });
+   return ret;
 }
 
-const ResolveEngine::SolveRule ResolveEngine::direct_rule = [](Use* U, DDGraph& G){
-   Value* V = U->get();
-   if(auto I = dyn_cast<Instruction>(V)){
-      G.addSolved(U, I->op_begin(), I->op_end());
-      return true;
-   }else if(auto C = dyn_cast<Constant>(V)){
-      G.addSolved(U, C);
-      return true;
-   }
-   return false;
-};
+//===========================RESOLVE RULES======================================//
 
-const ResolveEngine::SolveRule ResolveEngine::useonly_rule = [](Use* U, DDGraph& G){
+
+static bool useonly_rule_(Use* U, DDGraph& G)
+{
    User* V = U->getUser();
    Use* Tg = U;
    if(isa<LoadInst>(V))
@@ -514,8 +511,29 @@ const ResolveEngine::SolveRule ResolveEngine::useonly_rule = [](Use* U, DDGraph&
       }
    } while( (Tg = Tg->getNext()) );
    return false;
-};
-
+}
+static bool direct_rule_(Use* U, DDGraph& G)
+{
+   Value* V = U->get();
+   if(auto I = dyn_cast<Instruction>(V)){
+      G.addSolved(U, I->op_begin(), I->op_end());
+      return true;
+   }else if(auto C = dyn_cast<Constant>(V)){
+      G.addSolved(U, C);
+      return true;
+   }
+   return false;
+}
+bool ResolveEngine::implicity_rule(Instruction* I, DDGraph& G)
+{
+   if(isa<StoreInst>(I)){
+      G.addUnsolved(I->getOperandUse(0));
+      return false;
+   }else{
+      G.addUnsolved(I->op_begin(), I->op_end());
+      return true;
+   }
+}
 void GEPRule::operator()(ResolveEngine& RE)
 {
    ResolveEngine::SolveRule S = [](Use* U, DDGraph& G){
@@ -540,19 +558,9 @@ void GEPRule::operator()(ResolveEngine& RE)
    };
    RE.addRule(S);
 }
-const ResolveEngine::CallBack ResolveEngine::always_false = [](Use* U){
-   return false;
-};
 
-Value* ResolveEngine::find_store(Use& Tg, CallBack C)
-{
-   Value* ret = NULL;
-   resolve(Tg, [&ret, &C](Use* U){
-         User* Ur = U->getUser();
-         if(isa<StoreInst>(Ur))
-            ret=Ur->getOperand(0);
-         bool res = C(U);
-         return res;
-      });
-   return ret;
-}
+const ResolveEngine::CallBack ResolveEngine::always_false = [](Use* U){ return false; };
+const ResolveEngine::SolveRule ResolveEngine::direct_rule = direct_rule_;
+const ResolveEngine::SolveRule ResolveEngine::useonly_rule = useonly_rule_;
+
+//===============================RESOLVE RULES END===============================//

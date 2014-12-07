@@ -13,6 +13,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/GraphWriter.h>
+#include <llvm/ADT/PostOrderIterator.h>
 #include <llvm/Analysis/LibCallAliasAnalysis.h>
 
 #include <ValueProfiling.h>
@@ -186,6 +187,50 @@ char ReduceCode::ID = 0;
 static RegisterPass<ReduceCode> Y("Reduce", "Slash and Shrink Code to make a minicore program");
 
 
+AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
+{
+   StringRef Name = castoff(CI->getCalledValue())->getName();
+   auto Found = Attributes.find(Name);
+   if(Found == Attributes.end()) return AttributeFlags::None;
+   return Found->second(CI);
+}
+
+bool ReduceCode::runOnModule(Module &M)
+{
+   Function* F = M.getFunction("print_results_");
+   BasicBlock* entry = &F->getEntryBlock();
+   for(auto BB = po_begin(entry), BBE = po_end(entry); BB != BBE; ++BB){
+      for(auto I = --BB->end(), IE = --BB->begin(); I!=IE;){
+         Instruction* Inst = &*(I--);
+         if(CallInst* CI = dyn_cast<CallInst>(Inst)){
+            errs()<<*CI<<":"<<getAttribute(CI)<<"\n";
+            if(getAttribute(CI) == IsDeletable){
+               deleteInst(CI);
+            }
+         }
+      }
+   }
+
+   return true;
+}
+void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
+{
+   AU.addRequired<DominatorTreeWrapperPass>();
+   AU.setPreservesAll();
+}
+
+void ReduceCode::deleteInst(Instruction * I)
+{
+   I->replaceAllUsesWith(UndefValue::get(I->getType()));
+   for(unsigned i=0;i<I->getNumOperands();++i)
+      I->setOperand(i, NULL); /* destroy instruction need clean holds
+                                 reference */
+   I->removeFromParent(); /* use erase from would cause crash let
+                                 it freed by Context */
+}
+
+
+//======================ATTRIBUTE BEGIN====================================//
 static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
 {
    Use& st_parameter = CI->getArgOperandUse(0);
@@ -204,38 +249,28 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
          }
          return false;
          });
-   if(equal(dyn_cast<ConstantInt>(Store), 6)) // only 6 means write to stdout
-      return IsPrint;
+   if(Store != NULL){
+      auto u = extract(dyn_cast<ConstantInt>(Store));
+      if(u == 6 || u == 0) return IsPrint; // 6 means write to stdout, 0 means write to stderr
+   }
    return AttributeFlags::None;
+}
+
+static AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)
+{
+   return flags;
 }
 
 
 ReduceCode::ReduceCode():ModulePass(ID)
 {
+   using std::placeholders::_1;
    Attributes["_gfortran_transfer_character_write"] = gfortran_write_stdout;
    Attributes["_gfortran_transfer_integer_write"] = gfortran_write_stdout;
    Attributes["_gfortran_transfer_real_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
+   Attributes["main"] = std::bind(direct_return, _1, AttributeFlags::None);
 }
 
-void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
-{
-   AU.addRequired<DominatorTreeWrapperPass>();
-   AU.setPreservesAll();
-}
-
-bool ReduceCode::runOnModule(Module &M)
-{
-   Function* F = M.getFunction("print_results_");
-   for(auto& B : *F){
-      for(auto& I: B){
-         if(auto CI = dyn_cast<CallInst>(&I)){
-            if(Attributes.count(CI->getCalledFunction()->getName()))
-               gfortran_write_stdout(dyn_cast<CallInst>(&I));
-         }
-      }
-   }
-
-   return true;
-}
+//==================================ATTRIBUTE END===============================//

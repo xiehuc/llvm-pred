@@ -48,9 +48,17 @@ namespace lle
       return nullptr;
    }
 
+   //=========================NUMERIC BEGIN=================================//
+
    inline bool equal(llvm::ConstantInt* I, uint64_t V){
       return I && I->equalsInt(V);
    }
+
+   inline uint64_t extract(llvm::ConstantInt* CI){
+      return CI?CI->getZExtValue():UINT64_MAX;
+   }
+
+   //=========================NUMERIC END==================================//
 
    // inspired from llvm::ErrorOr<>
    template<typename FirstT, typename SecondT>

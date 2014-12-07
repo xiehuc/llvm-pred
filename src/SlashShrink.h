@@ -8,7 +8,6 @@
 #include <unordered_map>
 
 #include "Resolver.h"
-#include "util.h"
 
 namespace lle {
    struct MarkPreserve;
@@ -69,8 +68,10 @@ class lle::SlashShrink: public llvm::FunctionPass
 
 class lle::ReduceCode: public llvm::ModulePass
 {
-   typedef union_pair<AttributeFlags, AttributeFlags(*)(llvm::CallInst*)> Attribute_;
+   typedef std::function<AttributeFlags(llvm::CallInst*)> Attribute_;
    std::unordered_map<std::string, Attribute_> Attributes;
+   AttributeFlags getAttribute(llvm::CallInst*) const;
+   void deleteInst(llvm::Instruction*);
    public:
    static char ID;
    ReduceCode();
