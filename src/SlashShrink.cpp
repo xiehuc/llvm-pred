@@ -11,9 +11,11 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Dominators.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/Analysis/CallGraph.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/GraphWriter.h>
 #include <llvm/ADT/PostOrderIterator.h>
+#include <llvm/ADT/DepthFirstIterator.h>
 #include <llvm/Analysis/LibCallAliasAnalysis.h>
 
 #include <ValueProfiling.h>
@@ -197,15 +199,24 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
 
 bool ReduceCode::runOnModule(Module &M)
 {
-   Function* F = M.getFunction("print_results_");
-   BasicBlock* entry = &F->getEntryBlock();
-   for(auto BB = po_begin(entry), BBE = po_end(entry); BB != BBE; ++BB){
-      for(auto I = --BB->end(), IE = --BB->begin(); I!=IE;){
-         Instruction* Inst = &*(I--);
-         if(CallInst* CI = dyn_cast<CallInst>(Inst)){
-            errs()<<*CI<<":"<<getAttribute(CI)<<"\n";
-            if(getAttribute(CI) == IsDeletable){
-               deleteInst(CI);
+   CallGraph CG(M);
+   Function* Main = M.getFunction("main");
+   CallGraphNode* root = Main?CG[Main]:CG.getExternalCallingNode();
+   std::vector<CallGraphNode*> nodes(df_begin(root), df_end(root));
+   // use deep first visit order , then reverse it. can get what we need order.
+   for(auto FI = nodes.rbegin(), FE = nodes.rend(); FI != FE; ++FI){
+      Function * F = (*FI)->getFunction();
+      if(F==NULL || F->isDeclaration()) continue; //F==NULL --> is a external node
+      BasicBlock* entry = &F->getEntryBlock();
+      std::vector<BasicBlock*> blocks(po_begin(entry), po_end(entry));
+      // use deep first visit order , then reverse it. can get what we need order.
+      for(auto BB = blocks.rbegin(), BBE = blocks.rend(); BB != BBE; ++BB){
+         for(auto I = --(*BB)->end(), IE = --(*BB)->begin(); I!=IE;){
+            Instruction* Inst = &*(I--);
+            if(CallInst* CI = dyn_cast<CallInst>(Inst)){
+               if(getAttribute(CI) == IsDeletable){
+                  deleteInst(CI);
+               }
             }
          }
       }
@@ -215,7 +226,6 @@ bool ReduceCode::runOnModule(Module &M)
 }
 void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
 {
-   AU.addRequired<DominatorTreeWrapperPass>();
    AU.setPreservesAll();
 }
 
