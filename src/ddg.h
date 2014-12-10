@@ -112,6 +112,12 @@ class lle::DDGraph :
    // @F @T is a iterator from to.
    // which \forall V in [F,T) there a link K->V
    void addSolved(DDGraphKeyTy K, llvm::Use* F, llvm::Use* T);
+   template<typename Ite>
+   void addSolved(DDGraphKeyTy K, Ite F, Ite T)
+   {
+      for(Ite I = F; I!=T; ++I)
+         addSolved(K, **I);
+   }
    llvm::Use* popUnsolved(){
       if(unsolved.empty()) return NULL;
       llvm::Use* ret = unsolved.front();

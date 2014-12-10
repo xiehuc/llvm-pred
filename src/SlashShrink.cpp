@@ -245,7 +245,8 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
 {
    Use& st_parameter = CI->getArgOperandUse(0);
    ResolveEngine RE;
-   RE.addRule(GEPRule());
+   RE.addRule(RE.base_rule);
+   RE.addRule(RE.gep_rule);
    RE.addRule(RE.useonly_rule);
    Value* Store = RE.find_store(st_parameter, [](Use* U){
          if(auto GEP = dyn_cast<GetElementPtrInst>(U->getUser())){
@@ -266,6 +267,17 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
    return AttributeFlags::None;
 }
 
+static AttributeFlags mpi_reduce_nodep(llvm::CallInst* CI)
+{
+   Use& recvbuf = CI->getArgOperandUse(1);
+   ResolveEngine RE;
+   RE.addRule(RE.ibase_rule);
+   RE.addRule(InitRule(RE.iuse_rule));
+   DDGraph G = RE.resolve(recvbuf);
+   WriteGraph(&G, "ddg", false);
+   return AttributeFlags::None;
+}
+
 static AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)
 {
    return flags;
@@ -280,6 +292,7 @@ ReduceCode::ReduceCode():ModulePass(ID)
    Attributes["_gfortran_transfer_real_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
+   Attributes["mpi_reduce_"] = mpi_reduce_nodep;
    Attributes["main"] = std::bind(direct_return, _1, AttributeFlags::None);
 }
 

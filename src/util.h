@@ -47,6 +47,21 @@ namespace lle
       }
       return nullptr;
    }
+   // convert a Use to use_iterator
+   inline llvm::Value::use_iterator find_iterator(llvm::Use& U){
+      llvm::Value* V = U.get();
+      llvm::Value* Ur = U.getUser();
+      return std::find_if(V->use_begin(), V->use_end(), [Ur](llvm::Use&U){return U.getUser()==Ur;});
+   }
+
+   // convert a use_iterator range to std::vector<Use*>
+   template<typename Ite>
+   auto to_vector(Ite F, Ite T)->std::vector<decltype(&*F)>{
+      typedef decltype(*F) UseT;
+      std::vector<decltype(&*F)> ret;
+      std::transform(F, T, std::back_inserter(ret), [](UseT& U){return &U;});
+      return ret;
+   }
 
    //=========================NUMERIC BEGIN=================================//
 

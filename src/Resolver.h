@@ -36,7 +36,7 @@ namespace lle{
 
    struct DDGraph;
    class ResolveEngine;
-   struct GEPRule;
+   struct InitRule;
 };
 
 /**
@@ -226,13 +226,12 @@ class lle::ResolveEngine
 
    private:
    static const CallBack always_false;
-   static const SolveRule direct_rule;
    static bool implicity_rule(llvm::Instruction*, DDGraph& G);
    std::vector<SolveRule> rules;
    void do_solve(DDGraph& G, CallBack& C);
 
    public:
-   ResolveEngine():rules(1, direct_rule) {}
+   ResolveEngine() {}
    // add a rule in engine
    void addRule(SolveRule rule){
       rules.push_back(rule);
@@ -244,14 +243,29 @@ class lle::ResolveEngine
    DDGraph resolve(llvm::Instruction* I, CallBack C = always_false);
    DDGraph resolve(llvm::Use& U, CallBack C = always_false);
 
-   // a public service used for solve simple load.
+   // { normal version: these used for lookup it use who
+   // a public rule used for solve ssa dependency
+   static const SolveRule base_rule;
+   // a public rule used for solve simple load.
    static const SolveRule useonly_rule;
+   // a public rule used for expose gep instruction
+   static const SolveRule gep_rule;
+   // }
+   // { reversed version: these used for lookup who use it.
+   // a public rule used for lookup it's user's uses
+   static const SolveRule ibase_rule;
+   // use with InitRule, a public rule used for 
+   static const SolveRule iuse_rule;
+   // }
    llvm::Value* find_store(llvm::Use&, CallBack C);
 };
 
-struct lle::GEPRule
+/** make a rule only run once **/
+struct lle::InitRule
 {
-   GEPRule() {}
+   bool initialized;
+   ResolveEngine::SolveRule rule;
+   InitRule(const ResolveEngine::SolveRule r):initialized(false),rule(r) {}
    void operator()(ResolveEngine& RE);
 };
 

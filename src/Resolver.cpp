@@ -482,11 +482,34 @@ Value* ResolveEngine::find_store(Use& Tg, CallBack C)
          User* Ur = U->getUser();
          if(isa<StoreInst>(Ur))
             ret=Ur->getOperand(0);
-         bool res = C(U);
-         return res;
+         return C(U);
       });
    return ret;
 }
+
+#if 0
+Value* ResolveEngine::find_visit(Use& Src)
+{
+   /*Value* ret = NULL;
+   Value* V = Src.get();
+   auto UE = find_use(Src);
+   std::vector<Use*> uses(V->use_begin(), UE);
+   for(auto U = uses->rbegin(), UE = uses->rend(); U!=UE; ++U){
+      User* Ur = U->getUser();
+      if(isa<LoadInst>(Ur)) return Ur;
+      else if(isa<CallInst>(Ur)) 
+      else if(isa<CastInst>(Ur)) return find_visit(U->getUser());
+   }*/
+   return NULL;
+}
+
+Value* ResolveEngine::find_visit(User *Ur)
+{
+   for(auto U = Ur->use_begin(), UE = Ur->use_end(); U!=UE; ++U){
+   }
+   return NULL;
+}
+#endif
 
 //===========================RESOLVE RULES======================================//
 
@@ -524,6 +547,20 @@ static bool direct_rule_(Use* U, DDGraph& G)
    }
    return false;
 }
+static bool direct_inverse_rule_(Use* U, DDGraph& G)
+{
+   Value* V = U->getUser();
+   auto uses = to_vector(V->use_begin(), V->use_end());
+   G.addSolved(U, uses.rbegin(), uses.rend());
+   return true;
+}
+static bool use_inverse_rule_(Use* U, DDGraph& G)
+{
+   Value* V = U->get();
+   auto uses = to_vector(V->use_begin(), find_iterator(*U));
+   G.addSolved(U, uses.rbegin(), uses.rend());
+   return true;
+}
 bool ResolveEngine::implicity_rule(Instruction* I, DDGraph& G)
 {
    if(isa<StoreInst>(I)){
@@ -534,33 +571,46 @@ bool ResolveEngine::implicity_rule(Instruction* I, DDGraph& G)
       return true;
    }
 }
-void GEPRule::operator()(ResolveEngine& RE)
+static bool gep_rule_(Use* U, DDGraph& G)
 {
-   ResolveEngine::SolveRule S = [](Use* U, DDGraph& G){
-      // if isa GEP, means we already have solved before.
-      if(isa<GetElementPtrInst>(U->getUser())) return false;
-      Type* Ty = U->get()->getType();
-      if(Ty->isPointerTy()) Ty = Ty->getPointerElementType();
-      // only struct or array can have GEP
-      if(!Ty->isStructTy() && !Ty->isArrayTy()) return false;
-      Use* Tg = U;
-      bool ret = false;
-      while( (Tg = Tg->getNext()) ){
-         auto V = Tg->getUser();
-         if(isa<GetElementPtrInst>(V) && V->getOperand(0) == Tg->get() ){
-            // add all GEP to Unsolved
-            DEBUG(errs()<<"GEP Rule:"<<*V<<"\n");
-            G.addSolved(U, V->getOperandUse(0));
-            ret = true;
-         }
+   // if isa GEP, means we already have solved before.
+   if(isa<GetElementPtrInst>(U->getUser())) return false;
+   Type* Ty = U->get()->getType();
+   if(Ty->isPointerTy()) Ty = Ty->getPointerElementType();
+   // only struct or array can have GEP
+   if(!Ty->isStructTy() && !Ty->isArrayTy()) return false;
+   Use* Tg = U;
+   bool ret = false;
+   while( (Tg = Tg->getNext()) ){
+      auto V = Tg->getUser();
+      if(isa<GetElementPtrInst>(V) && V->getOperand(0) == Tg->get() ){
+         // add all GEP to Unsolved
+         DEBUG(errs()<<"GEP Rule:"<<*V<<"\n");
+         G.addSolved(U, V->getOperandUse(0));
+         ret = true;
       }
-      return ret;
+   }
+   return ret;
+}
+void InitRule::operator()(ResolveEngine& RE)
+{
+   bool& init = this->initialized;
+   auto& r = rule;
+   ResolveEngine::SolveRule S = [&init, &r](Use* U, DDGraph& G){
+      if(!init){
+         init = true;
+         return r(U,G);
+      }
+      return false;
    };
    RE.addRule(S);
 }
 
 const ResolveEngine::CallBack ResolveEngine::always_false = [](Use* U){ return false; };
-const ResolveEngine::SolveRule ResolveEngine::direct_rule = direct_rule_;
+const ResolveEngine::SolveRule ResolveEngine::base_rule = direct_rule_;
 const ResolveEngine::SolveRule ResolveEngine::useonly_rule = useonly_rule_;
+const ResolveEngine::SolveRule ResolveEngine::gep_rule = gep_rule_;
+const ResolveEngine::SolveRule ResolveEngine::ibase_rule = direct_inverse_rule_;
+const ResolveEngine::SolveRule ResolveEngine::iuse_rule = use_inverse_rule_;
 
 //===============================RESOLVE RULES END===============================//
