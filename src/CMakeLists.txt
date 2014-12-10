@@ -43,15 +43,6 @@ target_link_libraries(LLVMPred
 	${LLVM_PROF_LIBRARIES}
 	)
 
-add_executable(curve-fit
-   CurveFit.cpp
-	)
-
-target_link_libraries(curve-fit
-   ${GSL_LIBRARIES}
-   ${LLVM_DYNAMIC_LIBRARY}
-   ${LLVM_PROF_LIBRARIES}
-   )
 
 if(LLVM_VERSION VERSION_EQUAL "3.4")
 # print Asm code for a bitcode
