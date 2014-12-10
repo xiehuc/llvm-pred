@@ -487,29 +487,24 @@ Value* ResolveEngine::find_store(Use& Tg, CallBack C)
    return ret;
 }
 
-#if 0
-Value* ResolveEngine::find_visit(Use& Src)
+Value* ResolveEngine::find_visit(Use& Tg, CallBack C)
 {
-   /*Value* ret = NULL;
-   Value* V = Src.get();
-   auto UE = find_use(Src);
-   std::vector<Use*> uses(V->use_begin(), UE);
-   for(auto U = uses->rbegin(), UE = uses->rend(); U!=UE; ++U){
-      User* Ur = U->getUser();
-      if(isa<LoadInst>(Ur)) return Ur;
-      else if(isa<CallInst>(Ur)) 
-      else if(isa<CastInst>(Ur)) return find_visit(U->getUser());
-   }*/
-   return NULL;
+   Value* ret = NULL;
+   User* TgUr = Tg.getUser();
+   resolve(Tg, [&ret, &C, TgUr](Use* U){
+         User* Ur = U->getUser();
+         if(Ur == TgUr) return C(U);
+         if(isa<LoadInst>(Ur))
+            ret=Ur;
+         else if(CallInst* CI = dyn_cast<CallInst>(Ur)){//call inst also is a kind of visit
+            if(Function* F = dyn_cast<Function>(castoff(CI->getCalledValue())))
+               if(!F->getName().startswith("llvm."))//llvm call should ignore
+                  ret=CI;
+         }
+         return C(U);
+      });
+   return ret;
 }
-
-Value* ResolveEngine::find_visit(User *Ur)
-{
-   for(auto U = Ur->use_begin(), UE = Ur->use_end(); U!=UE; ++U){
-   }
-   return NULL;
-}
-#endif
 
 //===========================RESOLVE RULES======================================//
 

@@ -273,9 +273,9 @@ static AttributeFlags mpi_reduce_nodep(llvm::CallInst* CI)
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
    RE.addRule(InitRule(RE.iuse_rule));
-   DDGraph G = RE.resolve(recvbuf);
-   WriteGraph(&G, "ddg", false);
-   return AttributeFlags::None;
+   Value* Visit = RE.find_visit(recvbuf);
+   if(Visit == NULL) return IsDeletable;
+   else return AttributeFlags::None;
 }
 
 static AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)
