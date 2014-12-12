@@ -37,6 +37,7 @@ namespace lle{
    struct DDGraph;
    class ResolveEngine;
    struct InitRule;
+   struct MDARule;
 };
 
 /**
@@ -269,6 +270,16 @@ struct lle::InitRule
    bool initialized;
    ResolveEngine::SolveRule rule;
    InitRule(const ResolveEngine::SolveRule r):initialized(false),rule(r) {}
+   void operator()(ResolveEngine& RE);
+};
+
+struct lle::MDARule
+{
+   llvm::MemoryDependenceAnalysis& MDA;
+   llvm::AliasAnalysis& AA;
+   MDARule(llvm::MemoryDependenceAnalysis& MD, 
+         llvm::AliasAnalysis& A):
+      MDA(MD),AA(A) {}
    void operator()(ResolveEngine& RE);
 };
 

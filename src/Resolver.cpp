@@ -601,6 +601,28 @@ void InitRule::operator()(ResolveEngine& RE)
    RE.addRule(S);
 }
 
+void MDARule::operator()(ResolveEngine &RE)
+{
+   MemoryDependenceAnalysis& MDA = this->MDA;
+   AliasAnalysis&AA = this->AA;
+   ResolveEngine::SolveRule S = [&MDA,&AA](Use* U, DDGraph& G){
+      LoadInst* LI = dyn_cast<LoadInst>(U->getUser());
+      if(LI==NULL) return false;
+      MemDepResult Dep = MDA.getDependency(LI);
+      //Def: 定义, 可能是Alloca, 或者...
+      //Clobber: 改写, Load依赖的Store, Store改写了内存
+      if(!Dep.isDef() && !Dep.isClobber()) return false;
+      AliasAnalysis::Location Loc = AA.getLocation(LI);
+      //inspired from DeadStoreElimination.cpp
+      if(!Loc.Ptr) return false;
+      while(Dep.isDef() || Dep.isClobber()){
+         Instruction* DepWrite = Dep.getInst();
+         Dep = MDA.getPointerDependencyFrom(Loc, 1, DepWrite, LI->getParent());
+      }
+   };
+   RE.addRule(S);
+}
+
 const ResolveEngine::CallBack ResolveEngine::always_false = [](Use* U){ return false; };
 const ResolveEngine::SolveRule ResolveEngine::base_rule = direct_rule_;
 const ResolveEngine::SolveRule ResolveEngine::useonly_rule = useonly_rule_;
