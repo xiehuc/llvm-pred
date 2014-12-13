@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "Resolver.h"
+#include "Adaptive.h"
 
 namespace lle {
    struct MarkPreserve;
@@ -71,6 +72,9 @@ class lle::ReduceCode: public llvm::ModulePass
    typedef std::function<AttributeFlags(llvm::CallInst*)> Attribute_;
    std::unordered_map<std::string, Attribute_> Attributes;
    AttributeFlags getAttribute(llvm::CallInst*) const;
+
+   DSE_Adaptive dse;
+
    void deleteInst(llvm::Instruction*);
    public:
    static char ID;

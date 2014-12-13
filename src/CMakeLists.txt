@@ -26,6 +26,7 @@ add_library(LLVMPred SHARED
    BlockFreqExpr.cpp
 	LoopTripCount.cpp
    LoopSimplify.cpp
+   DSEAdaptive.cpp
    LibFReshape.cpp
    SlashShrink.cpp
    PerformPred.cpp

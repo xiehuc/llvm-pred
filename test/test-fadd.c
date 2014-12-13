@@ -1,6 +1,6 @@
-#include "../src/libtiming.c"
+#include "../timing/libtiming.c"
 
-#define REPEAT 100
+#define REPEAT 1
 /* use a template to generate instruction */
 int inst_template(const char* templ);
 

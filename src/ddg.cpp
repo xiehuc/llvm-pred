@@ -272,7 +272,12 @@ expr_type DDGraph::expr()
    int ref_num = 0;
    vector<DDGNode*> refs;
    for(auto I = po_begin(this), E = po_end(this); I!=E; ++I){
-      to_expr(I->first.dyn_cast<Value*>(),&I->second,ref_num);
+      if(Value* V = I->first.dyn_cast<Value*>())
+         to_expr(V, &I->second, ref_num);
+      else if(Use* U = I->first.dyn_cast<Use*>())
+         to_expr(U->getUser(), &I->second, ref_num);
+      else
+         Assert(0, "unreachable");
 #ifdef EXPR_ENABLE_REF
       if(I->second.ref_count>2 && !isa<Constant>(I->first.dyn_cast<Value*>())){
          I->second.ref(++ref_num);

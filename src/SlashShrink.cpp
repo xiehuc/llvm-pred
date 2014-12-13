@@ -17,6 +17,7 @@
 #include <llvm/ADT/PostOrderIterator.h>
 #include <llvm/ADT/DepthFirstIterator.h>
 #include <llvm/Analysis/LibCallAliasAnalysis.h>
+#include <llvm/Transforms/Scalar.h>
 
 #include <ValueProfiling.h>
 
@@ -199,6 +200,9 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
 
 bool ReduceCode::runOnModule(Module &M)
 {
+
+   dse.prepare(this);
+
    CallGraph CG(M);
    Function* Main = M.getFunction("main");
    CallGraphNode* root = Main?CG[Main]:CG.getExternalCallingNode();
@@ -207,18 +211,29 @@ bool ReduceCode::runOnModule(Module &M)
    for(auto FI = nodes.rbegin(), FE = nodes.rend(); FI != FE; ++FI){
       Function * F = (*FI)->getFunction();
       if(F==NULL || F->isDeclaration()) continue; //F==NULL --> is a external node
+
+      dse.prepare(F, this);
+
       BasicBlock* entry = &F->getEntryBlock();
       std::vector<BasicBlock*> blocks(po_begin(entry), po_end(entry));
+      bool MadeChange;
       // use deep first visit order , then reverse it. can get what we need order.
-      for(auto BB = blocks.rbegin(), BBE = blocks.rend(); BB != BBE; ++BB){
+      for(auto BB = blocks.rbegin(), BBE = blocks.rend(); BB != BBE;){
+         dse.runOnBasicBlock(**BB);
+         MadeChange = false;
          for(auto I = --(*BB)->end(), IE = --(*BB)->begin(); I!=IE;){
             Instruction* Inst = &*(I--);
             if(CallInst* CI = dyn_cast<CallInst>(Inst)){
                if(getAttribute(CI) == IsDeletable){
-                  deleteInst(CI);
+                  dse.DeleteDeadInstruction(CI);
+                  MadeChange = true;
+                  break;
                }
             }
          }
+         // if made change, we always recaculate this BB.
+         // if not, we goto next BB.
+         if(!MadeChange) ++BB;
       }
    }
 
@@ -226,7 +241,7 @@ bool ReduceCode::runOnModule(Module &M)
 }
 void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
 {
-   AU.setPreservesAll();
+   dse.getAnalysisUsage(AU);
 }
 
 void ReduceCode::deleteInst(Instruction * I)
@@ -284,7 +299,8 @@ static AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)
 }
 
 
-ReduceCode::ReduceCode():ModulePass(ID)
+ReduceCode::ReduceCode():ModulePass(ID), 
+   dse(createDeadStoreEliminationPass())
 {
    using std::placeholders::_1;
    Attributes["_gfortran_transfer_character_write"] = gfortran_write_stdout;
