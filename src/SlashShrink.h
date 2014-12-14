@@ -76,11 +76,12 @@ class lle::ReduceCode: public llvm::ModulePass
    DSE_Adaptive dse;
    DAE_Adaptive dae;
 
-   void deleteInst(llvm::Instruction*);
+   void deleteDeadCaller(llvm::Function* F);
    public:
    static char ID;
    ReduceCode();
    void getAnalysisUsage(llvm::AnalysisUsage& AU) const override;
    bool runOnModule(llvm::Module& M) override;
+   bool runOnFunction(llvm::Function& F);
 };
 #endif

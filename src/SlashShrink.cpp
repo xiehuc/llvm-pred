@@ -199,6 +199,32 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
    return Found->second(CI);
 }
 
+bool ReduceCode::runOnFunction(Function& F)
+{
+   BasicBlock* entry = &F.getEntryBlock();
+   std::vector<BasicBlock*> blocks(po_begin(entry), po_end(entry));
+   bool MadeChange, Ret = false;
+   // use deep first visit order , then reverse it. can get what we need order.
+   for(auto BB = blocks.rbegin(), BBE = blocks.rend(); BB != BBE;){
+      dse.runOnBasicBlock(**BB);
+      MadeChange = false;
+      for(auto I = --(*BB)->end(), IE = --(*BB)->begin(); I!=IE;){
+         Instruction* Inst = &*(I--);
+         if(CallInst* CI = dyn_cast<CallInst>(Inst)){
+            if(getAttribute(CI) == IsDeletable){
+               dse.DeleteDeadInstruction(CI);
+               Ret = MadeChange = true;
+               break;
+            }
+         }
+      }
+      // if made change, we always recaculate this BB.
+      // if not, we goto next BB.
+      if(!MadeChange) ++BB;
+   }
+   return Ret;
+}
+
 bool ReduceCode::runOnModule(Module &M)
 {
    dse.prepare(this);
@@ -214,31 +240,11 @@ bool ReduceCode::runOnModule(Module &M)
       if(F==NULL || F->isDeclaration()) continue; //F==NULL --> is a external node
 
       dse.prepare(F, this);
-
-      BasicBlock* entry = &F->getEntryBlock();
-      std::vector<BasicBlock*> blocks(po_begin(entry), po_end(entry));
-      bool MadeChange;
-      // use deep first visit order , then reverse it. can get what we need order.
-      for(auto BB = blocks.rbegin(), BBE = blocks.rend(); BB != BBE;){
-         dse.runOnBasicBlock(**BB);
-         MadeChange = false;
-         for(auto I = --(*BB)->end(), IE = --(*BB)->begin(); I!=IE;){
-            Instruction* Inst = &*(I--);
-            if(CallInst* CI = dyn_cast<CallInst>(Inst)){
-               if(getAttribute(CI) == IsDeletable){
-                  dse.DeleteDeadInstruction(CI);
-                  MadeChange = true;
-                  break;
-               }
-            }
-         }
-         // if made change, we always recaculate this BB.
-         // if not, we goto next BB.
-         if(!MadeChange) ++BB;
-      }
+      runOnFunction(*F);
 
       // eliminate function's argument
       dae.runOnFunction(*F);
+      deleteDeadCaller(F);
    }
 
    return true;
@@ -248,14 +254,18 @@ void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
    dse.getAnalysisUsage(AU);
 }
 
-void ReduceCode::deleteInst(Instruction * I)
+void ReduceCode::deleteDeadCaller(llvm::Function *F)
 {
-   I->replaceAllUsesWith(UndefValue::get(I->getType()));
-   for(unsigned i=0;i<I->getNumOperands();++i)
-      I->setOperand(i, NULL); /* destroy instruction need clean holds
-                                 reference */
-   I->removeFromParent(); /* use erase from would cause crash let
-                                 it freed by Context */
+   errs()<<F->getName()<<"\n";
+   for(auto I = F->use_begin(), E = F->use_end(); I!=E; ++I){
+      CallInst* CI = dyn_cast<CallInst>(I->getUser());
+      if(CI == NULL) continue;
+      errs()<<"Tg:"<<*CI<<"\n";
+      BasicBlock* BB = CI->getParent();
+      Function* Parent = BB->getParent();
+      dse.prepare(Parent, this);
+      dse.runOnBasicBlock(*BB);
+   }
 }
 
 
