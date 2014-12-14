@@ -14,6 +14,8 @@ namespace llvm{
    class Function;
    class Instruction;
    class FunctionPass;
+   class Module;
+   class ModulePass;
    class MemoryDependenceAnalysis;
    class Pass;
    class TargetLibraryInfo;
@@ -35,6 +37,14 @@ struct DSE_Adaptive{
    void getAnalysisUsage(llvm::AnalysisUsage& AU) const;
    void runOnBasicBlock(llvm::BasicBlock& BB);
    void DeleteDeadInstruction(llvm::Instruction* I);
+};
+
+struct DAE_Adaptive{
+   void* opaque;
+
+   DAE_Adaptive(llvm::ModulePass* DAE);
+   void prepare(llvm::Module* M);
+   void runOnFunction(llvm::Function& F);
 };
 }
 

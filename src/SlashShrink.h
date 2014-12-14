@@ -74,6 +74,7 @@ class lle::ReduceCode: public llvm::ModulePass
    AttributeFlags getAttribute(llvm::CallInst*) const;
 
    DSE_Adaptive dse;
+   DAE_Adaptive dae;
 
    void deleteInst(llvm::Instruction*);
    public:

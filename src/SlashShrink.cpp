@@ -18,6 +18,7 @@
 #include <llvm/ADT/DepthFirstIterator.h>
 #include <llvm/Analysis/LibCallAliasAnalysis.h>
 #include <llvm/Transforms/Scalar.h>
+#include <llvm/Transforms/IPO.h>
 
 #include <ValueProfiling.h>
 
@@ -200,8 +201,8 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
 
 bool ReduceCode::runOnModule(Module &M)
 {
-
    dse.prepare(this);
+   dae.prepare(&M);
 
    CallGraph CG(M);
    Function* Main = M.getFunction("main");
@@ -235,6 +236,9 @@ bool ReduceCode::runOnModule(Module &M)
          // if not, we goto next BB.
          if(!MadeChange) ++BB;
       }
+
+      // eliminate function's argument
+      dae.runOnFunction(*F);
    }
 
    return true;
@@ -300,7 +304,8 @@ static AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)
 
 
 ReduceCode::ReduceCode():ModulePass(ID), 
-   dse(createDeadStoreEliminationPass())
+   dse(createDeadStoreEliminationPass()),
+   dae(createDeadArgEliminationPass())
 {
    using std::placeholders::_1;
    Attributes["_gfortran_transfer_character_write"] = gfortran_write_stdout;
