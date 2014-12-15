@@ -212,6 +212,7 @@ bool ReduceCode::runOnFunction(Function& F)
          Instruction* Inst = &*(I--);
          if(CallInst* CI = dyn_cast<CallInst>(Inst)){
             if(getAttribute(CI) == IsDeletable){
+               errs()<<*CI<<"\n";
                dse.DeleteDeadInstruction(CI);
                Ret = MadeChange = true;
                break;
@@ -243,6 +244,7 @@ bool ReduceCode::runOnModule(Module &M)
 
       dse.prepare(F, this);
       runOnFunction(*F);
+      washFunction(F);
 
       // eliminate function's argument
       dae.runOnFunction(*F);
@@ -258,6 +260,12 @@ void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
    simpCFG.getAnalysisUsage(AU);
 }
 
+void ReduceCode::washFunction(llvm::Function *F)
+{
+   ic.runOnFunction(*F);
+   simpCFG.runOnFunction(*F);
+}
+
 void ReduceCode::deleteDeadCaller(llvm::Function *F)
 {
    //FunctionPass& IC = getAnalysisID<FunctionPass>(ic.id(), *F);
@@ -266,9 +274,7 @@ void ReduceCode::deleteDeadCaller(llvm::Function *F)
       if(CI == NULL) continue;
       BasicBlock* BB = CI->getParent();
       Function* Parent = BB->getParent();
-
-      ic.runOnFunction(*Parent);
-      simpCFG.runOnFunction(*Parent);
+      washFunction(Parent);
    }
 }
 

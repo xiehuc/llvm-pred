@@ -77,6 +77,7 @@ class lle::ReduceCode: public llvm::ModulePass
    DAE_Adaptive dae;
    Adaptive ic, simpCFG;
 
+   void washFunction(llvm::Function* F);
    void deleteDeadCaller(llvm::Function* F);
    public:
    static char ID;
