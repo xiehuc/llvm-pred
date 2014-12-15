@@ -21,6 +21,7 @@ else()
 endif()
 
 add_library(LLVMPred SHARED
+   InstCombineAdapter.cpp
 	KnownLibCallInfo.cpp
    ServiceLibrary.cpp
    BlockFreqExpr.cpp

@@ -251,11 +251,14 @@ bool ReduceCode::runOnModule(Module &M)
 }
 void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
 {
+   AU.addRequiredID(ic.id());
    dse.getAnalysisUsage(AU);
+   ic.getAnalysisUsage(AU);
 }
 
 void ReduceCode::deleteDeadCaller(llvm::Function *F)
 {
+   //FunctionPass& IC = getAnalysisID<FunctionPass>(ic.id(), *F);
    errs()<<F->getName()<<"\n";
    for(auto I = F->use_begin(), E = F->use_end(); I!=E; ++I){
       CallInst* CI = dyn_cast<CallInst>(I->getUser());
@@ -263,8 +266,10 @@ void ReduceCode::deleteDeadCaller(llvm::Function *F)
       errs()<<"Tg:"<<*CI<<"\n";
       BasicBlock* BB = CI->getParent();
       Function* Parent = BB->getParent();
-      dse.prepare(Parent, this);
-      dse.runOnBasicBlock(*BB);
+
+      ic.runOnFunction(*Parent);
+      //dse.prepare(Parent, this);
+      //dse.runOnBasicBlock(*BB);
    }
 }
 
@@ -315,7 +320,8 @@ static AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)
 
 ReduceCode::ReduceCode():ModulePass(ID), 
    dse(createDeadStoreEliminationPass()),
-   dae(createDeadArgEliminationPass())
+   dae(createDeadArgEliminationPass()),
+   ic(createInstructionCombiningPass())
 {
    using std::placeholders::_1;
    Attributes["_gfortran_transfer_character_write"] = gfortran_write_stdout;
