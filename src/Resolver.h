@@ -227,12 +227,12 @@ class lle::ResolveEngine
 
    private:
    static const CallBack always_false;
-   static bool implicity_rule(llvm::Instruction*, DDGraph& G);
+   bool (*implicity_rule)(llvm::Instruction*, DDGraph& G);
    std::vector<SolveRule> rules;
    void do_solve(DDGraph& G, CallBack& C);
 
    public:
-   ResolveEngine() {}
+   ResolveEngine();
    // add a rule in engine
    void addRule(SolveRule rule){
       rules.push_back(rule);
@@ -246,7 +246,7 @@ class lle::ResolveEngine
 
    // { normal version: these used for lookup it use who
    // a public rule used for solve ssa dependency
-   static const SolveRule base_rule;
+   static void base_rule(ResolveEngine&);
    // a public rule used for solve simple load.
    static const SolveRule useonly_rule;
    // a public rule used for expose gep instruction
@@ -254,7 +254,7 @@ class lle::ResolveEngine
    // }
    // { reversed version: these used for lookup who use it.
    // a public rule used for lookup it's user's uses
-   static const SolveRule ibase_rule;
+   static void ibase_rule(ResolveEngine&);
    // use with InitRule, a public rule used for 
    static const SolveRule iuse_rule;
    // }

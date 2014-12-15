@@ -15,6 +15,9 @@ using namespace std;
 using namespace lle;
 using namespace llvm;
 
+static bool implicity_rule(Instruction* I, DDGraph& G);
+static bool implicity_inverse_rule(Instruction* I, DDGraph& G);
+
 char ResolverPass::ID = 0;
 static RegisterPass<ResolverPass> Y("-Resolver","A Pass used to cache Resolver Result",false,false);
 
@@ -448,6 +451,10 @@ ResolverPass::~ResolverPass(){
 }
 
 
+ResolveEngine::ResolveEngine()
+{
+   implicity_rule = ::implicity_rule;
+}
 
 void ResolveEngine::do_solve(DDGraph& G, CallBack& C)
 {
@@ -556,7 +563,7 @@ static bool use_inverse_rule_(Use* U, DDGraph& G)
    G.addSolved(U, uses.rbegin(), uses.rend());
    return true;
 }
-bool ResolveEngine::implicity_rule(Instruction* I, DDGraph& G)
+static bool implicity_rule(Instruction* I, DDGraph& G)
 {
    if(isa<StoreInst>(I)){
       G.addUnsolved(I->getOperandUse(0));
@@ -565,6 +572,12 @@ bool ResolveEngine::implicity_rule(Instruction* I, DDGraph& G)
       G.addUnsolved(I->op_begin(), I->op_end());
       return true;
    }
+}
+static bool implicity_inverse_rule(Instruction* I, DDGraph& G)
+{
+   auto uses = to_vector(I->use_begin(), I->use_end());
+   G.addSolved(I, uses.rbegin(), uses.rend());
+   return true;
 }
 static bool gep_rule_(Use* U, DDGraph& G)
 {
@@ -623,11 +636,19 @@ void MDARule::operator()(ResolveEngine &RE)
    RE.addRule(S);
 }
 
+void ResolveEngine::base_rule(ResolveEngine& RE)
+{
+   RE.addRule(SolveRule(direct_rule_));
+   RE.implicity_rule = ::implicity_rule;
+}
+void ResolveEngine::ibase_rule(ResolveEngine& RE)
+{
+   RE.addRule(SolveRule(direct_inverse_rule_));
+   RE.implicity_rule = ::implicity_inverse_rule;
+}
 const ResolveEngine::CallBack ResolveEngine::always_false = [](Use* U){ return false; };
-const ResolveEngine::SolveRule ResolveEngine::base_rule = direct_rule_;
 const ResolveEngine::SolveRule ResolveEngine::useonly_rule = useonly_rule_;
 const ResolveEngine::SolveRule ResolveEngine::gep_rule = gep_rule_;
-const ResolveEngine::SolveRule ResolveEngine::ibase_rule = direct_inverse_rule_;
 const ResolveEngine::SolveRule ResolveEngine::iuse_rule = use_inverse_rule_;
 
 //===============================RESOLVE RULES END===============================//
