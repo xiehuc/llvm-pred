@@ -47,16 +47,15 @@ struct DAE_Adaptive{
    void runOnFunction(llvm::Function& F);
 };
 
-struct InstCombine_Adaptive{
+struct Adaptive{
    void* opaque;
 
-   InstCombine_Adaptive(llvm::FunctionPass* IC);
-   const void* id() const;
+   Adaptive(llvm::FunctionPass* IC);
    void getAnalysisUsage(llvm::AnalysisUsage& AU) const;
    void prepare(llvm::Pass* P);
    void runOnFunction(llvm::Function& F);
-
 };
+
 }
 
 #endif

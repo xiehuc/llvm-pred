@@ -230,6 +230,7 @@ bool ReduceCode::runOnModule(Module &M)
    dse.prepare(this);
    dae.prepare(&M);
    ic.prepare(this);
+   simpCFG.prepare(this);
 
    CallGraph CG(M);
    Function* Main = M.getFunction("main");
@@ -254,6 +255,7 @@ void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
 {
    dse.getAnalysisUsage(AU);
    ic.getAnalysisUsage(AU);
+   simpCFG.getAnalysisUsage(AU);
 }
 
 void ReduceCode::deleteDeadCaller(llvm::Function *F)
@@ -266,6 +268,7 @@ void ReduceCode::deleteDeadCaller(llvm::Function *F)
       Function* Parent = BB->getParent();
 
       ic.runOnFunction(*Parent);
+      simpCFG.runOnFunction(*Parent);
    }
 }
 
@@ -317,7 +320,8 @@ static AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)
 ReduceCode::ReduceCode():ModulePass(ID), 
    dse(createDeadStoreEliminationPass()),
    dae(createDeadArgEliminationPass()),
-   ic(createInstructionCombiningPass())
+   ic(createInstructionCombiningPass()),
+   simpCFG(createCFGSimplificationPass())
 {
    using std::placeholders::_1;
    Attributes["_gfortran_transfer_character_write"] = gfortran_write_stdout;

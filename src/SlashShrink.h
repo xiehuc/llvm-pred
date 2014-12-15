@@ -75,7 +75,7 @@ class lle::ReduceCode: public llvm::ModulePass
 
    DSE_Adaptive dse;
    DAE_Adaptive dae;
-   InstCombine_Adaptive ic;
+   Adaptive ic, simpCFG;
 
    void deleteDeadCaller(llvm::Function* F);
    public:
