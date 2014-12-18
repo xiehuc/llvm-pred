@@ -38,7 +38,7 @@ namespace lle
    llvm::Argument* findCallInstArgument(llvm::Use* use);
    // from a given function's argument and callinst, return the use
    inline llvm::Use* findCallInstParameter(llvm::Argument* Arg, llvm::CallInst* CI){
-      return &CI->getOperandUse(Arg->getArgNo());
+      return &CI->getArgOperandUse(Arg->getArgNo());
    }
    //find where to use V on instuction I
    inline llvm::Use* findOpUseOnInstruction(llvm::Instruction* I, llvm::Value* V){
@@ -63,7 +63,7 @@ namespace lle
    template<typename Ite, typename Cont>
    void insert_to(Ite F, Ite T, Cont& C){
       typedef decltype(*F) UseT;
-      std::transform(F, T, std::inserter(C), [](UseT& U){return &U;});
+      std::for_each(F, T, [&C](UseT U){C.insert(U);});
    }
 
    //=========================NUMERIC BEGIN=================================//

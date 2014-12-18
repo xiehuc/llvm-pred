@@ -563,7 +563,7 @@ static bool use_inverse_rule_(Use* U, DDGraph& G)
 {
    Value* V = U->get();
    std::vector<Use*> uses;
-   pushback_to(V->use_begin(), V->use_end(), uses);
+   pushback_to(V->use_begin(), find_iterator(*U), uses);
    G.addSolved(U, uses.rbegin(), uses.rend());
    return true;
 }
@@ -619,6 +619,7 @@ void InitRule::operator()(ResolveEngine& RE)
    RE.addRule(S);
 }
 
+#if 0
 void MDARule::operator()(ResolveEngine &RE)
 {
    MemoryDependenceAnalysis& MDA = this->MDA;
@@ -640,6 +641,7 @@ void MDARule::operator()(ResolveEngine &RE)
    };
    RE.addRule(S);
 }
+#endif
 
 void ResolveEngine::base_rule(ResolveEngine& RE)
 {

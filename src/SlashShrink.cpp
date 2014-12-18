@@ -189,6 +189,7 @@ bool SlashShrink::runOnFunction(Function &F)
 
 char ReduceCode::ID = 0;
 static RegisterPass<ReduceCode> Y("Reduce", "Slash and Shrink Code to make a minicore program");
+static AttributeFlags noused_exclude(llvm::Use& U, llvm::SmallPtrSetImpl<User*>& exclude);
 
 
 AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
@@ -201,6 +202,7 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
 
 bool ReduceCode::runOnFunction(Function& F)
 {
+   dse.prepare(&F, this);
    BasicBlock* entry = &F.getEntryBlock();
    std::vector<BasicBlock*> blocks(po_begin(entry), po_end(entry));
    bool MadeChange, Ret = false;
@@ -210,14 +212,27 @@ bool ReduceCode::runOnFunction(Function& F)
       MadeChange = false;
       for(auto I = --(*BB)->end(), IE = --(*BB)->begin(); I!=IE;){
          Instruction* Inst = &*(I--);
+         AttributeFlags flag = AttributeFlags::None;
          if(CallInst* CI = dyn_cast<CallInst>(Inst)){
-            AttributeFlags flag = getAttribute(CI);
-            if(flag & IsDeletable){
-               (flag & Cascade)? dse.DeleteCascadeInstruction(CI): 
-                  dse.DeleteDeadInstruction(CI);
-               Ret = MadeChange = true;
-               break;
+            flag = getAttribute(CI);
+         }else if(StoreInst* SI = dyn_cast<StoreInst>(Inst)){
+            if(Argument* A = dyn_cast<Argument>(SI->getPointerOperand())){
+               llvm::SmallSet<User*, 3> S;
+               insert_to(F.user_begin(), F.user_end(), S);
+               bool all_deletable = std::all_of(S.begin(), S.end(), [A, &S](User* C){
+                     llvm::Use* Para = findCallInstParameter(A, dyn_cast<CallInst>(C));
+                     if(Para == NULL) return 0;
+                     return (noused_exclude(*Para, S) & IsDeletable);
+                     });
+               //StoreInst never cascade, so IsDeletable is enough
+               flag = all_deletable ? IsDeletable : AttributeFlags::None;
             }
+         }
+         if(flag & IsDeletable){
+            (flag & Cascade)? dse.DeleteCascadeInstruction(Inst): 
+               dse.DeleteDeadInstruction(Inst);
+            Ret = MadeChange = true;
+            break;
          }
       }
       // if made change, we always recaculate this BB.
@@ -243,7 +258,6 @@ bool ReduceCode::runOnModule(Module &M)
       Function * F = (*FI)->getFunction();
       if(F==NULL || F->isDeclaration()) continue; //F==NULL --> is a external node
 
-      dse.prepare(F, this);
       runOnFunction(*F);
       washFunction(F);
 
@@ -307,15 +321,34 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
    return AttributeFlags::None;
 }
 
-static AttributeFlags mpi_nouse_at(llvm::CallInst* CI, unsigned Which)
+static AttributeFlags noused(llvm::Use& U)
 {
-   Use& buf = CI->getArgOperandUse(Which);
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
    RE.addRule(InitRule(RE.iuse_rule));
-   Value* Visit = RE.find_visit(buf);
+   Value* Visit = RE.find_visit(U);
    if(Visit == NULL) return IsDeletable;
    else return AttributeFlags::None;
+}
+
+static AttributeFlags mpi_nouse_at(llvm::CallInst* CI, unsigned Which)
+{
+   Use& buf = CI->getArgOperandUse(Which);
+   return noused(buf);
+}
+
+static AttributeFlags noused_exclude(llvm::Use& U, llvm::SmallPtrSetImpl<User*>& exclude)
+{
+   ResolveEngine RE;
+   RE.addRule(RE.ibase_rule);
+   RE.addRule(InitRule(RE.iuse_rule));
+   User* Self = U.getUser();
+   Value* Visit = RE.find_visit(U, [&exclude, Self](Use* U){
+         if(U->getUser() != Self && exclude.count(U->getUser())) return true;
+         return false;
+         });
+   if(Visit == NULL) return IsDeletable;
+   return AttributeFlags::None;
 }
 
 static constexpr AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)
