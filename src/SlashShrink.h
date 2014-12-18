@@ -18,8 +18,12 @@ namespace lle {
       None = 0,
       IsDeletable = 1,
       IsPrint = IsDeletable
+      Cascade = 1<<1
    };
+   inline AttributeFlags operator|(AttributeFlags a, AttributeFlags b)
+   {return static_cast<AttributeFlags>(static_cast<int>(a) | static_cast<int>(b));}
 };
+
 
 struct lle::MarkPreserve
 {

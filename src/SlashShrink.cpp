@@ -211,9 +211,10 @@ bool ReduceCode::runOnFunction(Function& F)
       for(auto I = --(*BB)->end(), IE = --(*BB)->begin(); I!=IE;){
          Instruction* Inst = &*(I--);
          if(CallInst* CI = dyn_cast<CallInst>(Inst)){
-            if(getAttribute(CI) == IsDeletable){
-               errs()<<*CI<<"\n";
-               dse.DeleteDeadInstruction(CI);
+            AttributeFlags flag = getAttribute(CI);
+            if(flag & IsDeletable){
+               (flag & Cascade)? dse.DeleteCascadeInstruction(CI): 
+                  dse.DeleteDeadInstruction(CI);
                Ret = MadeChange = true;
                break;
             }
@@ -317,7 +318,7 @@ static AttributeFlags mpi_reduce_nodep(llvm::CallInst* CI)
    else return AttributeFlags::None;
 }
 
-static AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)
+static constexpr AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)
 {
    return flags;
 }
@@ -336,6 +337,9 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["_gfortran_st_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
    Attributes["mpi_reduce_"] = mpi_reduce_nodep;
+   //always delete mpi_wtime_
+   Attributes["mpi_wtime_"] = std::bind(direct_return, _1, 
+         AttributeFlags::IsDeletable | AttributeFlags::Cascade);
    Attributes["main"] = std::bind(direct_return, _1, AttributeFlags::None);
 }
 

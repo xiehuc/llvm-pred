@@ -92,8 +92,15 @@ class lle::DDGraph :
    // a helper function to make a DDGValue with initialed DDGNode structure
    DDGValue make_value(DDGraphKeyTy root, DDGNode::Flags flags);
    std::deque<llvm::Use*> unsolved;
-   public:
    DDGValue* root; // the root for graph
+   public:
+   // a helper function to get User from DDGValue
+   static llvm::Value* get_user(DDGValue& v){
+      if(llvm::Value* V = v.first.dyn_cast<llvm::Value*>()) return V;
+      else if(llvm::Use* U = v.first.dyn_cast<llvm::Use*>()) return U->getUser();
+      else return NULL;
+   }
+
    typedef DDGNode::expr_type expr_type;
 
    DDGraph(lle::ResolveResult& RR, llvm::Value* root);
@@ -129,6 +136,9 @@ class lle::DDGraph :
    // @C isa constant, which naturally solved.
    void addSolved(DDGraphKeyTy K, llvm::Value* C);
 
+   void setRoot(DDGraphKeyTy K){ root = &*this->find(K); }
+   DDGValue* getRoot() {return root;}
+
    expr_type expr(); 
 };
 
@@ -152,7 +162,7 @@ struct llvm::GraphTraits<lle::DDGraph*>:public llvm::GraphTraits<lle::DDGValue*>
    typedef lle::DDGValue NodeType;
 
    static NodeType* getEntryNode(lle::DDGraph* G){
-      return G->root;
+      return G->getRoot();
    }
 
    typedef lle::DDGraph::value_type ValuePairTy;

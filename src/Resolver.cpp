@@ -471,6 +471,7 @@ DDGraph ResolveEngine::resolve(Use& U, CallBack C)
    DDGraph G;
    G.addUnsolved(U);
    do_solve(G, C);
+   G.setRoot(&U);
    return G;
 }
 
@@ -479,6 +480,7 @@ DDGraph ResolveEngine::resolve(Instruction* I, CallBack C)
    DDGraph G;
    implicity_rule(I, G);
    do_solve(G, C);
+   G.setRoot(I);
    return G;
 }
 
@@ -566,10 +568,10 @@ static bool use_inverse_rule_(Use* U, DDGraph& G)
 static bool implicity_rule(Instruction* I, DDGraph& G)
 {
    if(isa<StoreInst>(I)){
-      G.addUnsolved(I->getOperandUse(0));
+      G.addSolved(I, I->getOperandUse(0));
       return false;
    }else{
-      G.addUnsolved(I->op_begin(), I->op_end());
+      G.addSolved(I, I->op_begin(), I->op_end());
       return true;
    }
 }

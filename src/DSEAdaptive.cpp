@@ -1,6 +1,9 @@
 #include "preheader.h"
-#include "Adaptive.h"
 #include "../llvm/DeadStoreElimination.cpp"
+#include "Adaptive.h"
+#include "Resolver.h"
+#include <llvm/ADT/DepthFirstIterator.h>
+#include "ddg.h"
 
 using namespace lle;
 using namespace llvm;
@@ -42,4 +45,19 @@ void DSE_Adaptive::runOnBasicBlock(BasicBlock& BB)
 void DSE_Adaptive::DeleteDeadInstruction(llvm::Instruction* I)
 {
    ::DeleteDeadInstruction(I, *MD, TLI);
+}
+
+void DSE_Adaptive::DeleteCascadeInstruction(llvm::Instruction* I)
+{
+   lle::ResolveEngine RE;
+   RE.addRule(RE.ibase_rule);
+   auto ddg = RE.resolve(I);
+   // FIXME there should use ipo_begin, ipo_end
+   // because inversed search for ResolveEngine always return a single link
+   // so, it can also use df_begin, df_end
+   for(auto Ite = df_begin(&ddg), E = df_end(&ddg); Ite!=E; ++Ite){
+      Instruction* II = dyn_cast<Instruction>(DDGraph::get_user(**Ite));
+      II->replaceAllUsesWith(UndefValue::get(II->getType()));
+      ::DeleteDeadInstruction(II, *MD, TLI);
+   }
 }

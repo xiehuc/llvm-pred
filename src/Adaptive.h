@@ -37,6 +37,7 @@ struct DSE_Adaptive{
    void getAnalysisUsage(llvm::AnalysisUsage& AU) const;
    void runOnBasicBlock(llvm::BasicBlock& BB);
    void DeleteDeadInstruction(llvm::Instruction* I);
+   void DeleteCascadeInstruction(llvm::Instruction* I);
 };
 
 struct DAE_Adaptive{
