@@ -50,7 +50,7 @@ bool lle::InstTiming::runOnModule(Module &M)
 
    if((F = M.getFunction("inst_template")))
    {
-	   for(auto Ite = user_begin(F), E = user_end(F); Ite!=E; ++Ite){
+	   for(auto Ite = F->user_begin(), E = F->user_end(); Ite!=E; ++Ite){
 		  CallInst* Template = dyn_cast<CallInst>(*Ite);
 		  Value* R = implyTemplate(Template);
 		  Template->replaceAllUsesWith(R);

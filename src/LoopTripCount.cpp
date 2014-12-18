@@ -139,7 +139,7 @@ Value* LoopTripCount::insertTripCount(Loop* L, Instruction* InsertPos)
 		Value* PSi = IndOrNext->getOperand(0);//point type Step.i
 
 		int SICount[2] = {0};//store in predecessor count,store in loop body count
-		for( auto I = user_begin(PSi),E = user_end(PSi);I!=E;++I){
+		for( auto I = PSi->user_begin(),E = PSi->user_end();I!=E;++I){
 			DISABLE(errs()<<**I<<"\n");
 			StoreInst* SI = dyn_cast<StoreInst>(*I);
 			if(!SI || SI->getOperand(1) != PSi) continue;

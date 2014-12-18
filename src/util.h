@@ -55,12 +55,15 @@ namespace lle
    }
 
    // convert a use_iterator range to std::vector<Use*>
-   template<typename Ite>
-   auto to_vector(Ite F, Ite T)->std::vector<decltype(&*F)>{
+   template<typename Ite, typename Cont>
+   void pushback_to(Ite F, Ite T, Cont& C){
       typedef decltype(*F) UseT;
-      std::vector<decltype(&*F)> ret;
-      std::transform(F, T, std::back_inserter(ret), [](UseT& U){return &U;});
-      return ret;
+      std::transform(F, T, std::back_inserter(C), [](UseT& U){return &U;});
+   }
+   template<typename Ite, typename Cont>
+   void insert_to(Ite F, Ite T, Cont& C){
+      typedef decltype(*F) UseT;
+      std::transform(F, T, std::inserter(C), [](UseT& U){return &U;});
    }
 
    //=========================NUMERIC BEGIN=================================//
@@ -138,15 +141,5 @@ namespace lle
       }
    };
 }
-
-#if LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
-#define user_back(ins)  ins->use_back()
-#define user_begin(ins) ins->use_begin()
-#define user_end(ins)   ins->use_end()
-#else
-#define user_back(ins)  ins->user_back()
-#define user_begin(ins) ins->user_begin()
-#define user_end(ins)   ins->user_end()
-#endif
 
 #endif

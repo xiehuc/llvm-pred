@@ -59,7 +59,7 @@ static bool indirect_access_global(Value* V)
 struct CallArgResolve{
    Use* operator()(Use* U){
       Argument* arg = findCallInstArgument(U); // adjust attribute
-      if(arg && isArgumentWrite(arg) && arg->getNumUses()>0 && isa<StoreInst>(user_back(arg) )) 
+      if(arg && isArgumentWrite(arg) && arg->getNumUses()>0 && isa<StoreInst>(arg->user_back())) 
          // if no nocapture and readonly, it means could write into this addr
          // FIXME: when the last inst is not store, we consider this is unsolved
          // let it return NULL if failed, to let ResolverSet use next chain
@@ -171,7 +171,7 @@ Use* SpecialResolve::operator()(Value *V, ResolverBase* RB)
  */
 static void find_global_dependencies(const Value* GV,SmallVectorImpl<FindedDependenciesType>& Result)
 {
-	for(auto U = user_begin(GV),E = user_end(GV); U!=E;++U){
+	for(auto U = GV->user_begin(),E = GV->user_end(); U!=E;++U){
 		Instruction* I = const_cast<Instruction*>(dyn_cast<Instruction>(*U));
 		if(!I){
 			find_global_dependencies(*U, Result);
@@ -317,7 +317,7 @@ CallInst* ResolverBase::in_call(Function *F) const
          });
    if(Ite!=call_stack.end()) return *Ite;
    CallInst* only;
-   unsigned call_count = count_if(user_begin(F), user_end(F), [&only](User* U){
+   unsigned call_count = count_if(F->user_begin(), F->user_end(), [&only](User* U){
          return (only = dyn_cast<CallInst>(U)) > 0;
          });
    if(call_count==1) return only;
@@ -387,8 +387,8 @@ recursive:
             Argument* arg = findCallInstArgument(res);
             if(arg){
                // arg == NULL, maybe it calls a library function
-               partial.insert(make_pair(arg,&user_back(arg)->getOperandUse(0)));
-               next = user_back(arg);
+               partial.insert(make_pair(arg,&arg->user_back()->getOperandUse(0)));
+               next = arg->user_back();
                call_stack.push_back(CI);
             }
          }else{
@@ -554,14 +554,16 @@ static bool direct_rule_(Use* U, DDGraph& G)
 static bool direct_inverse_rule_(Use* U, DDGraph& G)
 {
    Value* V = U->getUser();
-   auto uses = to_vector(V->use_begin(), V->use_end());
+   std::vector<Use*> uses;
+   pushback_to(V->use_begin(), V->use_end(), uses);
    G.addSolved(U, uses.rbegin(), uses.rend());
    return true;
 }
 static bool use_inverse_rule_(Use* U, DDGraph& G)
 {
    Value* V = U->get();
-   auto uses = to_vector(V->use_begin(), find_iterator(*U));
+   std::vector<Use*> uses;
+   pushback_to(V->use_begin(), V->use_end(), uses);
    G.addSolved(U, uses.rbegin(), uses.rend());
    return true;
 }
@@ -577,7 +579,8 @@ static bool implicity_rule(Instruction* I, DDGraph& G)
 }
 static bool implicity_inverse_rule(Instruction* I, DDGraph& G)
 {
-   auto uses = to_vector(I->use_begin(), I->use_end());
+   std::vector<Use*> uses;
+   pushback_to(I->use_begin(), I->use_end(), uses);
    G.addSolved(I, uses.rbegin(), uses.rend());
    return true;
 }

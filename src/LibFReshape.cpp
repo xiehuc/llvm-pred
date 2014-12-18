@@ -53,7 +53,7 @@ bool LibFReshape::runOnModule(Module &M)
       Old->removeFromParent();
       Constant* New = M.getOrInsertFunction(F->getName(), F->getFunctionType(), F->getAttributes());
 
-      for(auto I = user_begin(Old), E = user_end(Old); I!=E; ++I){
+      for(auto I = Old->user_begin(), E = Old->user_end(); I!=E; ++I){
          if(ConstantExpr* CE = dyn_cast<ConstantExpr>(*I))
             //Assume all CE is used with in a call
             CE->replaceAllUsesWith(New);
