@@ -307,13 +307,13 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
    return AttributeFlags::None;
 }
 
-static AttributeFlags mpi_reduce_nodep(llvm::CallInst* CI)
+static AttributeFlags mpi_nouse_at(llvm::CallInst* CI, unsigned Which)
 {
-   Use& recvbuf = CI->getArgOperandUse(1);
+   Use& buf = CI->getArgOperandUse(Which);
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
    RE.addRule(InitRule(RE.iuse_rule));
-   Value* Visit = RE.find_visit(recvbuf);
+   Value* Visit = RE.find_visit(buf);
    if(Visit == NULL) return IsDeletable;
    else return AttributeFlags::None;
 }
@@ -336,10 +336,22 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["_gfortran_transfer_real_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
-   Attributes["mpi_reduce_"] = mpi_reduce_nodep;
+//int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
+//               MPI_Op op, int root, MPI_Comm comm)
+//Deletable if recvbuf is no used
+   Attributes["mpi_reduce_"] = std::bind(mpi_nouse_at, _1, 1);
+//int MPI_Send(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
+//             MPI_Comm comm)
+//Deletable if buf is no used
+   Attributes["mpi_send_"] = std::bind(mpi_nouse_at, _1, 0);
+//int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
+//              int tag, MPI_Comm comm, MPI_Request *request)
+//Deletable if buf is no used
+   Attributes["mpi_irecv_"] = std::bind(mpi_nouse_at, _1, 0);
    //always delete mpi_wtime_
    Attributes["mpi_wtime_"] = std::bind(direct_return, _1, 
          AttributeFlags::IsDeletable | AttributeFlags::Cascade);
+   Attributes["mpi_wait_"] = std::bind(direct_return, _1, AttributeFlags::IsDeletable);
    Attributes["main"] = std::bind(direct_return, _1, AttributeFlags::None);
 }
 

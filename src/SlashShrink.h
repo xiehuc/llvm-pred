@@ -17,7 +17,7 @@ namespace lle {
    enum AttributeFlags {
       None = 0,
       IsDeletable = 1,
-      IsPrint = IsDeletable
+      IsPrint = IsDeletable,
       Cascade = 1<<1
    };
    inline AttributeFlags operator|(AttributeFlags a, AttributeFlags b)
