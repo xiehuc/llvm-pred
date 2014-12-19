@@ -242,6 +242,26 @@ bool ReduceCode::runOnFunction(Function& F)
    return Ret;
 }
 
+void ReduceCode::walkThroughCg(llvm::CallGraphNode * CGN)
+{
+   Function* F = CGN->getFunction();
+   if(!F || F->isDeclaration()) return; // this is a external function
+
+   runOnFunction(*F);
+   washFunction(F);
+
+   CallGraphNode::CalledFunctionsVector vec(CGN->begin(), CGN->end());
+   for(auto I = vec.rbegin(), E = vec.rend(); I!=E; ++I)
+      walkThroughCg(I->second);
+
+   runOnFunction(*F);
+   washFunction(F);
+
+   // eliminate function's argument
+   dae.runOnFunction(*F);
+   deleteDeadCaller(F);
+}
+
 bool ReduceCode::runOnModule(Module &M)
 {
    dse.prepare(this);
@@ -252,20 +272,8 @@ bool ReduceCode::runOnModule(Module &M)
    CallGraph CG(M);
    Function* Main = M.getFunction("main");
    CallGraphNode* root = Main?CG[Main]:CG.getExternalCallingNode();
-   std::vector<CallGraphNode*> nodes(df_begin(root), df_end(root));
-   // use deep first visit order , then reverse it. can get what we need order.
-   for(auto FI = nodes.rbegin(), FE = nodes.rend(); FI != FE; ++FI){
-      Function * F = (*FI)->getFunction();
-      if(F==NULL || F->isDeclaration()) continue; //F==NULL --> is a external node
 
-      runOnFunction(*F);
-      washFunction(F);
-
-      // eliminate function's argument
-      dae.runOnFunction(*F);
-      deleteDeadCaller(F);
-   }
-
+   walkThroughCg(root);
    return true;
 }
 void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
@@ -321,12 +329,12 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
    return AttributeFlags::None;
 }
 
-static AttributeFlags noused(llvm::Use& U)
+static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C = ResolveEngine::always_false)
 {
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
    RE.addRule(InitRule(RE.iuse_rule));
-   Value* Visit = RE.find_visit(U);
+   Value* Visit = RE.find_visit(U, C);
    if(Visit == NULL) return IsDeletable;
    else return AttributeFlags::None;
 }
@@ -339,16 +347,12 @@ static AttributeFlags mpi_nouse_at(llvm::CallInst* CI, unsigned Which)
 
 static AttributeFlags noused_exclude(llvm::Use& U, llvm::SmallPtrSetImpl<User*>& exclude)
 {
-   ResolveEngine RE;
-   RE.addRule(RE.ibase_rule);
-   RE.addRule(InitRule(RE.iuse_rule));
    User* Self = U.getUser();
-   Value* Visit = RE.find_visit(U, [&exclude, Self](Use* U){
+   AttributeFlags ret = noused(U, [&exclude, Self](Use* U){
          if(U->getUser() != Self && exclude.count(U->getUser())) return true;
          return false;
          });
-   if(Visit == NULL) return IsDeletable;
-   return AttributeFlags::None;
+   return ret;
 }
 
 static constexpr AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)

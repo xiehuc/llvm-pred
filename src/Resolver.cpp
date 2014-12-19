@@ -502,15 +502,17 @@ Value* ResolveEngine::find_visit(Use& Tg, CallBack C)
    User* TgUr = Tg.getUser();
    resolve(Tg, [&ret, &C, TgUr](Use* U){
          User* Ur = U->getUser();
-         if(Ur == TgUr) return C(U);
-         if(isa<LoadInst>(Ur))
-            ret=Ur;
-         else if(CallInst* CI = dyn_cast<CallInst>(Ur)){//call inst also is a kind of visit
-            if(Function* F = dyn_cast<Function>(castoff(CI->getCalledValue())))
-               if(!F->getName().startswith("llvm."))//llvm call should ignore
-                  ret=CI;
+         bool Pass = C(U);
+         if(Ur != TgUr && !Pass){// only it isn't itSelf and not banned by Caller
+            if(isa<LoadInst>(Ur))
+               ret=Ur;
+            else if(CallInst* CI = dyn_cast<CallInst>(Ur)){//call inst also is a kind of visit
+               if(Function* F = dyn_cast<Function>(castoff(CI->getCalledValue())))
+                  if(!F->getName().startswith("llvm."))//llvm call should ignore
+                     ret=CI;
+            }
          }
-         return C(U);
+         return Pass;
       });
    return ret;
 }

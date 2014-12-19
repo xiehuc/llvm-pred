@@ -226,7 +226,6 @@ class lle::ResolveEngine
    typedef std::function<bool(llvm::Use*)> CallBack;
 
    private:
-   static const CallBack always_false;
    bool (*implicity_rule)(llvm::Instruction*, DDGraph& G);
    std::vector<SolveRule> rules;
    void do_solve(DDGraph& G, CallBack& C);
@@ -244,6 +243,7 @@ class lle::ResolveEngine
    DDGraph resolve(llvm::Instruction* I, CallBack C = always_false);
    DDGraph resolve(llvm::Use& U, CallBack C = always_false);
 
+   static const CallBack always_false;
    // { normal version: these used for lookup it use who
    // a public rule used for solve ssa dependency
    static void base_rule(ResolveEngine&);

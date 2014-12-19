@@ -3,6 +3,7 @@
 #include <llvm/IR/Instruction.h>
 #include <llvm/ADT/SmallSet.h>
 #include <llvm/IR/Metadata.h>
+#include <llvm/Analysis/CallGraph.h>
 #include <llvm/Pass.h>
 
 #include <unordered_map>
@@ -81,6 +82,7 @@ class lle::ReduceCode: public llvm::ModulePass
    DAE_Adaptive dae;
    Adaptive ic, simpCFG;
 
+   void walkThroughCg(llvm::CallGraphNode*);
    void washFunction(llvm::Function* F);
    void deleteDeadCaller(llvm::Function* F);
    public:
