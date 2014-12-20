@@ -297,24 +297,29 @@ void DataDepGraph::addUnsolved(llvm::Use *beg, llvm::Use *end)
 
 void DataDepGraph::addSolved(DDGraphKeyTy K, Use* F, Use* T)
 {
-   auto& N = (*this)[K];
-   N.flags_ = DataDepNode::Flags::SOLVED;
-   N.parent_ = this;
+   std::vector<DDGraphKeyTy> V;
+   V.reserve(T-F);
    for(auto U = F; U!=T; ++U){
       auto Found = &this->FindAndConstruct(U);
       Found->second.parent_ = this;
-      N.impl().push_back(Found->first);
+      V.push_back(Found->first);
+      // shouldn't push direct to N, FindAndConstruct would adjust buckets
       if(Found->second.flags() == DataDepNode::Flags::UNSOLVED) 
          unsolved.push_back(U);
    }
+   auto& N = (*this)[K];
+   N.flags_ = DataDepNode::Flags::SOLVED;
+   N.parent_ = this;
+   N.impl().insert(N.impl().end(), V.begin(), V.end());
 }
 
 void DataDepGraph::addSolved(DDGraphKeyTy K, Value* C)
 {
-   auto& N = (*this)[K];
-   N.flags_ = DataDepNode::Flags::SOLVED;
    auto Found = &this->FindAndConstruct(C);
    Found->second.flags_ = DataDepNode::Flags::SOLVED;
+
+   auto& N = (*this)[K];
+   N.flags_ = DataDepNode::Flags::SOLVED;
    N.parent_ = Found->second.parent_ = this;
-   N.impl().push_back(Found->first);
+   N.impl().push_back(K);
 }

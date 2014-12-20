@@ -177,7 +177,7 @@ struct llvm::DOTGraphTraits<lle::DDGraph*> : public llvm::DefaultDOTGraphTraits
 namespace lle{
 class DataDepGraph;
 struct DataDepNode{
-   typedef llvm::SmallVector<DDGraphKeyTy, 3> Impl;
+   typedef std::vector<DDGraphKeyTy> Impl;
    typedef Impl::iterator iterator;
    enum class Flags{
       SOLVED = 0,
@@ -188,7 +188,7 @@ struct DataDepNode{
    Flags flags_;            // this node's type information
    DataDepGraph* parent_;
 
-   DataDepNode(Flags = Flags::UNSOLVED);
+   DataDepNode():flags_(Flags::UNSOLVED) {};
    Flags flags(){return flags_;}
    iterator begin(){return childs_.begin();}
    iterator end(){return childs_.end();}
@@ -259,17 +259,17 @@ struct GraphTraits<lle::DataDepGraph::value_type*>
    static ChildIteratorType child_begin(Self* N){
       using std::placeholders::_1;
       return map_iterator(N->second.begin(), 
-            DerefFun(std::bind(Deref, _1, N->second.parent())));
+            DerefFun(std::bind(Deref, _1, &N->second.parent())));
    }
 
    static ChildIteratorType child_end(Self* N){
       using std::placeholders::_1;
       return map_iterator(N->second.end(), 
-            DerefFun(std::bind(Deref, _1, N->second.parent())));
+            DerefFun(std::bind(Deref, _1, &N->second.parent())));
    }
 
-   static Self* Deref(lle::DDGraphKeyTy V, lle::DataDepGraph& G){
-      return &*G.find(V);
+   static Self* Deref(lle::DDGraphKeyTy V, lle::DataDepGraph* G){
+      return &*G->find(V);
    }
 };
 template<>

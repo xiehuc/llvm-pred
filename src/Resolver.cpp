@@ -563,7 +563,6 @@ static bool direct_inverse_rule_(Use* U, DataDepGraph& G)
    Value* V = U->getUser();
    std::vector<Use*> uses;
    pushback_to(V->use_begin(), V->use_end(), uses);
-   errs()<<uses.size()<<"\n";
    G.addSolved(U, uses.rbegin(), uses.rend());
    return true;
 }
@@ -572,7 +571,6 @@ static bool use_inverse_rule_(Use* U, DataDepGraph& G)
    Value* V = U->get();
    std::vector<Use*> uses;
    pushback_to(V->use_begin(), find_iterator(*U), uses);
-   errs()<<uses.size()<<"\n";
    G.addSolved(U, uses.rbegin(), uses.rend());
    return true;
 }
