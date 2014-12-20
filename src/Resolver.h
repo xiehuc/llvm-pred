@@ -236,8 +236,19 @@ class lle::ResolveEngine
    void addRule(SolveRule rule){
       rules.push_back(rule);
    }
+   template<typename T>
+   using ShouldRef = std::integral_constant<bool, 
+         std::is_class<T>::value && !std::is_rvalue_reference<T>::value
+            >;
    template<typename R>
-   void addRule(R rule){
+   typename std::enable_if<ShouldRef<R>::value, void>::type
+   // if is a function object, try use it's reference
+   addRule(R& rule){
+      rule(*this);
+   }
+   template<typename R>
+   typename std::enable_if<!ShouldRef<R>::value, void>::type
+   addRule(R rule){
       rule(*this);
    }
    DDGraph resolve(llvm::Instruction* I, CallBack C = always_false);
@@ -271,6 +282,8 @@ struct lle::InitRule
    ResolveEngine::SolveRule rule;
    InitRule(const ResolveEngine::SolveRule r):initialized(false),rule(r) {}
    void operator()(ResolveEngine& RE);
+   // clear state by hand after one resolve
+   void clear(){ initialized = false;}
 };
 
 struct lle::MDARule

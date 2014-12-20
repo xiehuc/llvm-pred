@@ -190,6 +190,10 @@ bool SlashShrink::runOnFunction(Function &F)
 char ReduceCode::ID = 0;
 static RegisterPass<ReduceCode> Y("Reduce", "Slash and Shrink Code to make a minicore program");
 static AttributeFlags noused_exclude(llvm::Use& U, llvm::SmallPtrSetImpl<User*>& exclude);
+static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C = ResolveEngine::always_false);
+#ifndef NDEBUG
+static bool Dbg_EnablePrintGraph = false;
+#endif
 
 
 AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
@@ -216,6 +220,7 @@ bool ReduceCode::runOnFunction(Function& F)
          if(CallInst* CI = dyn_cast<CallInst>(Inst)){
             flag = getAttribute(CI);
          }else if(StoreInst* SI = dyn_cast<StoreInst>(Inst)){
+
             if(Argument* A = dyn_cast<Argument>(SI->getPointerOperand())){
                llvm::SmallSet<User*, 3> S;
                insert_to(F.user_begin(), F.user_end(), S);
@@ -226,7 +231,12 @@ bool ReduceCode::runOnFunction(Function& F)
                      });
                //StoreInst never cascade, so IsDeletable is enough
                flag = all_deletable ? IsDeletable : AttributeFlags::None;
+            }else if(isa<AllocaInst>(SI->getPointerOperand())){
+               Dbg_EnablePrintGraph = true;
+               noused(SI->getOperandUse(1));
+               Dbg_EnablePrintGraph = false;
             }
+
          }
          if(flag & IsDeletable){
             (flag & Cascade)? dse.DeleteCascadeInstruction(Inst): 
@@ -329,12 +339,22 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
    return AttributeFlags::None;
 }
 
-static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C = ResolveEngine::always_false)
+static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C)
 {
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
-   RE.addRule(InitRule(RE.iuse_rule));
+   InitRule ir(RE.iuse_rule);
+   RE.addRule(ir);
    Value* Visit = RE.find_visit(U, C);
+   ir.clear();
+#ifndef NDEBUG
+   if(Dbg_EnablePrintGraph){
+      auto ddg = RE.resolve(U, C);
+      Instruction* I = dyn_cast<Instruction>(U.getUser());
+      StringRef FName = I?I->getParent()->getParent()->getName():"test";
+      WriteGraph(&ddg, FName);
+   }
+#endif
    if(Visit == NULL) return IsDeletable;
    else return AttributeFlags::None;
 }

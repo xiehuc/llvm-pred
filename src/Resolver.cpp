@@ -534,7 +534,6 @@ static bool useonly_rule_(Use* U, DDGraph& G)
       //seems all things who use target is after target
       auto V = Tg->getUser();
       if(isa<StoreInst>(V) && V->getOperand(1) == Tg->get()){
-         DEBUG(errs()<<"UseOnly Rule:"<<*V<<"\n");
          G.addSolved(U, V->getOperandUse(0));
          return true;
       }
@@ -600,7 +599,6 @@ static bool gep_rule_(Use* U, DDGraph& G)
       auto V = Tg->getUser();
       if(isa<GetElementPtrInst>(V) && V->getOperand(0) == Tg->get() ){
          // add all GEP to Unsolved
-         DEBUG(errs()<<"GEP Rule:"<<*V<<"\n");
          G.addSolved(U, V->getOperandUse(0));
          ret = true;
       }
