@@ -34,7 +34,7 @@ namespace lle{
       ResolveResult;
 	typedef std::pair<llvm::MemDepResult,llvm::BasicBlock*> FindedDependenciesType;
 
-   struct DDGraph;
+   class DataDepGraph;
    class ResolveEngine;
    struct InitRule;
    struct MDARule;
@@ -221,14 +221,15 @@ class lle::ResolveEngine
 {
    public:
    // if return true, means found a solve.
-   typedef std::function<bool(llvm::Use*, DDGraph&)> SolveRule;
+   typedef std::function<bool(llvm::Use*, DataDepGraph&)> SolveRule;
    // if return true, stop solve in current branch
    typedef std::function<bool(llvm::Use*)> CallBack;
 
    private:
-   bool (*implicity_rule)(llvm::Instruction*, DDGraph& G);
+   bool (*implicity_rule)(llvm::Instruction*, DataDepGraph& G);
    std::vector<SolveRule> rules;
-   void do_solve(DDGraph& G, CallBack& C);
+   size_t max_iteration, iteration;
+   void do_solve(DataDepGraph& G, CallBack& C);
 
    public:
    ResolveEngine();
@@ -251,8 +252,9 @@ class lle::ResolveEngine
    addRule(R rule){
       rule(*this);
    }
-   DDGraph resolve(llvm::Instruction* I, CallBack C = always_false);
-   DDGraph resolve(llvm::Use& U, CallBack C = always_false);
+   void setMaxIteration(size_t max) { max_iteration = max;}
+   DataDepGraph resolve(llvm::Instruction* I, CallBack C = always_false);
+   DataDepGraph resolve(llvm::Use& U, CallBack C = always_false);
 
    static const CallBack always_false;
    // { normal version: these used for lookup it use who

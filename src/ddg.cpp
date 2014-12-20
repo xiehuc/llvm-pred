@@ -238,34 +238,6 @@ static void to_expr(Value* V, DDGNode* N, int& ref_num)
       Assert(0,"unreachable");
 }
 
-void DDGraph::addUnsolved(llvm::Use *beg, llvm::Use *end)
-{
-   auto& un = unsolved;
-   for_each(beg, end, [&un](Use& U){
-         un.push_back(&U);
-         });
-}
-
-void DDGraph::addSolved(DDGraphKeyTy K, Use* F, Use* T)
-{
-   auto& N = (*this)[K];
-   N.flags_ = DDGNode::SOLVED;
-   for(auto U = F; U!=T; ++U){
-      auto Found = &this->FindAndConstruct(U);
-      N.impl().push_back(Found);
-      if(Found->second.flags() == DDGNode::UNSOLVED) 
-         unsolved.push_back(U);
-   }
-}
-
-void DDGraph::addSolved(DDGraphKeyTy K, Value* C)
-{
-   auto& N = (*this)[K];
-   N.flags_ = DDGNode::SOLVED;
-   auto Found = &this->FindAndConstruct(C);
-   Found->second.flags_ = DDGNode::SOLVED;
-   N.impl().push_back(Found);
-}
 
 expr_type DDGraph::expr()
 {
@@ -315,4 +287,34 @@ string llvm::DOTGraphTraits<DDGraph*>::getNodeLabel(DDGValue* N,DDGraph* G)
       }
    }
    return ret;
+}
+
+//=======================NEW API==================================
+void DataDepGraph::addUnsolved(llvm::Use *beg, llvm::Use *end)
+{
+   pushback_to(beg, end, unsolved);
+}
+
+void DataDepGraph::addSolved(DDGraphKeyTy K, Use* F, Use* T)
+{
+   auto& N = (*this)[K];
+   N.flags_ = DataDepNode::Flags::SOLVED;
+   N.parent_ = this;
+   for(auto U = F; U!=T; ++U){
+      auto Found = &this->FindAndConstruct(U);
+      Found->second.parent_ = this;
+      N.impl().push_back(Found->first);
+      if(Found->second.flags() == DataDepNode::Flags::UNSOLVED) 
+         unsolved.push_back(U);
+   }
+}
+
+void DataDepGraph::addSolved(DDGraphKeyTy K, Value* C)
+{
+   auto& N = (*this)[K];
+   N.flags_ = DataDepNode::Flags::SOLVED;
+   auto Found = &this->FindAndConstruct(C);
+   Found->second.flags_ = DataDepNode::Flags::SOLVED;
+   N.parent_ = Found->second.parent_ = this;
+   N.impl().push_back(Found->first);
 }

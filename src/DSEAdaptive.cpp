@@ -56,7 +56,7 @@ void DSE_Adaptive::DeleteCascadeInstruction(llvm::Instruction* I)
    // because inversed search for ResolveEngine always return a single link
    // so, it can also use df_begin, df_end
    for(auto Ite = df_begin(&ddg), E = df_end(&ddg); Ite!=E; ++Ite){
-      Instruction* II = dyn_cast<Instruction>(DDGraph::get_user(**Ite));
+      Instruction* II = dyn_cast<Instruction>(DataDepGraph::get_user(**Ite));
       II->replaceAllUsesWith(UndefValue::get(II->getType()));
       ::DeleteDeadInstruction(II, *MD, TLI);
    }

@@ -15,8 +15,8 @@ using namespace std;
 using namespace lle;
 using namespace llvm;
 
-static bool implicity_rule(Instruction* I, DDGraph& G);
-static bool implicity_inverse_rule(Instruction* I, DDGraph& G);
+static bool implicity_rule(Instruction* I, DataDepGraph& G);
+static bool implicity_inverse_rule(Instruction* I, DataDepGraph& G);
 
 char ResolverPass::ID = 0;
 static RegisterPass<ResolverPass> Y("-Resolver","A Pass used to cache Resolver Result",false,false);
@@ -454,11 +454,13 @@ ResolverPass::~ResolverPass(){
 ResolveEngine::ResolveEngine()
 {
    implicity_rule = ::implicity_rule;
+   max_iteration = UINT32_MAX;
 }
 
-void ResolveEngine::do_solve(DDGraph& G, CallBack& C)
+void ResolveEngine::do_solve(DataDepGraph& G, CallBack& C)
 {
    while(Use* un = G.popUnsolved()){
+      if(++iteration>max_iteration) break;
       if(C(un)) continue;
       for(auto r = rules.rbegin(), e = rules.rend(); r!=e; ++r){
          if((*r)(un, G)) break;
@@ -466,18 +468,20 @@ void ResolveEngine::do_solve(DDGraph& G, CallBack& C)
    }
 }
 
-DDGraph ResolveEngine::resolve(Use& U, CallBack C)
+DataDepGraph ResolveEngine::resolve(Use& U, CallBack C)
 {
-   DDGraph G;
+   DataDepGraph G;
+   iteration = 0;
    G.addUnsolved(U);
    do_solve(G, C);
    G.setRoot(&U);
    return G;
 }
 
-DDGraph ResolveEngine::resolve(Instruction* I, CallBack C)
+DataDepGraph ResolveEngine::resolve(Instruction* I, CallBack C)
 {
-   DDGraph G;
+   DataDepGraph G;
+   iteration = 0;
    implicity_rule(I, G);
    do_solve(G, C);
    G.setRoot(I);
@@ -512,7 +516,9 @@ Value* ResolveEngine::find_visit(Use& Tg, CallBack C)
                      ret=CI;
             }
          }
-         return Pass;
+         // most of time, we just care whether it has visitor,
+         // so if we found one, we can stop search
+         return ret||Pass;
       });
    return ret;
 }
@@ -520,7 +526,7 @@ Value* ResolveEngine::find_visit(Use& Tg, CallBack C)
 //===========================RESOLVE RULES======================================//
 
 
-static bool useonly_rule_(Use* U, DDGraph& G)
+static bool useonly_rule_(Use* U, DataDepGraph& G)
 {
    User* V = U->getUser();
    Use* Tg = U;
@@ -540,7 +546,7 @@ static bool useonly_rule_(Use* U, DDGraph& G)
    } while( (Tg = Tg->getNext()) );
    return false;
 }
-static bool direct_rule_(Use* U, DDGraph& G)
+static bool direct_rule_(Use* U, DataDepGraph& G)
 {
    Value* V = U->get();
    if(auto I = dyn_cast<Instruction>(V)){
@@ -552,23 +558,25 @@ static bool direct_rule_(Use* U, DDGraph& G)
    }
    return false;
 }
-static bool direct_inverse_rule_(Use* U, DDGraph& G)
+static bool direct_inverse_rule_(Use* U, DataDepGraph& G)
 {
    Value* V = U->getUser();
    std::vector<Use*> uses;
    pushback_to(V->use_begin(), V->use_end(), uses);
+   errs()<<uses.size()<<"\n";
    G.addSolved(U, uses.rbegin(), uses.rend());
    return true;
 }
-static bool use_inverse_rule_(Use* U, DDGraph& G)
+static bool use_inverse_rule_(Use* U, DataDepGraph& G)
 {
    Value* V = U->get();
    std::vector<Use*> uses;
    pushback_to(V->use_begin(), find_iterator(*U), uses);
+   errs()<<uses.size()<<"\n";
    G.addSolved(U, uses.rbegin(), uses.rend());
    return true;
 }
-static bool implicity_rule(Instruction* I, DDGraph& G)
+static bool implicity_rule(Instruction* I, DataDepGraph& G)
 {
    if(isa<StoreInst>(I)){
       G.addSolved(I, I->getOperandUse(0));
@@ -578,14 +586,14 @@ static bool implicity_rule(Instruction* I, DDGraph& G)
       return true;
    }
 }
-static bool implicity_inverse_rule(Instruction* I, DDGraph& G)
+static bool implicity_inverse_rule(Instruction* I, DataDepGraph& G)
 {
    std::vector<Use*> uses;
    pushback_to(I->use_begin(), I->use_end(), uses);
    G.addSolved(I, uses.rbegin(), uses.rend());
    return true;
 }
-static bool gep_rule_(Use* U, DDGraph& G)
+static bool gep_rule_(Use* U, DataDepGraph& G)
 {
    // if isa GEP, means we already have solved before.
    if(isa<GetElementPtrInst>(U->getUser())) return false;
@@ -609,7 +617,7 @@ void InitRule::operator()(ResolveEngine& RE)
 {
    bool& init = this->initialized;
    auto& r = rule;
-   ResolveEngine::SolveRule S = [&init, &r](Use* U, DDGraph& G){
+   ResolveEngine::SolveRule S = [&init, &r](Use* U, DataDepGraph& G){
       if(!init){
          init = true;
          return r(U,G);
