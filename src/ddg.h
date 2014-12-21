@@ -199,6 +199,7 @@ class DataDepGraph: public llvm::DenseMap<DDGraphKeyTy, DataDepNode>
 {
    std::deque<llvm::Use*> unsolved;
    DDGraphKeyTy root; // the root for graph
+   bool bottom_up;
    public:
    typedef llvm::DenseMap<DDGraphKeyTy, DataDepNode>::value_type value_type;
    // a helper function to get User from DDGValue
@@ -208,7 +209,7 @@ class DataDepGraph: public llvm::DenseMap<DDGraphKeyTy, DataDepNode>
       else return NULL;
    }
 
-   DataDepGraph() {};
+   DataDepGraph():bottom_up(false) {};
    void addUnsolved(llvm::Use& U){
       unsolved.push_back(&U);
    }
@@ -240,8 +241,9 @@ class DataDepGraph: public llvm::DenseMap<DDGraphKeyTy, DataDepNode>
       return ret;
    }
 
-   void setRoot(DDGraphKeyTy K){ root = K; }
+   void setRoot(DDGraphKeyTy K, bool isDep=true){ root = K; bottom_up = isDep; }
    value_type& getRoot() {return *this->find(root);}
+   bool isDenpendency() const {return bottom_up;}
 };
 
 }
@@ -299,6 +301,25 @@ struct GraphTraits<lle::DataDepGraph*>: public llvm::GraphTraits<lle::DataDepGra
       return static_cast<NodeType*>(&V);
    }
 
+};
+template<>
+struct DOTGraphTraits<lle::DataDepGraph*> : public llvm::DefaultDOTGraphTraits
+{
+   DOTGraphTraits(bool isSimple = false) : DefaultDOTGraphTraits(isSimple) {}
+   typedef lle::DataDepGraph Self;
+
+   static std::string getGraphName(Self* G){ 
+      return "Data Dependencies Graph";
+   }
+
+   static std::string getGraphProperties(const Self* G){
+      std::string rankdir=G->isDenpendency()?"rankdir=\"BT\";":"";
+      return "nodesep=1.5;\nnode [margin=\"0.5,0.055 \"];" + rankdir;
+   }
+
+   //static bool renderGraphFromBottomUp(){ return true;}
+
+   std::string getNodeLabel(Self::value_type* N, Self* G);
 };
 
 }

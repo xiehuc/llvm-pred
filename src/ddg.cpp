@@ -323,3 +323,24 @@ void DataDepGraph::addSolved(DDGraphKeyTy K, Value* C)
    N.parent_ = Found->second.parent_ = this;
    N.impl().push_back(K);
 }
+
+string llvm::DOTGraphTraits<DataDepGraph*>::getNodeLabel(Self::value_type* N, Self* G)
+{
+   std::string ret;
+   llvm::raw_string_ostream os(ret);
+   if(Use* U = N->first.dyn_cast<Use*>()){
+      U->getUser()->print(os);
+   }else{
+      Value* V = N->first.get<Value*>();
+      V->print(os);
+      if(auto CI = dyn_cast<CallInst>(V)){
+         Function* F = CI->getCalledFunction();
+         if(!F) return ret;
+         os<<"\n\t Argument Names: [ ";
+         for(auto& Arg : F->getArgumentList())
+            os<<Arg.getName()<<"  ";
+         os<<"]";
+      }
+   }
+   return ret.substr(ret.find_first_not_of(' '));
+}

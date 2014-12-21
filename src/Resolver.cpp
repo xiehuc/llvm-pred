@@ -450,6 +450,7 @@ ResolverPass::~ResolverPass(){
       delete I.second;
 }
 
+static bool implicity_rule(Instruction* I, DataDepGraph& G);
 
 ResolveEngine::ResolveEngine()
 {
@@ -474,7 +475,8 @@ DataDepGraph ResolveEngine::resolve(Use& U, CallBack C)
    iteration = 0;
    G.addUnsolved(U);
    do_solve(G, C);
-   G.setRoot(&U);
+   // if is ::implicity_rule, it is dependency query.
+   G.setRoot(&U, implicity_rule == ::implicity_rule);
    return G;
 }
 
@@ -484,7 +486,7 @@ DataDepGraph ResolveEngine::resolve(Instruction* I, CallBack C)
    iteration = 0;
    implicity_rule(I, G);
    do_solve(G, C);
-   G.setRoot(I);
+   G.setRoot(I, implicity_rule == ::implicity_rule);
    return G;
 }
 
