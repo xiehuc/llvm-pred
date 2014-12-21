@@ -16,6 +16,7 @@
 #include "util.h"
 #include "config.h"
 #include "LoopTripCount.h"
+#include "Resolver.h"
 #include "debug.h"
 
 using namespace std;
@@ -25,8 +26,6 @@ using namespace llvm;
 char LoopTripCount::ID = 0;
 
 static RegisterPass<LoopTripCount> X("Loop-Trip-Count","Generate and insert loop trip count pass", false, false);
-
-// STATISTIC(NumUnfoundCycle, "Number of unfound loop cycle");
 
 //find start value fron induction variable
 static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
@@ -60,6 +59,9 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 	Value* ind = NULL;
 	Value* end = NULL;
 	ConstantInt* step = NULL,*PrevStep = NULL;/*only used if next is phi node*/
+   ResolveEngine RE;
+   RE.addRule(RE.base_rule);
+   RE.addRule(RE.useonly_rule);
 
 	// inspired from Loop::getCanonicalInductionVariable
 	BasicBlock *H = L->getHeader();
@@ -68,10 +70,7 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 	int OneStep = 0;// the extra add or plus step for calc
 
    AssertThrow(LoopPred, not_found("Require Loop has a Pred"));
-	DEBUG(errs()<<"loop  depth:"<<L->getLoopDepth()<<"\n");
 	/** whats difference on use of predecessor and preheader??*/
-	//RET_ON_FAIL(self->getLoopLatch()&&self->getLoopPreheader());
-	//assert(self->getLoopLatch() && self->getLoopPreheader() && "need loop simplify form" );
 	AssertThrow(L->getLoopLatch(), not_found("need loop simplify form"));
 
 	BasicBlock* TE = NULL;//True Exit
@@ -104,7 +103,8 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 		AssertThrow(EBR->isConditional(), not_found("end branch is not conditional"));
 		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
 		if(EC->getPredicate() == EC->ICMP_SGT){
-         AssertThrow(!L->contains(EBR->getSuccessor(0)), not_found(dbg()<<"abnormal exit with great than:"<<*EBR));//终止块的终止指令---->跳出执行循环外的指令
+         AssertThrow(!L->contains(EBR->getSuccessor(0)), not_found(dbg()<<"abnormal exit with great than:"<<*EBR));
+         //终止块的终止指令---->跳出执行循环外的指令
          OneStep += 1;
       } else if(EC->getPredicate() == EC->ICMP_EQ) {
          AssertThrow(!L->contains(EBR->getSuccessor(0)), not_found(dbg()<<"abnormal exit with great than:"<<*EBR));
@@ -115,7 +115,6 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
       }
 		IndOrNext = dyn_cast<Instruction>(castoff(EC->getOperand(0)));//去掉类型转化
 		end = EC->getOperand(1);
-		DEBUG(errs()<<"end   value:"<<*EC<<"\n");
 	}else if(isa<SwitchInst>(TE->getTerminator())){
 		SwitchInst* ESW = const_cast<SwitchInst*>(cast<SwitchInst>(TE->getTerminator()));
 		IndOrNext = dyn_cast<Instruction>(castoff(ESW->getCondition()));
@@ -125,7 +124,6 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 				end = I.getCaseValue();
 			}
 		}
-		DEBUG(errs()<<"end   value:"<<*ESW<<"\n");
 	}else{
 		AssertThrow(0 ,not_found("unknow terminator type"));
 	}
@@ -139,29 +137,34 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 	if(isa<LoadInst>(IndOrNext)){
 		//memory depend analysis
 		Value* PSi = IndOrNext->getOperand(0);//point type Step.i
-
 		int SICount[2] = {0};//store in predecessor count,store in loop body count
-		for( auto I = PSi->user_begin(),E = PSi->user_end();I!=E;++I){
-			DISABLE(errs()<<**I<<"\n");
-			StoreInst* SI = dyn_cast<StoreInst>(*I);
-			if(!SI || SI->getOperand(1) != PSi) continue;
-			if(!start&&L->isLoopInvariant(SI->getOperand(0))) {
-				if(SI->getParent() != LoopPred)
-					if(std::find(pred_begin(LoopPred),pred_end(LoopPred),SI->getParent()) == pred_end(LoopPred)) continue;
-				start = SI->getOperand(0);
-				startBB = SI->getParent();
-				++SICount[0];
-			}
-			Instruction* SI0 = dyn_cast<Instruction>(SI->getOperand(0));
-			if(L->contains(SI) && SI0 && SI0->getOpcode() == Instruction::Add){
-				next = SI0;
-				++SICount[1];
-			}
 
+      Value* Store = RE.find_store(IndOrNext->getOperandUse(0));
+      if(Store && isa<StoreInst>(Store)){
+         StoreInst* SI = cast<StoreInst>(Store);
+         if(L->isLoopInvariant(SI->getValueOperand())){
+            start = SI->getValueOperand();
+            startBB = SI->getParent();
+            // we always found the nearest storeinst
+            SICount[0] = 1;
+         }
+      }
+
+		for(auto I = PSi->user_begin(),E = PSi->user_end();I!=E;++I){
+			StoreInst* SI = dyn_cast<StoreInst>(*I);
+			if(SI==NULL || SI->getOperand(1) != PSi) continue;
+         if(L->contains(SI)){
+            Instruction* SI0 = dyn_cast<Instruction>(SI->getValueOperand());
+            if(SI0 && SI0->getOpcode() == Instruction::Add){
+               next = SI0;
+               ++SICount[1];
+            }
+         }
 		}
+
       AssertThrow(SICount[0]==1 && SICount[1]==1, 
             not_found(dbg() <<"should only have 1 store in/before loop:"
-               <<SICount[0] <<"," <<SICount[1] <<*PSi));
+               <<SICount[1] <<"," <<SICount[0]<<*PSi));
 		ind = IndOrNext;
 	}else{
 		if(isa<PHINode>(IndOrNext)){
@@ -180,25 +183,16 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 		for(auto I = H->begin();isa<PHINode>(I);++I){
 			PHINode* P = cast<PHINode>(I);
 			if(ind && P == ind){
-				//start = P->getIncomingValueForBlock(L->getLoopPredecessor());
 				start = tryFindStart(P, L, startBB);
 				next = dyn_cast<Instruction>(P->getIncomingValueForBlock(L->getLoopLatch()));
 			}else if(next && P->getIncomingValueForBlock(L->getLoopLatch()) == next){
-				//start = P->getIncomingValueForBlock(L->getLoopPredecessor());
 				start = tryFindStart(P, L, startBB);
 				ind = P;
 			}
 		}
 	}
 
-
 	AssertThrow(start , not_found("couldn't find a start value"));
-	//process complex loops later
-	//DEBUG(if(L->getLoopDepth()>1 || !L->getSubLoops().empty()) return NULL);
-	DEBUG(errs()<<"start value:"<<*start<<"\n");
-	DEBUG(errs()<<"ind   value:"<<*ind<<"\n");
-	DEBUG(errs()<<"next  value:"<<*next<<"\n");
-
 
 	//process non add later
 	unsigned next_phi_idx = 0;
@@ -208,7 +202,6 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 		if(next_phi) {
 			next = dyn_cast<Instruction>(next_phi->getIncomingValue(next_phi_idx));
 			AssertThrow(next, not_found("Next not found"));
-			DEBUG(errs()<<"next phi "<<next_phi_idx<<":"<<*next<<"\n");
 			if(step&&PrevStep){
 				Assert(step->getSExtValue() == PrevStep->getSExtValue(),"");
 			}
@@ -219,8 +212,6 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 		step = dyn_cast<ConstantInt>(next->getOperand(1));
 		Assert(step,"");
 	}while(next_phi && ++next_phi_idx<next_phi->getNumIncomingValues());
-	//RET_ON_FAIL(Step->equalsInt(1));
-	//assert(VERBOSE(Step->equalsInt(1),Step) && "why induction increment number is not 1");
 
 	if(addfirst) OneStep -= 1;
 	if(step->isMinusOne()) OneStep*=-1;
@@ -261,17 +252,16 @@ Value* LoopTripCount::insertTripCount(AnalysisedLoop AL, StringRef HeaderName, I
 
 bool LoopTripCount::runOnFunction(Function &F)
 {
-   LoopInfo& LI = getAnalysis<LoopInfo>();
+   LI = &getAnalysis<LoopInfo>();
    LoopMap.clear();
    CycleMap.clear();
+   unfound_str = "";
 
-   unfound<<"Function:"<<F.getName()<<"\n";
-
-   for(Loop* TopL : LI){
+   for(Loop* TopL : *LI){
       for(auto LIte = df_begin(TopL), E = df_end(TopL); LIte!=E; ++LIte){
          Loop* L = *LIte;
          Value* TC = NULL;
-         AnalysisedLoop AL;
+         AnalysisedLoop AL = {0};
          try{
             AL = analysis(L);
             /**trying to find inserted loop trip count in preheader */
@@ -285,7 +275,6 @@ bool LoopTripCount::runOnFunction(Function &F)
             }
             AL.TripCount = TC;
          }catch(NotFound& E){
-            ++NumUnfoundCycle;
             unfound<<"  "<<E.get_line()<<":  "<<E.what()<<"\n";
             unfound<<"\t"<<*L<<"\n";
          }
@@ -294,25 +283,14 @@ bool LoopTripCount::runOnFunction(Function &F)
          AssertRuntime(LoopMap[L] < CycleMap.size() ," should insert indeed");
       }
    }
+   unfound.str();
 
 	return true;
 }
 
-LoopTripCount::~LoopTripCount()
-	//we have no place to print out statistics information
-{
-	if(NumUnfoundCycle){
-		errs()<<std::string(73,'*')<<"\n";
-		errs()<<"\tNote!! there are "<<NumUnfoundCycle<<" loop cycles unresolved:\n";
-		errs()<<unfound.str();
-		errs()<<std::string(73,'*')<<"\n";
-	}
-}
-
 void LoopTripCount::print(llvm::raw_ostream& OS,const llvm::Module*) const
 {
-   LoopInfo& LI = getAnalysis<LoopInfo>();
-   for(Loop* TopL : LI){
+   for(Loop* TopL : *LI){
       for(auto LIte = df_begin(TopL), E = df_end(TopL); LIte != E; ++LIte){
          Loop* L = *LIte;
          Value* TripCount = getTripCount(L);
@@ -321,12 +299,12 @@ void LoopTripCount::print(llvm::raw_ostream& OS,const llvm::Module*) const
          OS<<"Cycle:"<<*TripCount<<"\n";
       }
    }
+   errs()<<unfound_str;
 }
 
 Loop* LoopTripCount::getLoopFor(BasicBlock *BB) const
 {
-   LoopInfo& LI = getAnalysis<LoopInfo>();
-   return LI.getLoopFor(BB);
+   return LI->getLoopFor(BB);
 }
 
 Value* LoopTripCount::getOrInsertTripCount(Loop *L)

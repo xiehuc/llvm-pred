@@ -23,6 +23,7 @@
 #include <ValueProfiling.h>
 
 #include "ddg.h"
+#include "LoopTripCount.h"
 #include "SlashShrink.h"
 #include "debug.h"
 
@@ -206,6 +207,7 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
 
 bool ReduceCode::runOnFunction(Function& F)
 {
+   LoopTripCount& TC = getAnalysis<LoopTripCount>(F);
    dse.prepare(&F, this);
    BasicBlock* entry = &F.getEntryBlock();
    std::vector<BasicBlock*> blocks(po_begin(entry), po_end(entry));
@@ -232,11 +234,18 @@ bool ReduceCode::runOnFunction(Function& F)
                //StoreInst never cascade, so IsDeletable is enough
                flag = all_deletable ? IsDeletable : AttributeFlags::None;
             }else if(isa<AllocaInst>(SI->getPointerOperand())){
-               Dbg_EnablePrintGraph = true;
-               noused(SI->getOperandUse(1));
-               Dbg_EnablePrintGraph = false;
+               Loop* L = TC.getLoopFor(SI->getParent());
+               // a store inst in loop, and it isn't used after loop
+               // and it isn't induction, then it can be removed
+               if(L && TC.getInduction(L) != NULL){
+                  Value* Ind = cast<Instruction>(TC.getInduction(L));
+                  if(LoadInst* LI = dyn_cast<LoadInst>(Ind))
+                     Ind = LI->getOperand(0);
+                  if(Ind != SI->getPointerOperand())
+                     //XXX not stable, because it doesn't use domtree info
+                     flag = noused(SI->getOperandUse(1));
+               }
             }
-
          }
          if(flag & IsDeletable){
             (flag & Cascade)? dse.DeleteCascadeInstruction(Inst): 
@@ -288,6 +297,7 @@ bool ReduceCode::runOnModule(Module &M)
 }
 void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
 {
+   AU.addRequired<LoopTripCount>();
    dse.getAnalysisUsage(AU);
    ic.getAnalysisUsage(AU);
    simpCFG.getAnalysisUsage(AU);
@@ -332,8 +342,8 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
          }
          return false;
          });
-   if(Store != NULL){
-      auto u = extract(dyn_cast<ConstantInt>(Store));
+   if(Store != NULL && isa<StoreInst>(Store)){
+      auto u = extract(dyn_cast<ConstantInt>(cast<StoreInst>(Store)->getValueOperand()));
       if(u == 6 || u == 0) return IsPrint; // 6 means write to stdout, 0 means write to stderr
    }
    return AttributeFlags::None;

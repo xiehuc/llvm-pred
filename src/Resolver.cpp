@@ -496,7 +496,7 @@ Value* ResolveEngine::find_store(Use& Tg, CallBack C)
    resolve(Tg, [&ret, &C](Use* U){
          User* Ur = U->getUser();
          if(isa<StoreInst>(Ur))
-            ret=Ur->getOperand(0);
+            ret=Ur;
          return C(U);
       });
    return ret;

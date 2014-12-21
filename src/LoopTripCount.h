@@ -28,8 +28,8 @@ namespace lle
 		//statistics variable:{
 		std::string unfound_str;
 		llvm::raw_string_ostream unfound;
-		unsigned NumUnfoundCycle;
 		//}
+      llvm::LoopInfo* LI;
       struct AnalysisedLoop {
          int AdjustStep;
          llvm::Value* Start, *Step, *End, *Ind, *TripCount;
@@ -50,10 +50,7 @@ namespace lle
       llvm::Value* insertTripCount(AnalysisedLoop,llvm::StringRef, llvm::Instruction* InsertPos);
 		public:
 		static char ID;
-		explicit LoopTripCount():FunctionPass(ID),unfound(unfound_str){
-			NumUnfoundCycle = 0;
-		}
-		virtual ~LoopTripCount();
+		explicit LoopTripCount():FunctionPass(ID),unfound(unfound_str){ }
 		void getAnalysisUsage(llvm::AnalysisUsage&) const;
 		bool runOnFunction(llvm::Function& F);
 		void print(llvm::raw_ostream&,const llvm::Module*) const;
