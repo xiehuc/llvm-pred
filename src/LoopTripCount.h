@@ -30,11 +30,16 @@ namespace lle
 		llvm::raw_string_ostream unfound;
 		unsigned NumUnfoundCycle;
 		//}
+      struct AnalysisedLoop {
+         int AdjustStep;
+         llvm::Value* Start, *Step, *End, *Ind, *TripCount;
+      };
 
 		// a stable cache, the index of Loop in df order -> LoopTripCount
-      std::vector<llvm::Value*> CycleMap;
+      std::vector<AnalysisedLoop> CycleMap;
       // an unstable cache, the Loop -> index of Loop in df order
       llvm::DenseMap<llvm::Loop*, size_t> LoopMap;
+      AnalysisedLoop analysis(llvm::Loop*);
 		/**
 		 * trying to find loop cycle, if it is a variable, because it is a
 		 * sub instruction, first insert it into source then we can get it.
@@ -42,7 +47,7 @@ namespace lle
 		 * source, so we directly return it. caller can make a cast
 		 * instruction and insert it by hand.
 		 */
-		llvm::Value* insertTripCount(llvm::Loop* l, llvm::Instruction* InsertPos);
+      llvm::Value* insertTripCount(AnalysisedLoop,llvm::StringRef, llvm::Instruction* InsertPos);
 		public:
 		static char ID;
 		explicit LoopTripCount():FunctionPass(ID),unfound(unfound_str){
@@ -54,9 +59,15 @@ namespace lle
 		void print(llvm::raw_ostream&,const llvm::Module*) const;
       // use this before getTripCount, to make a stable Loop Index Order
       void updateCache(llvm::LoopInfo& LI);
-      /**trying to find inserted loop trip count in preheader 
-       * don't use cache because Loop structure is not stable*/
-      llvm::Value* getTripCount(llvm::Loop* l) const;
+      llvm::Loop* getLoopFor(llvm::BasicBlock* BB) const;
+      llvm::Value* getTripCount(llvm::Loop* L) const {
+         auto ite = LoopMap.find(L);
+         return ite==LoopMap.end()?NULL:CycleMap[ite->second].TripCount;
+      }
+      llvm::Value* getInduction(llvm::Loop* L) const {
+         auto ite = LoopMap.find(L);
+         return ite==LoopMap.end()?NULL:CycleMap[ite->second].Ind;
+      }
       // a helper function which convenient.
       llvm::Value* getOrInsertTripCount(llvm::Loop* l);
 	};

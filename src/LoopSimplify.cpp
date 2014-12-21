@@ -43,7 +43,7 @@ bool lle::LoopCycleSimplify::runOnLoop(llvm::Loop *L, llvm::LPPassManager & LPM)
 	LoopTripCount& LC = getAnalysis<LoopTripCount>();
    ResolverPass& RP = getAnalysis<ResolverPass>();
    ProfileInfo& PI = getAnalysis<ProfileInfo>();
-	Value* CC = LC.getTripCount(L);
+	Value* CC = LC.getOrInsertTripCount(L);
    
    DEBUG(errs()<<"[Load ProfileInfo, Traped size:"<<PI.getAllTrapedValues().size()<<"]\n");
 
