@@ -241,9 +241,14 @@ bool ReduceCode::runOnFunction(Function& F)
                   Value* Ind = cast<Instruction>(TC.getInduction(L));
                   if(LoadInst* LI = dyn_cast<LoadInst>(Ind))
                      Ind = LI->getOperand(0);
-                  if(Ind != SI->getPointerOperand())
+                  if(Ind != SI->getPointerOperand()){
                      //XXX not stable, because it doesn't use domtree info
                      flag = noused(SI->getOperandUse(1));
+                  }
+               }else{
+                  // a store inst not in loop, and it isn't used after
+                  // then it can be removed
+                  flag = noused(SI->getOperandUse(1));
                }
             }
          }
