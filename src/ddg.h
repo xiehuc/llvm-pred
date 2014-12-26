@@ -197,9 +197,11 @@ struct DataDepNode{
 };
 class DataDepGraph: public llvm::DenseMap<DDGraphKeyTy, DataDepNode>
 {
+   friend class lle::ResolveEngine;
    std::deque<llvm::Use*> unsolved;
    DDGraphKeyTy root; // the root for graph
    bool bottom_up;
+   void isDependency(bool isDep){ bottom_up = isDep; }
    public:
    typedef llvm::DenseMap<DDGraphKeyTy, DataDepNode>::value_type value_type;
    // a helper function to get User from DDGValue
@@ -241,7 +243,7 @@ class DataDepGraph: public llvm::DenseMap<DDGraphKeyTy, DataDepNode>
       return ret;
    }
 
-   void setRoot(DDGraphKeyTy K, bool isDep=true){ root = K; bottom_up = isDep; }
+   void setRoot(DDGraphKeyTy K){ root = K; }
    value_type& getRoot() {return *this->find(root);}
    bool isDenpendency() const {return bottom_up;}
 };

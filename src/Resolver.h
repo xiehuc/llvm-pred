@@ -38,6 +38,7 @@ namespace lle{
    class ResolveEngine;
    struct InitRule;
    struct MDARule;
+   struct GEPFilter;
 };
 
 /**
@@ -228,6 +229,7 @@ class lle::ResolveEngine
    private:
    bool (*implicity_rule)(llvm::Instruction*, DataDepGraph& G);
    std::vector<SolveRule> rules;
+   std::vector<CallBack> filters;
    size_t max_iteration, iteration;
    void do_solve(DataDepGraph& G, CallBack& C);
 
@@ -251,6 +253,12 @@ class lle::ResolveEngine
    typename std::enable_if<!ShouldRef<R>::value, void>::type
    addRule(R rule){
       rule(*this);
+   }
+
+   // add filter in engine, filter is a helper callback, which used to cut
+   // search path.
+   void addFilter(CallBack filter){
+      filters.push_back(filter);
    }
    void setMaxIteration(size_t max) { max_iteration = max;}
    DataDepGraph resolve(llvm::Instruction* I, CallBack C = always_false);
@@ -297,5 +305,20 @@ struct lle::MDARule
       MDA(MD),AA(A) {}
    void operator()(ResolveEngine& RE);
 };
+
+/** gep filter can limit gep search path, need use with gep_rule.
+ * if we found a gep, and it equals filter, then we continue search, else we
+ * can ignore this branch. 
+ */
+struct lle::GEPFilter
+{
+   std::vector<uint64_t> idxs;
+   GEPFilter(llvm::GetElementPtrInst*);
+   GEPFilter(llvm::ArrayRef<uint64_t> idx, llvm::Value* P):
+      idxs(idx.begin(), idx.end()) {}
+   GEPFilter(std::initializer_list<uint64_t> idx): idxs(idx) {}
+   bool operator()(llvm::Use*);
+};
+
 
 #endif

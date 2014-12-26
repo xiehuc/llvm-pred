@@ -463,6 +463,10 @@ void ResolveEngine::do_solve(DataDepGraph& G, CallBack& C)
    while(Use* un = G.popUnsolved()){
       if(++iteration>max_iteration) break;
       if(C(un)) continue;
+      bool jump = false;
+      for(auto& f : filters)
+         if((jump = f(un))) break;
+      if(jump) continue;
       for(auto r = rules.rbegin(), e = rules.rend(); r!=e; ++r){
          if((*r)(un, G)) break;
       }
@@ -472,21 +476,23 @@ void ResolveEngine::do_solve(DataDepGraph& G, CallBack& C)
 DataDepGraph ResolveEngine::resolve(Use& U, CallBack C)
 {
    DataDepGraph G;
+   // if is ::implicity_rule, it is dependency query.
+   G.isDependency(implicity_rule == ::implicity_rule);
    iteration = 0;
    G.addUnsolved(U);
    do_solve(G, C);
-   // if is ::implicity_rule, it is dependency query.
-   G.setRoot(&U, implicity_rule == ::implicity_rule);
+   G.setRoot(&U);
    return G;
 }
 
 DataDepGraph ResolveEngine::resolve(Instruction* I, CallBack C)
 {
    DataDepGraph G;
+   G.isDependency(implicity_rule == ::implicity_rule);
    iteration = 0;
    implicity_rule(I, G);
    do_solve(G, C);
-   G.setRoot(I, implicity_rule == ::implicity_rule);
+   G.setRoot(I);
    return G;
 }
 
@@ -526,8 +532,6 @@ Value* ResolveEngine::find_visit(Use& Tg, CallBack C)
 }
 
 //===========================RESOLVE RULES======================================//
-
-
 static bool useonly_rule_(Use* U, DataDepGraph& G)
 {
    User* V = U->getUser();
@@ -667,3 +671,25 @@ const ResolveEngine::SolveRule ResolveEngine::gep_rule = gep_rule_;
 const ResolveEngine::SolveRule ResolveEngine::iuse_rule = use_inverse_rule_;
 
 //===============================RESOLVE RULES END===============================//
+//=============================RESOLVE FILTERS BEGIN=============================//
+GEPFilter::GEPFilter(GetElementPtrInst* GEP)
+{
+   idxs.resize(GEP->getNumIndices());
+   std::transform(GEP->idx_begin(), GEP->idx_end(), idxs.begin(), [](llvm::Value* V){
+         ConstantInt* CI = dyn_cast<ConstantInt>(V);
+         return CI?CI->getZExtValue():0;
+         });
+}
+bool GEPFilter::operator()(llvm::Use* U)
+{
+   if(auto Inst = dyn_cast<GetElementPtrInst>(U->getUser())){
+      bool eq = (idxs.size() == Inst->getNumIndices());
+      eq = eq && std::equal(idxs.begin(), idxs.end(), Inst->idx_begin(), [](uint64_t L, Value* R){
+         Constant* C = dyn_cast<Constant>(R);
+         return (C && C->getUniqueInteger() == L);
+         });
+      return !eq;
+   }
+   return false;
+}
+//==============================RESOLVE FILTERS END==============================//
