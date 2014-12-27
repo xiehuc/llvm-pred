@@ -227,7 +227,7 @@ class lle::ResolveEngine
    typedef std::function<bool(llvm::Use*)> CallBack;
 
    private:
-   bool (*implicity_rule)(llvm::Instruction*, DataDepGraph& G);
+   bool (*implicity_rule)(llvm::Value*, DataDepGraph& G);
    std::vector<SolveRule> rules;
    std::vector<CallBack> filters;
    size_t max_iteration, iteration;
@@ -261,7 +261,7 @@ class lle::ResolveEngine
       filters.push_back(filter);
    }
    void setMaxIteration(size_t max) { max_iteration = max;}
-   DataDepGraph resolve(llvm::Instruction* I, CallBack C = always_false);
+   DataDepGraph resolve(llvm::Value* I, CallBack C = always_false);
    DataDepGraph resolve(llvm::Use& U, CallBack C = always_false);
 
    static const CallBack always_false;
@@ -272,6 +272,7 @@ class lle::ResolveEngine
    static const SolveRule useonly_rule;
    // a public rule used for expose gep instruction
    static const SolveRule gep_rule;
+   static const SolveRule global_rule;
    // }
    // { reversed version: these used for lookup who use it.
    // a public rule used for lookup it's user's uses

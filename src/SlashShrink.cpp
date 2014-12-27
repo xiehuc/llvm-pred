@@ -193,6 +193,7 @@ static RegisterPass<ReduceCode> Y("Reduce", "Slash and Shrink Code to make a min
 static AttributeFlags noused_exclude(llvm::Use& U, llvm::SmallPtrSetImpl<User*>& exclude);
 static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C = ResolveEngine::always_false);
 #ifndef NDEBUG
+static void noused_value(llvm::Value* I, ResolveEngine::CallBack C = ResolveEngine::always_false);
 static bool Dbg_EnablePrintGraph = false;
 #endif
 
@@ -203,6 +204,23 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
    auto Found = Attributes.find(Name);
    if(Found == Attributes.end()) return AttributeFlags::None;
    return Found->second(CI);
+}
+
+void ReduceCode::undefParameter(CallInst* CI)
+{
+   Function* F = dyn_cast<Function>(castoff(CI->getCalledValue()));
+   if(F==NULL || F->isDeclaration()) return;
+   errs()<<*CI<<"\n";
+   for(auto& Op : CI->arg_operands()){
+      GlobalVariable* GV;
+      GetElementPtrInst* GEP;
+      if(isRefGlobal(Op.get(), &GV, &GEP)){
+         Dbg_EnablePrintGraph = true;
+         if(GEP) noused_value(GEP);
+         noused_value(GV);
+         Dbg_EnablePrintGraph = false;
+      }
+   }
 }
 
 bool ReduceCode::runOnFunction(Function& F)
@@ -221,6 +239,8 @@ bool ReduceCode::runOnFunction(Function& F)
          AttributeFlags flag = AttributeFlags::None;
          if(CallInst* CI = dyn_cast<CallInst>(Inst)){
             flag = getAttribute(CI);
+            if(flag == AttributeFlags::None)
+               undefParameter(CI);
          }else if(StoreInst* SI = dyn_cast<StoreInst>(Inst)){
 
             if(Argument* A = dyn_cast<Argument>(SI->getPointerOperand())){
@@ -335,24 +355,31 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
    RE.addRule(RE.base_rule);
    RE.addRule(RE.gep_rule);
    RE.addRule(RE.useonly_rule);
-   Value* Store = RE.find_store(st_parameter, [](Use* U){
-         if(auto GEP = dyn_cast<GetElementPtrInst>(U->getUser())){
-            if(GEP->getOperand(0) == U->get() && GEP->getNumIndices() == 3){
-               if(equal(dyn_cast<ConstantInt>(GEP->getOperand(1)), 0) &&
-                     equal(dyn_cast<ConstantInt>(GEP->getOperand(2)), 0) &&
-                     equal(dyn_cast<ConstantInt>(GEP->getOperand(3)), 1) )
-                  return false;
-            }
-            return true;
-         }
-         return false;
-         });
+   RE.addFilter(GEPFilter{0,0,1});
+   Value* Store = RE.find_store(st_parameter);
    if(Store != NULL && isa<StoreInst>(Store)){
       auto u = extract(dyn_cast<ConstantInt>(cast<StoreInst>(Store)->getValueOperand()));
       if(u == 6 || u == 0) return IsPrint; // 6 means write to stdout, 0 means write to stderr
    }
    return AttributeFlags::None;
 }
+
+#ifndef NDEBUG
+static void noused_value(llvm::Value* U, ResolveEngine::CallBack C)
+{
+   ResolveEngine RE;
+   RE.addRule(RE.ibase_rule);
+   InitRule ir(RE.iuse_rule);
+   RE.addRule(ir);
+   if(Dbg_EnablePrintGraph){
+      auto ddg = RE.resolve(U, C);
+      Instruction* I = dyn_cast<Instruction>(U);
+      BasicBlock* Block = I?I->getParent():NULL;
+      StringRef FName = Block?Block->getParent()->getName():"test";
+      WriteGraph(&ddg, FName);
+   }
+}
+#endif
 
 static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C)
 {
@@ -366,7 +393,8 @@ static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C)
    if(Dbg_EnablePrintGraph){
       auto ddg = RE.resolve(U, C);
       Instruction* I = dyn_cast<Instruction>(U.getUser());
-      StringRef FName = I?I->getParent()->getParent()->getName():"test";
+      BasicBlock* Block = I?I->getParent():NULL;
+      StringRef FName = Block?Block->getParent()->getName():"test";
       WriteGraph(&ddg, FName);
    }
 #endif

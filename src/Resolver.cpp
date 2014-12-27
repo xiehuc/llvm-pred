@@ -15,20 +15,8 @@ using namespace std;
 using namespace lle;
 using namespace llvm;
 
-static bool implicity_rule(Instruction* I, DataDepGraph& G);
-static bool implicity_inverse_rule(Instruction* I, DataDepGraph& G);
-
 char ResolverPass::ID = 0;
 static RegisterPass<ResolverPass> Y("-Resolver","A Pass used to cache Resolver Result",false,false);
-
-#ifndef NO_DEBUG
-void debug_print_resolved(unordered_set<Value*>& resolved)
-{
-   for ( auto V : resolved){
-      outs()<<*V<<"\n";
-   }
-}
-#endif
 
 Use* NoResolve::operator()(Value* V, ResolverBase* _UNUSED_)
 {
@@ -42,18 +30,6 @@ Use* NoResolve::operator()(Value* V, ResolverBase* _UNUSED_)
    else
       Assert(0,*I);
    return NULL;
-}
-
-static bool indirect_access_global(Value* V)
-{
-   while(!isa<GlobalVariable>(V)){
-      if(auto LI = dyn_cast<LoadInst>(V)) V = LI->getPointerOperand();
-      else if(auto Cast = dyn_cast<CastInst>(V)) V = Cast->getOperand(0);
-      else if(auto CE = dyn_cast<ConstantExpr>(V)) V = CE->getAsInstruction();
-      else if(auto GEP = dyn_cast<GetElementPtrInst>(V)) V = GEP->getPointerOperand();
-      else return false;
-   }
-   return true;
 }
 
 struct CallArgResolve{
@@ -148,7 +124,7 @@ Use* SpecialResolve::operator()(Value *V, ResolverBase* RB)
 
    Value* U = Tg->get();
    if(auto GEP = dyn_cast<GetElementPtrInst>(U)){
-      if(indirect_access_global(GEP->getPointerOperand()) &&
+      if(isRefGlobal(GEP->getPointerOperand()) &&
             GEP->getNumOperands()>2 &&
             !isa<Constant>(GEP->getOperand(1)))
          // GEP is load from a global variable array
@@ -450,7 +426,7 @@ ResolverPass::~ResolverPass(){
       delete I.second;
 }
 
-static bool implicity_rule(Instruction* I, DataDepGraph& G);
+static bool implicity_rule(Value* I, DataDepGraph& G);
 
 ResolveEngine::ResolveEngine()
 {
@@ -485,7 +461,7 @@ DataDepGraph ResolveEngine::resolve(Use& U, CallBack C)
    return G;
 }
 
-DataDepGraph ResolveEngine::resolve(Instruction* I, CallBack C)
+DataDepGraph ResolveEngine::resolve(Value* I, CallBack C)
 {
    DataDepGraph G;
    G.isDependency(implicity_rule == ::implicity_rule);
@@ -580,17 +556,18 @@ static bool use_inverse_rule_(Use* U, DataDepGraph& G)
    G.addSolved(U, uses.rbegin(), uses.rend());
    return true;
 }
-static bool implicity_rule(Instruction* I, DataDepGraph& G)
+static bool implicity_rule(Value* V, DataDepGraph& G)
 {
-   if(isa<StoreInst>(I)){
-      G.addSolved(I, I->getOperandUse(0));
+   if(StoreInst* SI = dyn_cast<StoreInst>(V)){
+      G.addSolved(SI, SI->getOperandUse(0));
       return false;
-   }else{
+   }else if(User* I = dyn_cast<User>(V)){
       G.addSolved(I, I->op_begin(), I->op_end());
       return true;
-   }
+   }else
+      AssertRuntime(0, "a non-user couldn't have dependency");
 }
-static bool implicity_inverse_rule(Instruction* I, DataDepGraph& G)
+static bool implicity_inverse_rule(Value* I, DataDepGraph& G)
 {
    std::vector<Use*> uses;
    pushback_to(I->use_begin(), I->use_end(), uses);
@@ -617,6 +594,7 @@ static bool gep_rule_(Use* U, DataDepGraph& G)
    }
    return ret;
 }
+
 void InitRule::operator()(ResolveEngine& RE)
 {
    bool& init = this->initialized;

@@ -29,6 +29,10 @@ namespace lle
    bool isArgumentWrite(llvm::Argument* Arg);
 
    bool isArray(llvm::Value*);
+   // if value is a constexpr refence global variable.
+   // return true, and set @param 2 to global variable,
+   // if it is referenced by a gep inst, set @param 3 to this gep inst
+   bool isRefGlobal(llvm::Value* V, llvm::GlobalVariable** = nullptr, llvm::GetElementPtrInst** = nullptr);
 
 	//remove cast instruction for a value
 	//because cast means the original value and the returned value is
@@ -40,6 +44,7 @@ namespace lle
    inline llvm::Use* findCallInstParameter(llvm::Argument* Arg, llvm::CallInst* CI){
       return &CI->getArgOperandUse(Arg->getArgNo());
    }
+#if 0
    //find where to use V on instuction I
    inline llvm::Use* findOpUseOnInstruction(llvm::Instruction* I, llvm::Value* V){
       for(auto O = I->op_begin(), E = I->op_end(); O!=E; ++O){
@@ -47,6 +52,7 @@ namespace lle
       }
       return nullptr;
    }
+#endif
    // convert a Use to use_iterator
    inline llvm::Value::use_iterator find_iterator(llvm::Use& U){
       llvm::Value* V = U.get();
@@ -68,78 +74,12 @@ namespace lle
 
    //=========================NUMERIC BEGIN=================================//
 
-   inline bool equal(llvm::ConstantInt* I, uint64_t V){
-      return I && I->equalsInt(V);
-   }
-
    inline uint64_t extract(llvm::ConstantInt* CI){
       return CI?CI->getZExtValue():UINT64_MAX;
    }
 
    //=========================NUMERIC END==================================//
 
-   // inspired from llvm::ErrorOr<>
-   template<typename FirstT, typename SecondT>
-   class union_pair
-   {
-      union {
-         llvm::AlignedCharArrayUnion<SecondT> SStorage;
-         llvm::AlignedCharArrayUnion<FirstT> FStorage;
-      };
-      bool isFirst:1;
-      FirstT* getFirstStorage(){
-         return reinterpret_cast<FirstT*>(FStorage.buffer);
-      }
-      SecondT* getSecondStorage(){
-         return reinterpret_cast<SecondT*>(SStorage.buffer);
-      }
-      public:
-      union_pair(const FirstT& first):isFirst(true) {
-         //placement new
-         new (getFirstStorage()) FirstT(first);
-      }
-      union_pair(const SecondT& second):isFirst(false) {
-         new (getSecondStorage()) SecondT(second);
-      }
-      union_pair():union_pair(FirstT()) {}
-      union_pair(const union_pair& Other) {
-         if(Other.isFirst){
-            isFirst = true;
-            new (getFirstStorage()) FirstT(*Other.getFirstStorage());
-         }else{
-            isFirst = false;
-            new (getSecondStorage()) SecondT(*Other.getSecondStorage());
-         }
-      }
-      union_pair(union_pair&& Other) {
-         if(Other.isFirst){
-            isFirst = true;
-            new (getFirstStorage())
-               FirstT(std::move(*Other.getFirstStorage()));
-         }else{
-            isFirst = false;
-            new (getSecondStorage())
-               SecondT(std::move(*Other.getSecondStorage()));
-         }
-      }
-      ~union_pair(){
-         if(isFirst)
-            getFirstStorage()->~FirstT();
-         else
-            getSecondStorage()->~SecondT();
-      }
-
-      union_pair& operator=(const union_pair& Other){
-         this->~union_pair();
-         new (this) union_pair(Other);
-         return *this;
-      }
-      union_pair& operator=(union_pair&& Other){
-         this->~union_pair();
-         new (this) union_pair(std::move(Other));
-         return *this;
-      }
-   };
 }
 
 #endif

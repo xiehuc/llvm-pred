@@ -316,3 +316,22 @@ bool lle::isArray(Value *V)
    return false;
 
 }
+
+bool lle::isRefGlobal(Value* V, GlobalVariable** pGV, GetElementPtrInst** pGEP)
+{
+   GlobalVariable* GV = NULL;
+   GetElementPtrInst* gep = NULL;
+   while(!isa<GlobalVariable>(V)){
+      if(auto LI = dyn_cast<LoadInst>(V)) V = LI->getPointerOperand();
+      else if(auto Cast = dyn_cast<CastInst>(V)) V = Cast->getOperand(0);
+      else if(auto CE = dyn_cast<ConstantExpr>(V)) V = CE->getAsInstruction();
+      else if(auto GEP = dyn_cast<GetElementPtrInst>(V)){
+         V = GEP->getPointerOperand();
+         gep = GEP;
+      }
+      else return false;
+   }
+   if(pGV) *pGV = cast<GlobalVariable>(V);
+   if(pGEP) *pGEP = gep;
+   return true;
+}
