@@ -239,18 +239,8 @@ class lle::ResolveEngine
    void addRule(SolveRule rule){
       rules.push_back(rule);
    }
-   template<typename T>
-   using ShouldRef = std::integral_constant<bool, 
-         std::is_class<T>::value && !std::is_rvalue_reference<T>::value
-            >;
    template<typename R>
-   typename std::enable_if<ShouldRef<R>::value, void>::type
-   // if is a function object, try use it's reference
-   addRule(R& rule){
-      rule(*this);
-   }
-   template<typename R>
-   typename std::enable_if<!ShouldRef<R>::value, void>::type
+   typename std::result_of<R(ResolveEngine&)>::type
    addRule(R rule){
       rule(*this);
    }
@@ -260,6 +250,7 @@ class lle::ResolveEngine
    void addFilter(CallBack filter){
       filters.push_back(filter);
    }
+
    void setMaxIteration(size_t max) { max_iteration = max;}
    DataDepGraph resolve(llvm::Value* I, CallBack C = always_false);
    DataDepGraph resolve(llvm::Use& U, CallBack C = always_false);
@@ -292,7 +283,7 @@ struct lle::InitRule
    bool initialized;
    ResolveEngine::SolveRule rule;
    InitRule(const ResolveEngine::SolveRule r):initialized(false),rule(r) {}
-   void operator()(ResolveEngine& RE);
+   bool operator()(llvm::Use*, DataDepGraph& G);
    // clear state by hand after one resolve
    void clear(){ initialized = false;}
 };
@@ -304,7 +295,7 @@ struct lle::MDARule
    MDARule(llvm::MemoryDependenceAnalysis& MD, 
          llvm::AliasAnalysis& A):
       MDA(MD),AA(A) {}
-   void operator()(ResolveEngine& RE);
+   void operator()(llvm::Use*, DataDepGraph& G);
 };
 
 /** gep filter can limit gep search path, need use with gep_rule.
@@ -315,7 +306,7 @@ struct lle::GEPFilter
 {
    std::vector<uint64_t> idxs;
    GEPFilter(llvm::GetElementPtrInst*);
-   GEPFilter(llvm::ArrayRef<uint64_t> idx, llvm::Value* P):
+   GEPFilter(llvm::ArrayRef<uint64_t> idx):
       idxs(idx.begin(), idx.end()) {}
    GEPFilter(std::initializer_list<uint64_t> idx): idxs(idx) {}
    bool operator()(llvm::Use*);

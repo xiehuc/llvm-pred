@@ -319,7 +319,6 @@ bool lle::isArray(Value *V)
 
 bool lle::isRefGlobal(Value* V, GlobalVariable** pGV, GetElementPtrInst** pGEP)
 {
-   GlobalVariable* GV = NULL;
    GetElementPtrInst* gep = NULL;
    while(!isa<GlobalVariable>(V)){
       if(auto LI = dyn_cast<LoadInst>(V)) V = LI->getPointerOperand();

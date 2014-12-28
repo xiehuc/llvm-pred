@@ -595,18 +595,13 @@ static bool gep_rule_(Use* U, DataDepGraph& G)
    return ret;
 }
 
-void InitRule::operator()(ResolveEngine& RE)
+bool InitRule::operator()(Use* U, DataDepGraph& G)
 {
-   bool& init = this->initialized;
-   auto& r = rule;
-   ResolveEngine::SolveRule S = [&init, &r](Use* U, DataDepGraph& G){
-      if(!init){
-         init = true;
-         return r(U,G);
-      }
-      return false;
-   };
-   RE.addRule(S);
+   if(!initialized){
+      initialized = true;
+      return rule(U,G);
+   }
+   return false;
 }
 
 #if 0
@@ -652,6 +647,10 @@ const ResolveEngine::SolveRule ResolveEngine::iuse_rule = use_inverse_rule_;
 //=============================RESOLVE FILTERS BEGIN=============================//
 GEPFilter::GEPFilter(GetElementPtrInst* GEP)
 {
+   if(GEP == NULL){
+      idxs.clear();
+      return;
+   }
    idxs.resize(GEP->getNumIndices());
    std::transform(GEP->idx_begin(), GEP->idx_end(), idxs.begin(), [](llvm::Value* V){
          ConstantInt* CI = dyn_cast<ConstantInt>(V);
@@ -660,12 +659,16 @@ GEPFilter::GEPFilter(GetElementPtrInst* GEP)
 }
 bool GEPFilter::operator()(llvm::Use* U)
 {
-   if(auto Inst = dyn_cast<GetElementPtrInst>(U->getUser())){
+   if(idxs.empty()) return false; // if idxs empty, disable filter.
+   User* Tg = U->getUser();
+   if(ConstantExpr* CE = dyn_cast<ConstantExpr>(Tg))
+      Tg = CE->getAsInstruction();
+   if(auto Inst = dyn_cast<GetElementPtrInst>(Tg)){
       bool eq = (idxs.size() == Inst->getNumIndices());
       eq = eq && std::equal(idxs.begin(), idxs.end(), Inst->idx_begin(), [](uint64_t L, Value* R){
-         Constant* C = dyn_cast<Constant>(R);
-         return (C && C->getUniqueInteger() == L);
-         });
+            Constant* C = dyn_cast<Constant>(R);
+            return (C && C->getUniqueInteger() == L);
+            });
       return !eq;
    }
    return false;

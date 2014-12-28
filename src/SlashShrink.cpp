@@ -211,14 +211,20 @@ void ReduceCode::undefParameter(CallInst* CI)
    Function* F = dyn_cast<Function>(castoff(CI->getCalledValue()));
    if(F==NULL || F->isDeclaration()) return;
    errs()<<*CI<<"\n";
+
+   ResolveEngine RE;
+   RE.addRule(RE.ibase_rule);
+   GEPFilter gep_fi(nullptr);
+   RE.addFilter(std::ref(gep_fi));
+
    for(auto& Op : CI->arg_operands()){
       GlobalVariable* GV;
       GetElementPtrInst* GEP;
       if(isRefGlobal(Op.get(), &GV, &GEP)){
-         Dbg_EnablePrintGraph = true;
-         if(GEP) noused_value(GEP);
-         noused_value(GV);
-         Dbg_EnablePrintGraph = false;
+         gep_fi = GEPFilter(GEP);
+         if(GEP) errs()<<*GEP<<"\n";
+         auto ddg = RE.resolve(GV);
+         WriteGraph(&ddg, "test");
       }
    }
 }
@@ -370,7 +376,7 @@ static void noused_value(llvm::Value* U, ResolveEngine::CallBack C)
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
    InitRule ir(RE.iuse_rule);
-   RE.addRule(ir);
+   RE.addRule(std::ref(ir));
    if(Dbg_EnablePrintGraph){
       auto ddg = RE.resolve(U, C);
       Instruction* I = dyn_cast<Instruction>(U);
@@ -386,7 +392,7 @@ static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C)
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
    InitRule ir(RE.iuse_rule);
-   RE.addRule(ir);
+   RE.addRule(std::ref(ir));
    Value* Visit = RE.find_visit(U, C);
    ir.clear();
 #ifndef NDEBUG
