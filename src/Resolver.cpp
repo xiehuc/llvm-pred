@@ -491,26 +491,43 @@ Value* ResolveEngine::find_store(Use& Tg, CallBack C)
    return ret;
 }
 
-Value* ResolveEngine::find_visit(Use& Tg, CallBack C)
+struct find_visit
+{
+   llvm::Value*& ret;
+   ResolveEngine::CallBack& C;
+   llvm::User* TgUr;
+   find_visit(llvm::Value*& ret, ResolveEngine::CallBack& C, llvm::User* Ur):
+      ret(ret), C(C), TgUr(Ur) {}
+   bool operator()(Use* U){
+      User* Ur = U->getUser();
+      bool Pass = C(U);
+      if(Ur != TgUr && !Pass){// only it isn't itSelf and not banned by Caller
+         if(isa<LoadInst>(Ur))
+            ret=Ur;
+         else if(CallInst* CI = dyn_cast<CallInst>(Ur)){//call inst also is a kind of visit
+            if(Function* F = dyn_cast<Function>(castoff(CI->getCalledValue())))
+               if(!F->getName().startswith("llvm."))//llvm call should ignore
+                  ret=CI;
+         }
+      }
+      // most of time, we just care whether it has visitor,
+      // so if we found one, we can stop search
+      return ret||Pass;
+   }
+};
+
+Value* ResolveEngine::find_visit(Use& U, CallBack C)
 {
    Value* ret = NULL;
-   User* TgUr = Tg.getUser();
-   resolve(Tg, [&ret, &C, TgUr](Use* U){
-         User* Ur = U->getUser();
-         bool Pass = C(U);
-         if(Ur != TgUr && !Pass){// only it isn't itSelf and not banned by Caller
-            if(isa<LoadInst>(Ur))
-               ret=Ur;
-            else if(CallInst* CI = dyn_cast<CallInst>(Ur)){//call inst also is a kind of visit
-               if(Function* F = dyn_cast<Function>(castoff(CI->getCalledValue())))
-                  if(!F->getName().startswith("llvm."))//llvm call should ignore
-                     ret=CI;
-            }
-         }
-         // most of time, we just care whether it has visitor,
-         // so if we found one, we can stop search
-         return ret||Pass;
-      });
+   User* TgUr = U.getUser();
+   resolve(U, ::find_visit(ret, C, TgUr));
+   return ret;
+}
+
+Value* ResolveEngine::find_visit(Value* V, CallBack C)
+{
+   Value* ret = NULL;
+   resolve(V, ::find_visit(ret, C, nullptr));
    return ret;
 }
 
@@ -702,12 +719,18 @@ void CGFilter::update(Instruction* threshold_inst_)
          Function* F = N->getFunction();
          return F == th_f;
          });
+   if(ite->empty()){
+      threshold = order_map[th_f];
+      return;
+   }
    for(auto t = ite->begin(), e = ite->end(); t!=e; ++t){
       if(t->first == NULL) continue;
       Instruction* call_inst = dyn_cast<Instruction>((Value*)t->first);
       Function* F = t->second->getFunction();
-      if(F && !F->isDeclaration() && DomT->dominates(threshold_inst, call_inst))
+      if(F && !F->isDeclaration() && DomT->dominates(threshold_inst, call_inst)){
          threshold = order_map[F];
+         break;
+      }
    }
 }
 bool CGFilter::operator()(Use* U)

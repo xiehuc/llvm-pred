@@ -210,7 +210,6 @@ void ReduceCode::undefParameter(CallInst* CI)
 {
    Function* F = dyn_cast<Function>(castoff(CI->getCalledValue()));
    if(F==NULL || F->isDeclaration()) return;
-   errs()<<*CI<<"\n";
 
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
@@ -222,12 +221,38 @@ void ReduceCode::undefParameter(CallInst* CI)
    for(auto& Op : CI->arg_operands()){
       GlobalVariable* GV;
       GetElementPtrInst* GEP;
+      Argument* Arg = findCallInstArgument(&Op);
+      // we didn't undef readonly argument, if an readonly argument never used
+      // in a function, then it would undefed by other process.
+      if(Arg->onlyReadsMemory()) continue;
       if(isRefGlobal(Op.get(), &GV, &GEP)){
          gep_fi = GEPFilter(GEP);
-         if(GEP) errs()<<*GEP<<"\n";
-         auto ddg = RE.resolve(GV);
-         WriteGraph(&ddg, "test");
+         Value* Visit = RE.find_visit(GV);
+         if(Visit == NULL)
+            CI->setArgOperand(Arg->getArgNo(), UndefValue::get(Op.get()->getType()));
       }
+   }
+}
+
+static void undefArgumentUse(CallInst* CI)
+{
+   Function* F = dyn_cast<Function>(castoff(CI->getCalledValue()));
+   if(F==NULL || F->isDeclaration()) return;
+
+   SmallVector<User*, 3> S;
+   if(F->use_empty()) return;
+   errs()<<"\n";
+   errs()<<F->getName()<<"\n";
+   for(auto& Arg : F->args()){
+      errs()<<"Arg: "<<Arg<<"\n";
+      bool all_undef = std::all_of(F->user_begin(), F->user_end(), [&Arg](User* C){
+            llvm::Use* Para = findCallInstParameter(&Arg, dyn_cast<CallInst>(C));
+            if(Para == NULL) return false;
+            errs()<<*Para->get()<<"\n";
+            return isa<UndefValue>(Para->get());
+            });
+      if(all_undef) 
+         Arg.replaceAllUsesWith(UndefValue::get(Arg.getType()));
    }
 }
 
@@ -248,10 +273,11 @@ bool ReduceCode::runOnFunction(Function& F)
          AttributeFlags flag = AttributeFlags::None;
          if(CallInst* CI = dyn_cast<CallInst>(Inst)){
             flag = getAttribute(CI);
-            if(flag == AttributeFlags::None)
+            if(flag == AttributeFlags::None){
                undefParameter(CI);
+               //undefArgumentUse(CI);
+            }
          }else if(StoreInst* SI = dyn_cast<StoreInst>(Inst)){
-
             if(Argument* A = dyn_cast<Argument>(SI->getPointerOperand())){
                llvm::SmallSet<User*, 3> S;
                insert_to(F.user_begin(), F.user_end(), S);

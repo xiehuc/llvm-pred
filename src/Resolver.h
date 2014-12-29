@@ -216,7 +216,6 @@ class lle::ResolverPass: public llvm::FunctionPass
    void getAnalysisUsage(llvm::AnalysisUsage& AU) const;
    bool runOnFunction(llvm::Function& F) {return false;}
 };
-
 // a redesigned new resolve engine. 
 // support Use* 
 // support CallBack
@@ -277,7 +276,9 @@ class lle::ResolveEngine
    llvm::Value* find_store(llvm::Use&, CallBack C = always_false);
    // return loadinst or callinst
    llvm::Value* find_visit(llvm::Use&, CallBack C = always_false);
+   llvm::Value* find_visit(llvm::Value*, CallBack C = always_false);
 };
+
 
 /** make a rule only run once **/
 struct lle::InitRule
