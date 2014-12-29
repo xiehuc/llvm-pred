@@ -9,6 +9,7 @@
 
 #include <llvm/Pass.h>
 #include <llvm/IR/Instruction.h>
+#include <llvm/Analysis/CallGraph.h>
 #include <llvm/Analysis/MemoryDependenceAnalysis.h>
 
 #include <ProfileInfo.h>
@@ -39,6 +40,7 @@ namespace lle{
    struct InitRule;
    struct MDARule;
    struct GEPFilter;
+   struct CGFilter;
 };
 
 /**
@@ -309,6 +311,20 @@ struct lle::GEPFilter
    GEPFilter(llvm::ArrayRef<uint64_t> idx):
       idxs(idx.begin(), idx.end()) {}
    GEPFilter(std::initializer_list<uint64_t> idx): idxs(idx) {}
+   bool operator()(llvm::Use*);
+};
+
+struct lle::CGFilter
+{
+   llvm::DenseMap<llvm::Function*, unsigned> order_map;
+   unsigned threshold;
+   llvm::Instruction* threshold_inst;
+   llvm::Function* threshold_f;
+   llvm::CallGraphNode* root;
+   llvm::DominatorTree* DomT;
+   CGFilter(llvm::CallGraphNode* main, llvm::DominatorTree* DomT, 
+         llvm::Instruction* threshold=nullptr);
+   void update(llvm::Instruction* threshold);
    bool operator()(llvm::Use*);
 };
 

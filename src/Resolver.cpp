@@ -6,6 +6,8 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/ADT/DepthFirstIterator.h>
+#include <llvm/IR/Dominators.h>
 
 #include "ddg.h"
 #include "util.h"
@@ -438,11 +440,16 @@ void ResolveEngine::do_solve(DataDepGraph& G, CallBack& C)
 {
    while(Use* un = G.popUnsolved()){
       if(++iteration>max_iteration) break;
-      if(C(un)) continue;
       bool jump = false;
       for(auto& f : filters)
          if((jump = f(un))) break;
-      if(jump) continue;
+      // if refused by filter, it is ignored. so we shouldn't use
+      // callback
+      if(!jump) jump = C(un); 
+      if(jump){
+         G.markIgnore(un); // if refused, this node is ignored.
+         continue;
+      }
       for(auto r = rules.rbegin(), e = rules.rend(); r!=e; ++r){
          if((*r)(un, G)) break;
       }
@@ -672,5 +679,49 @@ bool GEPFilter::operator()(llvm::Use* U)
       return !eq;
    }
    return false;
+}
+CGFilter::CGFilter(CallGraphNode* root_, DominatorTree* DomT_, Instruction* threshold_inst_):
+   root(root_), DomT(DomT_)
+{
+   unsigned i=0;
+   for(auto N = df_begin(root), E = df_end(root); N!=E; ++N){
+      Function* F = N->getFunction();
+      if(F && !F->isDeclaration())
+         order_map[F] = i++;
+   }
+   DomT = DomT_;
+   update(threshold_inst_);
+}
+void CGFilter::update(Instruction* threshold_inst_)
+{
+   if(threshold_inst_==NULL) return;
+   threshold_inst = threshold_inst_;
+   threshold_f = threshold_inst->getParent()->getParent();
+   auto th_f = threshold_f;
+   auto ite = std::find_if(df_begin(root), df_end(root), [th_f](CallGraphNode* N){
+         Function* F = N->getFunction();
+         return F == th_f;
+         });
+   for(auto t = ite->begin(), e = ite->end(); t!=e; ++t){
+      if(t->first == NULL) continue;
+      Instruction* call_inst = dyn_cast<Instruction>((Value*)t->first);
+      Function* F = t->second->getFunction();
+      if(F && !F->isDeclaration() && DomT->dominates(threshold_inst, call_inst))
+         threshold = order_map[F];
+   }
+}
+bool CGFilter::operator()(Use* U)
+{
+   Instruction* I = dyn_cast<Instruction>(U->getUser());
+   if(I==NULL) return false;
+   BasicBlock* B = I->getParent();
+   if(B==NULL) return false;
+   Function* F = B->getParent();
+   if(F==NULL) return false;
+   unsigned order = order_map[F];
+   if(order > threshold) return false;
+   else if(F == threshold_f)
+      return !DomT->dominates(threshold_inst, I);
+   return true;
 }
 //==============================RESOLVE FILTERS END==============================//

@@ -216,6 +216,8 @@ void ReduceCode::undefParameter(CallInst* CI)
    RE.addRule(RE.ibase_rule);
    GEPFilter gep_fi(nullptr);
    RE.addFilter(std::ref(gep_fi));
+   CGFilter cg_fi(root, DomT, CI);
+   RE.addFilter(std::ref(cg_fi));
 
    for(auto& Op : CI->arg_operands()){
       GlobalVariable* GV;
@@ -232,6 +234,7 @@ void ReduceCode::undefParameter(CallInst* CI)
 bool ReduceCode::runOnFunction(Function& F)
 {
    LoopTripCount& TC = getAnalysis<LoopTripCount>(F);
+   DomT = &getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
    dse.prepare(&F, this);
    BasicBlock* entry = &F.getEntryBlock();
    std::vector<BasicBlock*> blocks(po_begin(entry), po_end(entry));
@@ -321,7 +324,7 @@ bool ReduceCode::runOnModule(Module &M)
 
    CallGraph CG(M);
    Function* Main = M.getFunction("main");
-   CallGraphNode* root = Main?CG[Main]:CG.getExternalCallingNode();
+   root = Main?CG[Main]:CG.getExternalCallingNode();
 
    walkThroughCg(root);
    return true;
@@ -329,6 +332,7 @@ bool ReduceCode::runOnModule(Module &M)
 void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
 {
    AU.addRequired<LoopTripCount>();
+   AU.addRequired<DominatorTreeWrapperPass>();
    dse.getAnalysisUsage(AU);
    ic.getAnalysisUsage(AU);
    simpCFG.getAnalysisUsage(AU);

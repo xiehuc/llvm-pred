@@ -77,6 +77,8 @@ class lle::ReduceCode: public llvm::ModulePass
    typedef std::function<AttributeFlags(llvm::CallInst*)> Attribute_;
    std::unordered_map<std::string, Attribute_> Attributes;
    AttributeFlags getAttribute(llvm::CallInst*) const;
+   llvm::CallGraphNode* root;
+   llvm::DominatorTree* DomT;
 
    DSE_Adaptive dse;
    DAE_Adaptive dae;

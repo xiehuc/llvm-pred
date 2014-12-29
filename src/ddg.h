@@ -182,6 +182,7 @@ struct DataDepNode{
    enum class Flags{
       SOLVED = 0,
       UNSOLVED = 1,
+      IGNORED = 2
    };
 
    Impl childs_;     // the pointed childrens.
@@ -241,6 +242,10 @@ class DataDepGraph: public llvm::DenseMap<DDGraphKeyTy, DataDepNode>
       llvm::Use* ret = unsolved.front();
       unsolved.pop_front();
       return ret;
+   }
+   void markIgnore(DDGraphKeyTy K){
+      auto& N = (*this)[K];
+      N.flags_ = DataDepNode::Flags::IGNORED;
    }
 
    void setRoot(DDGraphKeyTy K){ root = K; }
@@ -319,7 +324,14 @@ struct DOTGraphTraits<lle::DataDepGraph*> : public llvm::DefaultDOTGraphTraits
       return "nodesep=1.5;\nnode [margin=\"0.5,0.055 \"];" + rankdir;
    }
 
-   //static bool renderGraphFromBottomUp(){ return true;}
+   static std::string getNodeAttributes(Self::value_type* N,Self* G){
+      auto F = N->second.flags();
+      if(F == lle::DataDepNode::Flags::UNSOLVED)
+         return "style=dashed";
+      else if(F == lle::DataDepNode::Flags::IGNORED)
+         return "style=dotted";
+      else return "";
+   }
 
    std::string getNodeLabel(Self::value_type* N, Self* G);
 };
