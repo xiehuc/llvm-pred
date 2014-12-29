@@ -267,13 +267,16 @@ class lle::ResolveEngine
    static const SolveRule global_rule;
    // }
    // { reversed version: these used for lookup who use it.
-   // a public rule used for lookup it's user's uses
+   // 逆向查找依赖关系, 从上自下
    static void ibase_rule(ResolveEngine&);
+   // 逆向查找依赖关系, 从下自上
+   static void ibase_rule_last(ResolveEngine&);
    // use with InitRule, a public rule used for 
    static const SolveRule iuse_rule;
    // }
    // return storeinst if found
    llvm::Value* find_store(llvm::Use&, CallBack C = always_false);
+   llvm::Value* find_store(llvm::Value*, CallBack C = always_false);
    // return loadinst or callinst
    llvm::Value* find_visit(llvm::Use&, CallBack C = always_false);
    llvm::Value* find_visit(llvm::Value*, CallBack C = always_false);

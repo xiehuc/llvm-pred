@@ -462,7 +462,7 @@ DataDepGraph ResolveEngine::resolve(Use& U, CallBack C)
    // if is ::implicity_rule, it is dependency query.
    G.isDependency(implicity_rule == ::implicity_rule);
    iteration = 0;
-   G.addUnsolved(U);
+   G.addSolved(U.getUser(), U);
    do_solve(G, C);
    G.setRoot(&U);
    return G;
@@ -479,15 +479,32 @@ DataDepGraph ResolveEngine::resolve(Value* I, CallBack C)
    return G;
 }
 
+struct find_store
+{
+   llvm::Value*& ret;
+   ResolveEngine::CallBack& C;
+   find_store(llvm::Value*& ret, ResolveEngine::CallBack& C):
+      ret(ret), C(C) {}
+   bool operator()(Use* U){
+      User* Ur = U->getUser();
+      // it is an store, and dependency is about pointer operand
+      if(isa<StoreInst>(Ur) && U->getOperandNo()==1)
+         ret=Ur;
+      return C(U);
+   }
+};
+
 Value* ResolveEngine::find_store(Use& Tg, CallBack C)
 {
    Value* ret = NULL;
-   resolve(Tg, [&ret, &C](Use* U){
-         User* Ur = U->getUser();
-         if(isa<StoreInst>(Ur))
-            ret=Ur;
-         return C(U);
-      });
+   resolve(Tg, ::find_store(ret, C));
+   return ret;
+}
+
+Value* ResolveEngine::find_store(Value *V, CallBack C)
+{
+   Value* ret = NULL;
+   resolve(V, ::find_store(ret, C));
    return ret;
 }
 
@@ -558,8 +575,8 @@ static bool direct_rule_(Use* U, DataDepGraph& G)
    if(auto I = dyn_cast<Instruction>(V)){
       G.addSolved(U, I->op_begin(), I->op_end());
       return true;
-   }else if(auto C = dyn_cast<Constant>(V)){
-      G.addSolved(U, C);
+   }else if(isa<Constant>(V)){
+      G.addSolved(U);
       return true;
    }
    return false;
@@ -570,6 +587,14 @@ static bool direct_inverse_rule_(Use* U, DataDepGraph& G)
    std::vector<Use*> uses;
    pushback_to(V->use_begin(), V->use_end(), uses);
    G.addSolved(U, uses.rbegin(), uses.rend());
+   return true;
+}
+static bool direct_inverse_rule_last_(Use* U, DataDepGraph& G)
+{
+   Value* V = U->getUser();
+   std::vector<Use*> uses;
+   pushback_to(V->use_begin(), V->use_end(), uses);
+   G.addSolved(U, uses.begin(), uses.end());
    return true;
 }
 static bool use_inverse_rule_(Use* U, DataDepGraph& G)
@@ -654,12 +679,17 @@ void MDARule::operator()(ResolveEngine &RE)
 
 void ResolveEngine::base_rule(ResolveEngine& RE)
 {
-   RE.addRule(SolveRule(direct_rule_));
+   RE.addRule(direct_rule_);
    RE.implicity_rule = ::implicity_rule;
 }
 void ResolveEngine::ibase_rule(ResolveEngine& RE)
 {
-   RE.addRule(SolveRule(direct_inverse_rule_));
+   RE.addRule(direct_inverse_rule_);
+   RE.implicity_rule = ::implicity_inverse_rule;
+}
+void ResolveEngine::ibase_rule_last(ResolveEngine& RE)
+{
+   RE.addRule(direct_inverse_rule_last_);
    RE.implicity_rule = ::implicity_inverse_rule;
 }
 const ResolveEngine::CallBack ResolveEngine::always_false = [](Use* U){ return false; };
