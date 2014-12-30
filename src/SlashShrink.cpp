@@ -27,6 +27,8 @@
 #include "SlashShrink.h"
 #include "debug.h"
 
+#define REASON(flag, what) DEBUG(if(flag){errs()<<what<<" removed in line: "<<__LINE__<<"\n";})
+
 using namespace std;
 using namespace lle;
 using namespace llvm;
@@ -218,6 +220,11 @@ void ReduceCode::undefParameter(CallInst* CI)
    CGFilter cg_fi(root, DomT, CI);
    RE.addFilter(std::ref(cg_fi));
 
+   ResolveEngine RE2;
+   // 因为要寻找最后一条store语句, 所以使用ibase_rule_last
+   RE2.addRule(RE.ibase_rule_last);
+   errs()<<*CI<<"\n";
+
    for(auto& Op : CI->arg_operands()){
       GlobalVariable* GV;
       GetElementPtrInst* GEP;
@@ -228,8 +235,10 @@ void ReduceCode::undefParameter(CallInst* CI)
       if(isRefGlobal(Op.get(), &GV, &GEP)){
          gep_fi = GEPFilter(GEP);
          Value* Visit = RE.find_visit(GV);
-         if(Visit == NULL)
-            CI->setArgOperand(Arg->getArgNo(), UndefValue::get(Op.get()->getType()));
+         if(Visit == NULL){
+            Value* Store = RE2.find_store(Arg);
+            if(Store) errs()<<*Store<<"\n";
+         }
       }
    }
 }
@@ -251,9 +260,26 @@ static void undefArgumentUse(CallInst* CI)
             errs()<<*Para->get()<<"\n";
             return isa<UndefValue>(Para->get());
             });
-      if(all_undef) 
+      if(all_undef && !Arg.use_empty()) 
          Arg.replaceAllUsesWith(UndefValue::get(Arg.getType()));
    }
+}
+
+static AttributeFlags noused_param(Argument* Arg)
+{
+   Function* F = Arg->getParent();
+   llvm::SmallSet<User*, 3> S;
+   insert_to(F->user_begin(), F->user_end(), S);
+   bool all_deletable = std::all_of(F->user_begin(), F->user_end(), [Arg, &S](User* C){
+         llvm::Use* Para = findCallInstParameter(Arg, dyn_cast<CallInst>(C));
+         if(Para == NULL) return 0;
+         auto f = (noused_exclude(*Para, S) & IsDeletable);
+         Argument* NestArg = dyn_cast<Argument>(Para->get());
+         if(f && NestArg)
+            f &= noused_param(NestArg);
+         return f;
+         });
+   return all_deletable ? IsDeletable : AttributeFlags::None;
 }
 
 bool ReduceCode::runOnFunction(Function& F)
@@ -264,8 +290,9 @@ bool ReduceCode::runOnFunction(Function& F)
    BasicBlock* entry = &F.getEntryBlock();
    std::vector<BasicBlock*> blocks(po_begin(entry), po_end(entry));
    bool MadeChange, Ret = false;
+   errs()<<F.getName()<<"\n";
    // use deep first visit order , then reverse it. can get what we need order.
-   for(auto BB = blocks.rbegin(), BBE = blocks.rend(); BB != BBE;){
+   for(auto BB = blocks.begin(), BBE = blocks.end(); BB != BBE;){
       dse.runOnBasicBlock(**BB);
       MadeChange = false;
       for(auto I = --(*BB)->end(), IE = --(*BB)->begin(); I!=IE;){
@@ -273,10 +300,11 @@ bool ReduceCode::runOnFunction(Function& F)
          AttributeFlags flag = AttributeFlags::None;
          if(CallInst* CI = dyn_cast<CallInst>(Inst)){
             flag = getAttribute(CI);
-            if(flag == AttributeFlags::None){
+            REASON(flag, *CI);
+            /*if(flag == AttributeFlags::None){
                undefParameter(CI);
                //undefArgumentUse(CI);
-            }
+            }*/
          }else if(StoreInst* SI = dyn_cast<StoreInst>(Inst)){
             if(Argument* A = dyn_cast<Argument>(SI->getPointerOperand())){
                llvm::SmallSet<User*, 3> S;
@@ -288,23 +316,45 @@ bool ReduceCode::runOnFunction(Function& F)
                      });
                //StoreInst never cascade, so IsDeletable is enough
                flag = all_deletable ? IsDeletable : AttributeFlags::None;
+               REASON(flag, *SI);
             }else if(isa<AllocaInst>(SI->getPointerOperand())){
                Loop* L = TC.getLoopFor(SI->getParent());
-               // a store inst in loop, and it isn't used after loop
-               // and it isn't induction, then it can be removed
-               if(L && TC.getInduction(L) != NULL){
-                  Value* Ind = cast<Instruction>(TC.getInduction(L));
-                  if(LoadInst* LI = dyn_cast<LoadInst>(Ind))
-                     Ind = LI->getOperand(0);
-                  if(Ind != SI->getPointerOperand()){
-                     //XXX not stable, because it doesn't use domtree info
-                     flag = noused(SI->getOperandUse(1));
-                  }
+               if(L){
+                  Value* Ind = TC.getInduction(L);
+                  if(Ind != NULL){
+                     // a store inst in loop, and it isn't used after loop
+                     // and it isn't induction, then it can be removed
+                     if(LoadInst* LI = dyn_cast<LoadInst>(Ind))
+                        Ind = LI->getOperand(0);
+                     if(Ind != SI->getPointerOperand()){
+                        //XXX not stable, because it doesn't use domtree info
+                        flag = noused(SI->getOperandUse(1));
+                        REASON(flag, *SI);
+                     }
+                  }// if it is in loop, and we can't get induction, we ignore it
                }else{
                   // a store inst not in loop, and it isn't used after
                   // then it can be removed
                   flag = noused(SI->getOperandUse(1));
+                  REASON(flag, *SI);
                }
+            }else{
+               ResolveEngine RE;
+               RE.addRule(RE.base_rule);
+               Argument* Arg = NULL;
+               Use* ArgUse = NULL;
+               auto ddg = RE.resolve(SI->getOperandUse(1), [&Arg, &ArgUse](Use* U){
+                     if(Arg == NULL){
+                        ArgUse = U;
+                        Arg = dyn_cast<Argument>(U->get());
+                     }
+                     return Arg;
+                     });
+               if(Arg && noused(*ArgUse)){
+                  auto f2 = noused_param(Arg);
+                  //errs()<<f2<<":"<<*SI<<"\n";
+               }
+
             }
          }
          if(flag & IsDeletable){
@@ -372,7 +422,6 @@ void ReduceCode::washFunction(llvm::Function *F)
 
 void ReduceCode::deleteDeadCaller(llvm::Function *F)
 {
-   //FunctionPass& IC = getAnalysisID<FunctionPass>(ic.id(), *F);
    for(auto I = F->use_begin(), E = F->use_end(); I!=E; ++I){
       CallInst* CI = dyn_cast<CallInst>(I->getUser());
       if(CI == NULL) continue;
