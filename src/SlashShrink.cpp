@@ -195,7 +195,6 @@ static RegisterPass<ReduceCode> Y("Reduce", "Slash and Shrink Code to make a min
 static AttributeFlags noused_exclude(llvm::Use& U, llvm::SmallPtrSetImpl<User*>& exclude);
 static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C = ResolveEngine::always_false);
 #ifndef NDEBUG
-static void noused_value(llvm::Value* I, ResolveEngine::CallBack C = ResolveEngine::always_false);
 static bool Dbg_EnablePrintGraph = false;
 #endif
 
@@ -206,63 +205,6 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
    auto Found = Attributes.find(Name);
    if(Found == Attributes.end()) return AttributeFlags::None;
    return Found->second(CI);
-}
-
-void ReduceCode::undefParameter(CallInst* CI)
-{
-   Function* F = dyn_cast<Function>(castoff(CI->getCalledValue()));
-   if(F==NULL || F->isDeclaration()) return;
-
-   ResolveEngine RE;
-   RE.addRule(RE.ibase_rule);
-   GEPFilter gep_fi(nullptr);
-   RE.addFilter(std::ref(gep_fi));
-   CGFilter cg_fi(root, DomT, CI);
-   RE.addFilter(std::ref(cg_fi));
-
-   ResolveEngine RE2;
-   // 因为要寻找最后一条store语句, 所以使用ibase_rule_last
-   RE2.addRule(RE.ibase_rule_last);
-   errs()<<*CI<<"\n";
-
-   for(auto& Op : CI->arg_operands()){
-      GlobalVariable* GV;
-      GetElementPtrInst* GEP;
-      Argument* Arg = findCallInstArgument(&Op);
-      // we didn't undef readonly argument, if an readonly argument never used
-      // in a function, then it would undefed by other process.
-      if(Arg->onlyReadsMemory()) continue;
-      if(isRefGlobal(Op.get(), &GV, &GEP)){
-         gep_fi = GEPFilter(GEP);
-         Value* Visit = RE.find_visit(GV);
-         if(Visit == NULL){
-            Value* Store = RE2.find_store(Arg);
-            if(Store) errs()<<*Store<<"\n";
-         }
-      }
-   }
-}
-
-static void undefArgumentUse(CallInst* CI)
-{
-   Function* F = dyn_cast<Function>(castoff(CI->getCalledValue()));
-   if(F==NULL || F->isDeclaration()) return;
-
-   SmallVector<User*, 3> S;
-   if(F->use_empty()) return;
-   errs()<<"\n";
-   errs()<<F->getName()<<"\n";
-   for(auto& Arg : F->args()){
-      errs()<<"Arg: "<<Arg<<"\n";
-      bool all_undef = std::all_of(F->user_begin(), F->user_end(), [&Arg](User* C){
-            llvm::Use* Para = findCallInstParameter(&Arg, dyn_cast<CallInst>(C));
-            if(Para == NULL) return false;
-            errs()<<*Para->get()<<"\n";
-            return isa<UndefValue>(Para->get());
-            });
-      if(all_undef && !Arg.use_empty()) 
-         Arg.replaceAllUsesWith(UndefValue::get(Arg.getType()));
-   }
 }
 
 static AttributeFlags noused_param(Argument* Arg)
@@ -300,23 +242,19 @@ bool ReduceCode::runOnFunction(Function& F)
          AttributeFlags flag = AttributeFlags::None;
          if(CallInst* CI = dyn_cast<CallInst>(Inst)){
             flag = getAttribute(CI);
-            REASON(flag, *CI);
-            /*if(flag == AttributeFlags::None){
-               undefParameter(CI);
-               //undefArgumentUse(CI);
-            }*/
          }else if(StoreInst* SI = dyn_cast<StoreInst>(Inst)){
-            if(Argument* A = dyn_cast<Argument>(SI->getPointerOperand())){
-               llvm::SmallSet<User*, 3> S;
-               insert_to(F.user_begin(), F.user_end(), S);
-               bool all_deletable = std::all_of(S.begin(), S.end(), [A, &S](User* C){
-                     llvm::Use* Para = findCallInstParameter(A, dyn_cast<CallInst>(C));
-                     if(Para == NULL) return 0;
-                     return (noused_exclude(*Para, S) & IsDeletable);
-                     });
-               //StoreInst never cascade, so IsDeletable is enough
-               flag = all_deletable ? IsDeletable : AttributeFlags::None;
-               REASON(flag, *SI);
+            if(auto Arg = dyn_cast<Argument>(SI->getPointerOperand())){
+               if(noused(SI->getOperandUse(1))){
+                  flag = noused_param(Arg);
+                  REASON(flag, *SI);
+               }
+            }else if(auto GEP = dyn_cast<GetElementPtrInst>(SI->getPointerOperand())){
+               Argument* Arg = NULL;
+               if((Arg = dyn_cast<Argument>(GEP->getPointerOperand())) && noused(SI->getOperandUse(1))){
+                  flag = noused_param(Arg);
+                  // 过于激进的删除
+                  REASON(flag, *SI);
+               }
             }else if(isa<AllocaInst>(SI->getPointerOperand())){
                Loop* L = TC.getLoopFor(SI->getParent());
                if(L){
@@ -338,23 +276,6 @@ bool ReduceCode::runOnFunction(Function& F)
                   flag = noused(SI->getOperandUse(1));
                   REASON(flag, *SI);
                }
-            }else{
-               ResolveEngine RE;
-               RE.addRule(RE.base_rule);
-               Argument* Arg = NULL;
-               Use* ArgUse = NULL;
-               auto ddg = RE.resolve(SI->getOperandUse(1), [&Arg, &ArgUse](Use* U){
-                     if(Arg == NULL){
-                        ArgUse = U;
-                        Arg = dyn_cast<Argument>(U->get());
-                     }
-                     return Arg;
-                     });
-               if(Arg && noused(*ArgUse)){
-                  auto f2 = noused_param(Arg);
-                  //errs()<<f2<<":"<<*SI<<"\n";
-               }
-
             }
          }
          if(flag & IsDeletable){
@@ -448,23 +369,6 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
    }
    return AttributeFlags::None;
 }
-
-#ifndef NDEBUG
-static void noused_value(llvm::Value* U, ResolveEngine::CallBack C)
-{
-   ResolveEngine RE;
-   RE.addRule(RE.ibase_rule);
-   InitRule ir(RE.iuse_rule);
-   RE.addRule(std::ref(ir));
-   if(Dbg_EnablePrintGraph){
-      auto ddg = RE.resolve(U, C);
-      Instruction* I = dyn_cast<Instruction>(U);
-      BasicBlock* Block = I?I->getParent():NULL;
-      StringRef FName = Block?Block->getParent()->getName():"test";
-      WriteGraph(&ddg, FName);
-   }
-}
-#endif
 
 static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C)
 {
