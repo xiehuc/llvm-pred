@@ -437,10 +437,13 @@ ReduceCode::ReduceCode():ModulePass(ID),
 //              int tag, MPI_Comm comm, MPI_Request *request)
 //Deletable if buf is no used
    Attributes["mpi_irecv_"] = std::bind(mpi_nouse_at, _1, 0);
-   //always delete mpi_wtime_
-   Attributes["mpi_wtime_"] = std::bind(direct_return, _1, 
+   auto DirectDelete = std::bind(direct_return, _1, AttributeFlags::IsDeletable);
+   auto DirectDeleteCascade = std::bind(direct_return, _1, 
          AttributeFlags::IsDeletable | AttributeFlags::Cascade);
-   Attributes["mpi_wait_"] = std::bind(direct_return, _1, AttributeFlags::IsDeletable);
+   //always delete mpi_wtime_
+   Attributes["mpi_wtime_"] = DirectDeleteCascade;
+   Attributes["mpi_wait_"] = DirectDelete;
+   Attributes["mpi_barrier_"] = DirectDelete;
    Attributes["main"] = std::bind(direct_return, _1, AttributeFlags::None);
 }
 
