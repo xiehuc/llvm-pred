@@ -290,6 +290,11 @@ string llvm::DOTGraphTraits<DDGraph*>::getNodeLabel(DDGValue* N,DDGraph* G)
 }
 
 //=======================NEW API==================================
+void DataDepGraph::addUnsolved(llvm::Use *beg, llvm::Use *end)
+{
+   pushback_to(beg, end, unsolved);
+}
+
 void DataDepGraph::addSolved(DDGraphKeyTy K, Use* F, Use* T)
 {
    std::vector<DDGraphKeyTy> V;
@@ -308,13 +313,23 @@ void DataDepGraph::addSolved(DDGraphKeyTy K, Use* F, Use* T)
    N.impl().insert(N.impl().end(), V.begin(), V.end());
 }
 
+void DataDepGraph::addSolved(DDGraphKeyTy K, Value* C)
+{
+   auto Found = &this->FindAndConstruct(C);
+   Found->second.flags_ = DataDepNode::Flags::SOLVED;
+
+   auto& N = (*this)[K];
+   N.flags_ = DataDepNode::Flags::SOLVED;
+   N.parent_ = Found->second.parent_ = this;
+   N.impl().push_back(K);
+}
+
 string llvm::DOTGraphTraits<DataDepGraph*>::getNodeLabel(Self::value_type* N, Self* G)
 {
    std::string ret;
    llvm::raw_string_ostream os(ret);
    if(Use* U = N->first.dyn_cast<Use*>()){
-      if(G->isDependency()) U->get()->print(os);
-      else U->getUser()->print(os);
+      U->getUser()->print(os);
    }else{
       Value* V = N->first.get<Value*>();
       V->print(os);

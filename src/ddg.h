@@ -213,6 +213,10 @@ class DataDepGraph: public llvm::DenseMap<DDGraphKeyTy, DataDepNode>
    }
 
    DataDepGraph():bottom_up(false) {};
+   void addUnsolved(llvm::Use& U){
+      unsolved.push_back(&U);
+   }
+   void addUnsolved(llvm::Use*, llvm::Use*);
    // add a solved node.
    // @K is a solved Value* or Use*
    // @U is a unsolved Use, there a link K -> U
@@ -230,10 +234,9 @@ class DataDepGraph: public llvm::DenseMap<DDGraphKeyTy, DataDepNode>
          addSolved(K, **I);
    }
    // add a solved constant value
-   // just simply mark it(constant) as solved.
-   void addSolved(DDGraphKeyTy K){
-      (*this)[K].flags_ = DataDepNode::Flags::SOLVED;
-   }
+   // @K isa solved Value* or Use*
+   // @C isa constant, which naturally solved.
+   void addSolved(DDGraphKeyTy K, llvm::Value* C);
    llvm::Use* popUnsolved(){
       if(unsolved.empty()) return NULL;
       llvm::Use* ret = unsolved.front();
@@ -247,7 +250,7 @@ class DataDepGraph: public llvm::DenseMap<DDGraphKeyTy, DataDepNode>
 
    void setRoot(DDGraphKeyTy K){ root = K; }
    value_type& getRoot() {return *this->find(root);}
-   bool isDependency() const {return bottom_up;}
+   bool isDenpendency() const {return bottom_up;}
 };
 
 }
@@ -317,7 +320,7 @@ struct DOTGraphTraits<lle::DataDepGraph*> : public llvm::DefaultDOTGraphTraits
    }
 
    static std::string getGraphProperties(const Self* G){
-      std::string rankdir=G->isDependency()?"rankdir=\"BT\";":"";
+      std::string rankdir=G->isDenpendency()?"rankdir=\"BT\";":"";
       return "nodesep=1.5;\nnode [margin=\"0.5,0.055 \"];" + rankdir;
    }
 
