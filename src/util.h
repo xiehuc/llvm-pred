@@ -3,6 +3,7 @@
 
 #include <list>
 #include <vector>
+#include <functional>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Argument.h>
 #include <llvm/IR/Constants.h>
@@ -79,7 +80,21 @@ namespace lle
    }
 
    //=========================NUMERIC END==================================//
-
+}
+namespace std{
+// return true if BasicBlock L is 'before' R
+template <>
+struct less<llvm::BasicBlock>
+{
+   bool operator()(llvm::BasicBlock*, llvm::BasicBlock* );
+};
+// return true if Instruction L is 'before' R
+template <>
+template <>
+struct less<llvm::Instruction>
+{
+   bool operator()(llvm::Instruction*, llvm::Instruction* );
+};
 }
 
 #endif

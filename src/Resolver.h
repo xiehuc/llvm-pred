@@ -308,10 +308,18 @@ struct lle::MDARule
 struct lle::GEPFilter
 {
    std::vector<uint64_t> idxs;
+   // it would only store front constants to idxs.
+   // @example getelementptr @gv, 0, 1, %2
+   // idxs == {0,1}
    GEPFilter(llvm::GetElementPtrInst*);
    GEPFilter(llvm::ArrayRef<uint64_t> idx):
       idxs(idx.begin(), idx.end()) {}
    GEPFilter(std::initializer_list<uint64_t> idx): idxs(idx) {}
+   // it would only compare front idxs 
+   // @example idxs == {0,1}
+   // getelementptr @gv, 0, 1, 2 ==> true
+   // getelementptr @gv, 0, 2    ==> false
+   // getelementptr @gv, 0       ==> false
    bool operator()(llvm::Use*);
 };
 
@@ -322,9 +330,7 @@ struct lle::CGFilter
    llvm::Instruction* threshold_inst;
    llvm::Function* threshold_f;
    llvm::CallGraphNode* root;
-   llvm::DominatorTree* DomT;
-   CGFilter(llvm::CallGraphNode* main, llvm::DominatorTree* DomT, 
-         llvm::Instruction* threshold=nullptr);
+   CGFilter(llvm::CallGraphNode* main, llvm::Instruction* threshold=nullptr);
    void update(llvm::Instruction* threshold);
    bool operator()(llvm::Use*);
 };

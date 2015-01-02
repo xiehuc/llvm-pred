@@ -675,11 +675,12 @@ GEPFilter::GEPFilter(GetElementPtrInst* GEP)
       idxs.clear();
       return;
    }
-   idxs.resize(GEP->getNumIndices());
-   std::transform(GEP->idx_begin(), GEP->idx_end(), idxs.begin(), [](llvm::Value* V){
-         ConstantInt* CI = dyn_cast<ConstantInt>(V);
-         return CI?CI->getZExtValue():0;
-         });
+   idxs.reserve(GEP->getNumIndices());
+   for(auto I=GEP->idx_begin(), E = GEP->idx_end(); I!=E; ++I){
+      ConstantInt* CI = dyn_cast<ConstantInt>(I->get());
+      if(CI) idxs.push_back(CI->getZExtValue());
+      else break;
+   }
 }
 bool GEPFilter::operator()(llvm::Use* U)
 {
@@ -688,7 +689,7 @@ bool GEPFilter::operator()(llvm::Use* U)
    if(ConstantExpr* CE = dyn_cast<ConstantExpr>(Tg))
       Tg = CE->getAsInstruction();
    if(auto Inst = dyn_cast<GetElementPtrInst>(Tg)){
-      bool eq = (idxs.size() == Inst->getNumIndices());
+      bool eq = (idxs.size() <= Inst->getNumIndices());
       eq = eq && std::equal(idxs.begin(), idxs.end(), Inst->idx_begin(), [](uint64_t L, Value* R){
             Constant* C = dyn_cast<Constant>(R);
             return (C && C->getUniqueInteger() == L);
@@ -697,8 +698,7 @@ bool GEPFilter::operator()(llvm::Use* U)
    }
    return false;
 }
-CGFilter::CGFilter(CallGraphNode* root_, DominatorTree* DomT_, Instruction* threshold_inst_):
-   root(root_), DomT(DomT_)
+CGFilter::CGFilter(CallGraphNode* root_, Instruction* threshold_inst_): root(root_)
 {
    unsigned i=0;
    for(auto N = df_begin(root), E = df_end(root); N!=E; ++N){
@@ -706,7 +706,6 @@ CGFilter::CGFilter(CallGraphNode* root_, DominatorTree* DomT_, Instruction* thre
       if(F && !F->isDeclaration())
          order_map[F] = i++;
    }
-   DomT = DomT_;
    update(threshold_inst_);
 }
 void CGFilter::update(Instruction* threshold_inst_)
@@ -727,7 +726,10 @@ void CGFilter::update(Instruction* threshold_inst_)
       if(t->first == NULL) continue;
       Instruction* call_inst = dyn_cast<Instruction>((Value*)t->first);
       Function* F = t->second->getFunction();
-      if(F && !F->isDeclaration() && DomT->dominates(threshold_inst, call_inst)){
+      if(F && !F->isDeclaration() && 
+            (threshold_inst == call_inst || 
+             std::less<Instruction>()(threshold_inst, call_inst))
+        ){
          threshold = order_map[F];
          break;
       }
@@ -743,8 +745,9 @@ bool CGFilter::operator()(Use* U)
    if(F==NULL) return false;
    unsigned order = order_map[F];
    if(order > threshold) return false;
-   else if(F == threshold_f)
-      return !DomT->dominates(threshold_inst, I);
+   else if(F == threshold_f){
+      return !std::less<Instruction>()(threshold_inst, I);
+   }
    return true;
 }
 //==============================RESOLVE FILTERS END==============================//
