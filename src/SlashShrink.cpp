@@ -223,6 +223,17 @@ static AttributeFlags noused_param(Argument* Arg)
          });
    return all_deletable ? IsDeletable : AttributeFlags::None;
 }
+AttributeFlags ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP)
+{
+   ResolveEngine RE;
+   RE.addRule(RE.ibase_rule);
+   GetElementPtrInst* GEPI = dyn_cast<GetElementPtrInst>(GEP);
+   if(GEPI) RE.addFilter(GEPFilter(GEPI));
+   RE.addFilter(CGFilter(root, DomT, GEP));
+   auto ddg = RE.resolve(GV);
+   WriteGraph(&ddg, "");
+   return AttributeFlags::None;
+}
 
 bool ReduceCode::runOnFunction(Function& F)
 {
@@ -254,6 +265,10 @@ bool ReduceCode::runOnFunction(Function& F)
                   flag = noused_param(Arg);
                   // 过于激进的删除
                   REASON(flag, *SI);
+               }else if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
+                  errs()<<"--"<<*SI<<"\n";
+                  auto f = noused_global(GV, GEP);
+                  REASON(f, *SI);
                }
             }else if(isa<AllocaInst>(SI->getPointerOperand())){
                Loop* L = TC.getLoopFor(SI->getParent());
@@ -362,6 +377,8 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
    RE.addRule(RE.gep_rule);
    RE.addRule(RE.useonly_rule);
    RE.addFilter(GEPFilter{0,0,1});
+   auto ddg = RE.resolve(st_parameter);
+   WriteGraph(&ddg, "a");
    Value* Store = RE.find_store(st_parameter);
    if(Store != NULL && isa<StoreInst>(Store)){
       auto u = extract(dyn_cast<ConstantInt>(cast<StoreInst>(Store)->getValueOperand()));

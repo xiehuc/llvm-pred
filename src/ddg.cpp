@@ -321,7 +321,7 @@ void DataDepGraph::addSolved(DDGraphKeyTy K, Value* C)
    auto& N = (*this)[K];
    N.flags_ = DataDepNode::Flags::SOLVED;
    N.parent_ = Found->second.parent_ = this;
-   N.impl().push_back(K);
+   N.impl().push_back(C);
 }
 
 string llvm::DOTGraphTraits<DataDepGraph*>::getNodeLabel(Self::value_type* N, Self* G)
