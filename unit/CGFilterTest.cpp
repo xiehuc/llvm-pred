@@ -237,22 +237,28 @@ entry:
 })";
    std::unique_ptr<Module> M = parseAssembly(Assembly);
    Function* F_a = M->getFunction("a");
+   Function* F_b = M->getFunction("b");
+   Function* F_c = M->getFunction("c");
    CallGraph CG(*M);
    CallGraphNode* CG_root = CG[F_a];
    BasicBlock::iterator B_a_beg = F_a->begin()->begin();
-   Instruction* Bitcast_0 = dyn_cast<Instruction>(B_a_beg++);
-   EXPECT_NE(Bitcast_0, nullptr);
-   Instruction* Bitcast_1 = dyn_cast<Instruction>(B_a_beg++);
-   Instruction* Bitcast_2 = dyn_cast<Instruction>(B_a_beg++);
-   CGFilter CGF(CG_root, Bitcast_0);
+   CGFilter CGF(CG_root, B_a_beg);
    EXPECT_EQ(CGF.order_map.size(), 3);
 
-   EXPECT_EQ(order_map(CGF, M->getFunction("a")), 0);
-   EXPECT_EQ(order_map(CGF, M->getFunction("b")), 1);
-   EXPECT_EQ(order_map(CGF, M->getFunction("c")), 3);
+   EXPECT_EQ(order_map(CGF, F_a), 0);
+   EXPECT_EQ(order_map(CGF, F_b), 1);
+   EXPECT_EQ(order_map(CGF, F_c), 3);
+   EXPECT_EQ(CGF.order_map[F_a].last, 5);
+   EXPECT_EQ(CGF.order_map[F_b].last, 2);
+   EXPECT_EQ(CGF.order_map[F_c].last, 4);
 
+   Instruction* Bitcast_0 = B_a_beg;
    EXPECT_EQ(CGF.indexof(Bitcast_0), 0);
+   std::advance(B_a_beg, 2);
+   Instruction* Bitcast_1 = B_a_beg;
    EXPECT_EQ(CGF.indexof(Bitcast_1), 2);
+   std::advance(B_a_beg, 2);
+   Instruction* Bitcast_2 = B_a_beg;
    EXPECT_EQ(CGF.indexof(Bitcast_2), 4);
 
    // %1 = bitcast i32 1 to i32

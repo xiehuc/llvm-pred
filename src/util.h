@@ -90,7 +90,6 @@ struct less<llvm::BasicBlock>
 };
 // return true if Instruction L is 'before' R
 template <>
-template <>
 struct less<llvm::Instruction>
 {
    bool operator()(llvm::Instruction*, llvm::Instruction* );

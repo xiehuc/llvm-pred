@@ -340,28 +340,17 @@ bool std::less<BasicBlock>::operator()(BasicBlock* L, BasicBlock* R)
    using std::placeholders::_1;
    if(L->getParent() != R->getParent()) return false;
    Function* F = L->getParent();
-   auto counter = [](llvm::BasicBlock& T, BasicBlock* B, unsigned& count){
-      count++;
-      return &T==B;
-   };
-   unsigned L_idx = 0, R_idx = 0;
-   std::find_if(F->begin(), F->end(), std::bind(counter, _1, L, std::ref(L_idx)));
-   std::find_if(F->begin(), F->end(), std::bind(counter, _1, R, std::ref(R_idx)));
+   unsigned L_idx = std::distance(F->begin(), Function::iterator(L));
+   unsigned R_idx = std::distance(F->begin(), Function::iterator(R));
    return L_idx < R_idx;
 }
 
 bool std::less<Instruction>::operator()(Instruction* L, Instruction* R)
 {
-   using std::placeholders::_1;
    if(L->getParent() != R->getParent())
       return std::less<BasicBlock>()(L->getParent(), R->getParent());
    BasicBlock* B = L->getParent();
-   auto counter = [](llvm::Instruction& T, Instruction* I, unsigned& count){
-      count++;
-      return &T==I;
-   };
-   unsigned L_idx = 0, R_idx = 0;
-   std::find_if(B->begin(), B->end(), std::bind(counter, _1, L, std::ref(L_idx)));
-   std::find_if(B->begin(), B->end(), std::bind(counter, _1, R, std::ref(R_idx)));
+   unsigned L_idx = std::distance(B->begin(), BasicBlock::iterator(L));
+   unsigned R_idx = std::distance(B->begin(), BasicBlock::iterator(R));
    return L_idx < R_idx;
 }
