@@ -7,6 +7,7 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/ADT/DepthFirstIterator.h>
+#include <llvm/ADT/PostOrderIterator.h>
 #include <llvm/IR/Dominators.h>
 
 #include "ddg.h"
@@ -698,63 +699,112 @@ bool GEPFilter::operator()(llvm::Use* U)
    }
    return false;
 }
+CallGraphNode* last_valid_child(CallGraphNode* N, set<Value*>& Only)
+{
+   using RIte = std::reverse_iterator<CallGraphNode::iterator>;
+   auto found = find_if(RIte(N->end()), RIte(N->begin()), [&Only](RIte::value_type& P){
+            auto F = P.second->getFunction();
+            return Only.count(P.first) && F != NULL && !F->isDeclaration();
+         });
+   if(found == RIte(N->begin())) return NULL;
+   else return found->second;
+}
+
+/** CGFilter : 用于求解在全局范围内, 给出一条指令作为基准点, 查询其它指令是基于CG在其之前还是之后.
+ * 例如: 
+ *   MAIN
+ *     ├─ setup_submatrix_info (c)
+ *     ├─ randlc
+ *     │   ├─ sprnvc
+ *     │   │   ├─ randlc (a)
+ *     │   │   └─ icnvrt
+ *     ├─ makea
+ *     │   ├─ vecset (b)
+ * (a) 在 (b) 之前, (c) 在 (a) 和 (b) 之前
+ * 求其偏序关系, 即是对其排序, 可以将其映射到正数序列上即可比较. 
+ * 映射规则:
+ * 1. 对所有的callgraphnode标记, 其长度表示范围从 [first, last)
+ * 2. 预留出足够的空间, 映射那些夹杂在call之间的语句.
+ * 3. 先按深度优先遍历, 记录 PathLen 和 OldPathLen, first = OldPathLen - PathLen + 2;
+ * 4. 再按后序遍历, 该节点为空, last = first + 1; 否则 last = last_valid_child.last + 1
+ * 以上就完成了所有callgraphnode的映射.
+ * 5. 对于任意一条指令, 找到 Call1 < I < Call2
+ *    indexof(I) = indexof(Call2)
+ *    indexof(Call2) = Function(Call2).first - 1
+ * 6. 如果有 forall Call < I. 表明I在函数的最后部分.
+ *    indexof(I) = I所在的函数.last - 1
+ * 7. 对于重复调用的或三角调用或递归调用, 只考虑第一次, 忽略之后的调用
+ * 查询时, 求出两个待比较指令的index, 如果不等则比较其大小, 如果相等, 表明两条
+ * 指令一定在同一函数中, 直接返回其偏序关系
+ *
+ * 具体的示例可以参考单元测试. 以便取得更加深刻的理解.
+ */
+
 CGFilter::CGFilter(CallGraphNode* root_, Instruction* threshold_inst_): root(root_)
 {
    using std::placeholders::_1;
-   unsigned i=0;
-   std::vector<unsigned> visitStack;
-   visitStack.push_back(-1);
-   std::set<CallGraphNode*> Only;
-   // first we go through tree, only stores which we visited
-   for(auto N = df_begin(root), E = df_end(root); N!=E; ++N){
-      Only.insert(*N);
-   }
+   unsigned LastPathLen = 0;
+   int i=-1; // for initial
    for(auto N = df_begin(root), E = df_end(root); N!=E; ++N){
       Function* F = N->getFunction();
       if(F && !F->isDeclaration()){
-         if(visitStack.back()==0){
-            // there are how much zero, means we should quit how much level
-            auto ite = std::find_if_not(visitStack.rbegin(), visitStack.rend(), std::bind(std::equal_to<unsigned>(), _1, 0));
-            i+=std::distance(visitStack.rbegin(), ite);
-            while(visitStack.back()==0)
-               visitStack.pop_back();
-         }
-         visitStack.back()--; // upper level left call --
-         // none repeat size, {the children of N} union {Only} == what we would real visit
-         unsigned non_rep_size = std::count_if(N->begin(), N->end(), [&Only](CallGraphNode::iterator::value_type& node){
-               return Only.count(node.second)==1;
-               });
-         visitStack.push_back(non_rep_size); // push back this level's call number
 
-         order_map[F]= {i++, *N}; // a function only store minimal idx
+         if(N.getPathLength()>1){
+            // first we go through tree, only stores which we visited
+            CallGraphNode* Parent = N.getPath(N.getPathLength()-2);
+            CallGraphNode* Current = *N;
+            auto found = find_if(Parent->begin(), Parent->end(), [Current](CallGraphNode::iterator::value_type& V){
+                  return V.second == Current;
+                  });
+            Only.insert(&*found->first);
+         }
+
+         // we caculate [first
+         unsigned CurPathLen = N.getPathLength();
+         i += LastPathLen - CurPathLen + 2;
+         LastPathLen = CurPathLen;
+         order_map[F] = {(unsigned)i, 0, *N}; // a function only store minimal idx
       }
+   }
+   // we caculate last)
+   for(auto N = po_begin(root), E = po_end(root); N!=E; ++N){
+      Function* F = N->getFunction();
+      if(F==NULL || F->isDeclaration()) continue;
+
+      Record& r = order_map[F];
+      auto Clast = last_valid_child(*N, Only);
+      if(N->empty() || Clast == NULL) r.last = r.first + 1;
+      else r.last = order_map[Clast->getFunction()].last + 1;
    }
    threshold = 0;
    threshold_inst = NULL;
    threshold_f = NULL;
    update(threshold_inst_);
 }
+
 unsigned CGFilter::indexof(llvm::Instruction *I)
 {
    Function* ParentF = I->getParent()->getParent();
    CallGraphNode* Parent = order_map[ParentF].second;
    if(Parent->empty()) return order_map[ParentF].first;
 
-   Function* Fprev = ParentF;
+   Function* Fmatch = NULL;
    for(auto t = Parent->begin(), e = Parent->end(); t!=e; ++t){
-      if(t->first == NULL) continue;
-      Instruction* call_inst = dyn_cast<Instruction>((Value*)t->first);
       Function* F = t->second->getFunction();
       if(F==NULL || F->isDeclaration()) continue;
+      if(t->first == NULL || Only.count(t->first)==0) continue;
+      Instruction* call_inst = dyn_cast<Instruction>(&*t->first);
       // last call_inst < threshold_inst < next call_inst
       // then threshold should equal to last call_inst's order
-      if(I == call_inst || 
-            std::less<Instruction>()(I, call_inst)){
-         Fprev = F;
+      if(I == call_inst || std::less<Instruction>()(I, call_inst)){
+         Fmatch = F;
          break;
       }
    }
-   return order_map[Fprev].first;
+   if(Fmatch == NULL)
+      return order_map[ParentF].last - 1;
+   else
+      return order_map[Fmatch].first - 1;
 }
 void CGFilter::update(Instruction* threshold_inst_)
 {
@@ -762,17 +812,6 @@ void CGFilter::update(Instruction* threshold_inst_)
    threshold_inst = threshold_inst_;
    threshold_f = threshold_inst->getParent()->getParent();
    threshold = indexof(threshold_inst);
-}
-bool CGFilter::less(Function* L, Function* R)
-{
-   CallGraphNode* L_N = order_map[L].second;
-   for(auto t = L_N->begin(), e = L_N->end(); t!=e; ++t){
-      if(t->first == NULL) continue;
-      Function* F = t->second->getFunction();
-      if(F==NULL || F->isDeclaration()) continue;
-      if( F == R) return true;
-   }
-   return false;
 }
 bool CGFilter::operator()(Use* U)
 {
@@ -782,13 +821,16 @@ bool CGFilter::operator()(Use* U)
    if(B==NULL) return false;
    Function* F = B->getParent();
    if(F==NULL) return false;
+
+   // quick lookup:
+   // it's index > it's function's index > threshold
    unsigned order = order_map[F].first;
    if(order > threshold) return false;
+
    order = indexof(I);
    if(order == threshold){
-      if(threshold_f == F) 
-         return !std::less<Instruction>()(threshold_inst, I);
-      else return less(F, threshold_f);
+      AssertRuntime(threshold_f == F, "should be same function");
+      return !std::less<Instruction>()(threshold_inst, I);
    }
    return order < threshold;
 }

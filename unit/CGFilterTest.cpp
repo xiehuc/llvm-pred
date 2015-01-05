@@ -100,6 +100,13 @@ entry:
    CallGraph CG(*M);
    CallGraphNode* CG_root = CG[F_a];
    CGFilter CGF(CG_root, nullptr);
+   auto B_a = F_a->begin()->begin();
+   Instruction* Call_b = B_a++;
+   Instruction* Call_c = B_a++;
+   Instruction* Call_d = B_a++;
+   auto B_b = M->getFunction("b")->begin()->begin();
+   Instruction* Call_e = B_b++;
+   Instruction* Call_f = B_b++;
 
    // 我们需要为空白的地方预留空间.
    EXPECT_EQ(order_map(CGF, M->getFunction("a")), 0);
@@ -108,33 +115,49 @@ entry:
    EXPECT_EQ(order_map(CGF, M->getFunction("f")), 4);
    EXPECT_EQ(order_map(CGF, M->getFunction("c")), 7);
    EXPECT_EQ(order_map(CGF, M->getFunction("d")), 9);
+
+   EXPECT_EQ(CGF.indexof(Call_b), 0);
+   EXPECT_EQ(CGF.indexof(Call_c), 6);
+   EXPECT_EQ(CGF.indexof(Call_d), 8);
+   EXPECT_EQ(CGF.indexof(Call_e), 1);
+   EXPECT_EQ(CGF.indexof(Call_f), 3);
 }
 
 TEST(CGFilterTest, TriangleConstruct) {
    const char Assembly[] = R"(
 define void @a(){  ;/** @a : 0 
 entry:             ; *       call @b: 1
-   call void @b()  ; *       |        call @e: 2          
-   call void @c()  ; *       |        3                   
-   call void @d()  ; *       |        call @c: 4          
-   ret void        ; *       ---------5
-}                  ; *       6
-define void @b(){  ; *       call @c: 4
-entry:             ; *       6
-   call void @e()  ; *       call @d: 7
-   call void @c()  ; *       8                            
-   ret void        ; */                         
+   %0 = alloca i32 ; *       |        call @e: 2          
+   call void @b()  ; *       |        3   
+   %1 = alloca i32 ; *       |        call @c: 4 
+   call void @c()  ; *       ---------5                   
+   %2 = alloca i32 ; *       6
+   call void @d()  ; *       call @c: 4          
+   %3 = alloca i32 ; *       6
+   ret void        ; *       call @d: 7
+}                  ; *       8 
+define void @b(){  
+entry:             
+   %0 = alloca i32
+   call void @e()     
+   %1 = alloca i32
+   call void @c()                             
+   %2 = alloca i32
+   ret void                         
 }
 define void @c(){
 entry:
+   %0 = alloca i32
    ret void
 }
 define void @d(){
 entry:
+   %0 = alloca i32
    ret void
 }
 define void @e(){
 entry:
+   %0 = alloca i32
    ret void
 })";
    std::unique_ptr<Module> M = parseAssembly(Assembly);
@@ -142,12 +165,33 @@ entry:
    CallGraph CG(*M);
    CallGraphNode* CG_root = CG[F_a];
    CGFilter CGF(CG_root, nullptr);
+   auto B_a = F_a->begin()->begin();
+   auto B_b = M->getFunction("b")->begin()->begin();
+   auto B_c = M->getFunction("c")->begin()->begin();
+   auto B_d = M->getFunction("d")->begin()->begin();
+   auto B_e = M->getFunction("e")->begin()->begin();
 
    EXPECT_EQ(order_map(CGF, M->getFunction("a")), 0);
    EXPECT_EQ(order_map(CGF, M->getFunction("b")), 1);
    EXPECT_EQ(order_map(CGF, M->getFunction("e")), 2);
    EXPECT_EQ(order_map(CGF, M->getFunction("c")), 4);
    EXPECT_EQ(order_map(CGF, M->getFunction("d")), 7);
+
+   EXPECT_EQ(CGF.indexof(B_a), 0);
+   std::advance(B_a, 2);
+   EXPECT_EQ(CGF.indexof(B_a), 6);
+   std::advance(B_a, 2);
+   EXPECT_EQ(CGF.indexof(B_a), 6);
+   std::advance(B_a, 2);
+   EXPECT_EQ(CGF.indexof(B_a), 8);
+   EXPECT_EQ(CGF.indexof(B_b), 1);
+   std::advance(B_b, 2);
+   EXPECT_EQ(CGF.indexof(B_b), 3);
+   std::advance(B_b, 2);
+   EXPECT_EQ(CGF.indexof(B_b), 5);
+   EXPECT_EQ(CGF.indexof(B_e), 2);
+   EXPECT_EQ(CGF.indexof(B_c), 4);
+   EXPECT_EQ(CGF.indexof(B_d), 7);
 }
 
 TEST(CGFilterTest, RecusiveConstruct) {
@@ -177,9 +221,9 @@ TEST(CGFilterTest, ConstructFromRoot) {
 define void @a(){
 entry:
    %0 = bitcast i32 0 to i32 ; -- 0 
-   call void @b()            ; -- 1
+   call void @b()            ; -- 0
    %1 = bitcast i32 1 to i32 ; -- 2
-   call void @c()            ; -- 3
+   call void @c()            ; -- 2
    %2 = bitcast i32 2 to i32 ; -- 4
    ret void
 }
@@ -189,7 +233,7 @@ entry:
 }
 define void @c(){
 entry:
-   ret void   ; -- 2
+   ret void   ; -- 3
 })";
    std::unique_ptr<Module> M = parseAssembly(Assembly);
    Function* F_a = M->getFunction("a");
@@ -198,42 +242,21 @@ entry:
    BasicBlock::iterator B_a_beg = F_a->begin()->begin();
    Instruction* Bitcast_0 = dyn_cast<Instruction>(B_a_beg++);
    EXPECT_NE(Bitcast_0, nullptr);
-   Instruction* Call_b = dyn_cast<Instruction>(B_a_beg++);
    Instruction* Bitcast_1 = dyn_cast<Instruction>(B_a_beg++);
-   Instruction* Call_c = dyn_cast<Instruction>(B_a_beg++);
    Instruction* Bitcast_2 = dyn_cast<Instruction>(B_a_beg++);
    CGFilter CGF(CG_root, Bitcast_0);
    EXPECT_EQ(CGF.order_map.size(), 3);
-   /**callgraph: a   --- 0
-    *            |-b --- 1
-    *            |-c --- 2
-    */
+
    EXPECT_EQ(order_map(CGF, M->getFunction("a")), 0);
    EXPECT_EQ(order_map(CGF, M->getFunction("b")), 1);
    EXPECT_EQ(order_map(CGF, M->getFunction("c")), 3);
 
-   // %0 = bitcast i32 0 to i32
-   EXPECT_EQ(CGF.threshold, 0);
-   EXPECT_TRUE(CGF(&Bitcast_0->getOperandUse(0)));
-   EXPECT_FALSE(CGF(&Bitcast_1->getOperandUse(0)));
-   EXPECT_FALSE(CGF(&Bitcast_2->getOperandUse(0)));
-
-   // call void @b()
-   EXPECT_NE(dyn_cast<Instruction>(Call_b), nullptr);
-   CGF.update(Call_b);
-   EXPECT_EQ(CGF.threshold, 1);
-   EXPECT_TRUE(CGF(&Bitcast_0->getOperandUse(0)));
-   EXPECT_FALSE(CGF(&Bitcast_1->getOperandUse(0)));
-   EXPECT_FALSE(CGF(&Bitcast_2->getOperandUse(0)));
+   EXPECT_EQ(CGF.indexof(Bitcast_0), 0);
+   EXPECT_EQ(CGF.indexof(Bitcast_1), 2);
+   EXPECT_EQ(CGF.indexof(Bitcast_2), 4);
 
    // %1 = bitcast i32 1 to i32
    CGF.update(Bitcast_1);
-   EXPECT_EQ(CGF.threshold, 1);
-   EXPECT_TRUE(CGF(&Bitcast_0->getOperandUse(0)));
-   EXPECT_TRUE(CGF(&Bitcast_1->getOperandUse(0)));
-   EXPECT_FALSE(CGF(&Bitcast_2->getOperandUse(0)));
-
-   CGF.update(Call_c);
    EXPECT_EQ(CGF.threshold, 2);
    EXPECT_TRUE(CGF(&Bitcast_0->getOperandUse(0)));
    EXPECT_TRUE(CGF(&Bitcast_1->getOperandUse(0)));
@@ -244,24 +267,24 @@ TEST(CGFilterTest, TriangleQuery) {
    const char Assembly[] = R"(
 define void @a(){ ;--0
 entry:
-   %0 = bitcast i32 0 to i32
-   call void @b() ;--1
-   %1 = bitcast i32 1 to i32
-   call void @c() ;--3
-   %2 = bitcast i32 2 to i32
+   %0 = bitcast i32 0 to i32  ; -- 0
+   call void @b()             ; -- 0
+   %1 = bitcast i32 1 to i32  ; -- 4
+   call void @c()             ; -- 4
+   %2 = bitcast i32 2 to i32  ; -- 4
    ret void
-}
+}                             ; -- 5
 define void @b(){
 entry:
-   %0 = bitcast i32 3 to i32
-   call void @c() ;--2
-   %1 = bitcast i32 4 to i32
+   %0 = bitcast i32 3 to i32  ; -- 1
+   call void @c()             ; -- 1
+   %1 = bitcast i32 4 to i32  ; -- 3
    ret void
-}
+}                             ; -- 4
 define void @c(){
 entry:
-   %0 = bitcast i32 5 to i32
-   ret void
+   %0 = bitcast i32 5 to i32  ; -- 2
+   ret void                   
 })";
    std::unique_ptr<Module> M = parseAssembly(Assembly);
    Function* F_a = M->getFunction("a");
@@ -279,29 +302,29 @@ entry:
 
    CallGraph CG(*M);
    CGFilter CGF(CG[F_a], Bitcast_3);
-   EXPECT_EQ(CGF.order_map.size(), 3);
+   EXPECT_EQ(CGF.order_map[F_a].last, 5);
+   EXPECT_EQ(CGF.order_map[F_b].last, 4);
+   EXPECT_EQ(CGF.order_map[F_c].last, 3);
 
-   EXPECT_EQ(CGF.threshold, 1);
-   EXPECT_TRUE (CGF(&Bitcast_0->getOperandUse(0)));
-   errs()<<CGF.indexof(Bitcast_1)<<"\n";
-   EXPECT_FALSE(CGF(&Bitcast_1->getOperandUse(0)));
-   EXPECT_FALSE(CGF(&Bitcast_2->getOperandUse(0)));
-   EXPECT_FALSE(CGF(&Bitcast_3->getOperandUse(0)));
-   EXPECT_FALSE(CGF(&Bitcast_4->getOperandUse(0)));
-   EXPECT_FALSE(CGF(&Bitcast_5->getOperandUse(0)));
+   EXPECT_EQ(CGF.indexof(Bitcast_0), 0);
+   EXPECT_EQ(CGF.indexof(Bitcast_1), 4);
+   EXPECT_EQ(CGF.indexof(Bitcast_2), 4);
+   EXPECT_EQ(CGF.indexof(Bitcast_3), 1);
+   EXPECT_EQ(CGF.indexof(Bitcast_4), 3);
+   EXPECT_EQ(CGF.indexof(Bitcast_5), 2);
 
-   CGF.update(Bitcast_4);
-   EXPECT_EQ(CGF.threshold, 2);
    EXPECT_TRUE (CGF(&Bitcast_0->getOperandUse(0)));
    EXPECT_FALSE(CGF(&Bitcast_1->getOperandUse(0)));
    EXPECT_FALSE(CGF(&Bitcast_2->getOperandUse(0)));
    EXPECT_TRUE (CGF(&Bitcast_3->getOperandUse(0)));
    EXPECT_FALSE(CGF(&Bitcast_4->getOperandUse(0)));
+   EXPECT_FALSE(CGF(&Bitcast_5->getOperandUse(0)));
+
+   CGF.update(Bitcast_4);
+   EXPECT_TRUE (CGF(&Bitcast_0->getOperandUse(0)));
+   EXPECT_FALSE(CGF(&Bitcast_1->getOperandUse(0)));
+   EXPECT_FALSE(CGF(&Bitcast_2->getOperandUse(0)));
+   EXPECT_TRUE (CGF(&Bitcast_3->getOperandUse(0)));
+   EXPECT_TRUE (CGF(&Bitcast_4->getOperandUse(0)));
    EXPECT_TRUE (CGF(&Bitcast_5->getOperandUse(0)));
-
-   CGF.update(Bitcast_1);
-   EXPECT_EQ(CGF.threshold, 2);
-
-   CGF.update(Bitcast_5);
-   EXPECT_EQ(CGF.threshold, 2);
 }
