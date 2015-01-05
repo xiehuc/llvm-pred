@@ -20,6 +20,7 @@ set(TIMING "tsc" CACHE STRINGS "Select timing implement")
 set_property(CACHE TIMING PROPERTY STRINGS "tsc" "tscp" "clock_gettime")
 set(TIMING_SOURCE "lmbench" CACHE STRINGS "Select cycle timging source")
 set_property(CACHE TIMING_SOURCE PROPERTY STRINGS "lmbench")
+option(UNIT_TEST "Enable Build Unit Test" Off)
 
 
 find_package(PkgConfig)
@@ -33,3 +34,6 @@ configure_file(config.h.in config.h)
 
 add_subdirectory(timing)
 add_subdirectory(src)
+if(UNIT_TEST)
+add_subdirectory(unit)
+endif()

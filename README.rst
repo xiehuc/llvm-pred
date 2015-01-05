@@ -26,3 +26,14 @@ script
 *  dirdiff.sh  : compare two dir's llvmprof.out file and report whether they are
    same
 
+unit test
+---------
+
+we provide some unit test in ``unit`` dir
+
+.. code:: bash
+
+   $ cmake .. -DUNIT_TEST=On
+   $ make
+   $ cd unit
+   $ ./*test

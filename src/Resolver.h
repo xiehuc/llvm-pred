@@ -325,12 +325,15 @@ struct lle::GEPFilter
 
 struct lle::CGFilter
 {
-   llvm::DenseMap<llvm::Function*, unsigned> order_map;
+   llvm::DenseMap<llvm::Function*, 
+      std::pair<unsigned, llvm::CallGraphNode*> > order_map;
    unsigned threshold;
    llvm::Instruction* threshold_inst;
    llvm::Function* threshold_f;
    llvm::CallGraphNode* root;
    CGFilter(llvm::CallGraphNode* main, llvm::Instruction* threshold=nullptr);
+   unsigned indexof(llvm::Instruction*);
+   bool less(llvm::Function*, llvm::Function*);
    void update(llvm::Instruction* threshold);
    bool operator()(llvm::Use*);
 };

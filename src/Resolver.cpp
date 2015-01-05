@@ -700,40 +700,79 @@ bool GEPFilter::operator()(llvm::Use* U)
 }
 CGFilter::CGFilter(CallGraphNode* root_, Instruction* threshold_inst_): root(root_)
 {
+   using std::placeholders::_1;
    unsigned i=0;
+   std::vector<unsigned> visitStack;
+   visitStack.push_back(-1);
+   std::set<CallGraphNode*> Only;
+   // first we go through tree, only stores which we visited
+   for(auto N = df_begin(root), E = df_end(root); N!=E; ++N){
+      Only.insert(*N);
+   }
    for(auto N = df_begin(root), E = df_end(root); N!=E; ++N){
       Function* F = N->getFunction();
-      if(F && !F->isDeclaration())
-         order_map[F] = i++;
+      if(F && !F->isDeclaration()){
+         if(visitStack.back()==0){
+            // there are how much zero, means we should quit how much level
+            auto ite = std::find_if_not(visitStack.rbegin(), visitStack.rend(), std::bind(std::equal_to<unsigned>(), _1, 0));
+            i+=std::distance(visitStack.rbegin(), ite);
+            while(visitStack.back()==0)
+               visitStack.pop_back();
+         }
+         visitStack.back()--; // upper level left call --
+         // none repeat size, {the children of N} union {Only} == what we would real visit
+         unsigned non_rep_size = std::count_if(N->begin(), N->end(), [&Only](CallGraphNode::iterator::value_type& node){
+               return Only.count(node.second)==1;
+               });
+         visitStack.push_back(non_rep_size); // push back this level's call number
+
+         order_map[F]= {i++, *N}; // a function only store minimal idx
+      }
    }
+   threshold = 0;
+   threshold_inst = NULL;
+   threshold_f = NULL;
    update(threshold_inst_);
+}
+unsigned CGFilter::indexof(llvm::Instruction *I)
+{
+   Function* ParentF = I->getParent()->getParent();
+   CallGraphNode* Parent = order_map[ParentF].second;
+   if(Parent->empty()) return order_map[ParentF].first;
+
+   Function* Fprev = ParentF;
+   for(auto t = Parent->begin(), e = Parent->end(); t!=e; ++t){
+      if(t->first == NULL) continue;
+      Instruction* call_inst = dyn_cast<Instruction>((Value*)t->first);
+      Function* F = t->second->getFunction();
+      if(F==NULL || F->isDeclaration()) continue;
+      // last call_inst < threshold_inst < next call_inst
+      // then threshold should equal to last call_inst's order
+      if(I == call_inst || 
+            std::less<Instruction>()(I, call_inst)){
+         Fprev = F;
+         break;
+      }
+   }
+   return order_map[Fprev].first;
 }
 void CGFilter::update(Instruction* threshold_inst_)
 {
    if(threshold_inst_==NULL) return;
    threshold_inst = threshold_inst_;
    threshold_f = threshold_inst->getParent()->getParent();
-   auto th_f = threshold_f;
-   auto ite = std::find_if(df_begin(root), df_end(root), [th_f](CallGraphNode* N){
-         Function* F = N->getFunction();
-         return F == th_f;
-         });
-   if(ite->empty()){
-      threshold = order_map[th_f];
-      return;
-   }
-   for(auto t = ite->begin(), e = ite->end(); t!=e; ++t){
+   threshold = indexof(threshold_inst);
+}
+bool CGFilter::less(Function* L, Function* R)
+{
+   CallGraphNode* L_N = order_map[L].second;
+   for(auto t = L_N->begin(), e = L_N->end(); t!=e; ++t){
       if(t->first == NULL) continue;
-      Instruction* call_inst = dyn_cast<Instruction>((Value*)t->first);
       Function* F = t->second->getFunction();
-      if(F && !F->isDeclaration() && 
-            (threshold_inst == call_inst || 
-             std::less<Instruction>()(threshold_inst, call_inst))
-        ){
-         threshold = order_map[F];
-         break;
-      }
+      if(F==NULL || F->isDeclaration()) continue;
+      if( F == R) return true;
    }
+   return false;
 }
 bool CGFilter::operator()(Use* U)
 {
@@ -743,11 +782,14 @@ bool CGFilter::operator()(Use* U)
    if(B==NULL) return false;
    Function* F = B->getParent();
    if(F==NULL) return false;
-   unsigned order = order_map[F];
+   unsigned order = order_map[F].first;
    if(order > threshold) return false;
-   else if(F == threshold_f){
-      return !std::less<Instruction>()(threshold_inst, I);
+   order = indexof(I);
+   if(order == threshold){
+      if(threshold_f == F) 
+         return !std::less<Instruction>()(threshold_inst, I);
+      else return less(F, threshold_f);
    }
-   return true;
+   return order < threshold;
 }
 //==============================RESOLVE FILTERS END==============================//
