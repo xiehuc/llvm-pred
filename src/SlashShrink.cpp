@@ -27,7 +27,7 @@
 #include "SlashShrink.h"
 #include "debug.h"
 
-#define REASON(flag, what) DEBUG(if(flag){errs()<<what<<" removed in line: "<<__LINE__<<"\n";})
+#define REASON(flag, what, tag) DEBUG(if(flag){errs()<<what<<" removed in line: "<<__LINE__<<':'<<tag<<"\n";})
 
 using namespace std;
 using namespace lle;
@@ -254,22 +254,23 @@ bool ReduceCode::runOnFunction(Function& F)
          if(CallInst* CI = dyn_cast<CallInst>(Inst)){
             flag = getAttribute(CI);
          }else if(StoreInst* SI = dyn_cast<StoreInst>(Inst)){
-            if(auto Arg = dyn_cast<Argument>(SI->getPointerOperand())){
-               if(noused(SI->getOperandUse(1))){
-                  flag = noused_param(Arg);
-                  REASON(flag, *SI);
-               }
-            }else if(auto GEP = dyn_cast<GetElementPtrInst>(SI->getPointerOperand())){
-               Argument* Arg = NULL;
-               if((Arg = dyn_cast<Argument>(GEP->getPointerOperand())) && noused(SI->getOperandUse(1))){
-                  flag = noused_param(Arg);
-                  // 过于激进的删除
-                  REASON(flag, *SI);
-               }else if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
+            Argument* Arg = dyn_cast<Argument>(SI->getPointerOperand());
+            AllocaInst* Alloca = dyn_cast<AllocaInst>(SI->getPointerOperand());
+            auto GEP = dyn_cast<GetElementPtrInst>(SI->getPointerOperand());
+            if(GEP){
+               Arg = dyn_cast<Argument>(GEP->getPointerOperand());
+               Alloca = dyn_cast<AllocaInst>(GEP->getPointerOperand());
+               // 过于激进的删除
+               if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
                   flag = noused_global(GV, GEP);
-                  REASON(flag, *SI);
+                  REASON(flag, *SI, 0);
                }
-            }else if(isa<AllocaInst>(SI->getPointerOperand())){
+            }
+
+            if(Arg && noused(SI->getOperandUse(1))){
+               flag = noused_param(Arg);
+               REASON(flag, *SI, (GEP==nullptr));
+            }else if(Alloca){
                Loop* L = TC.getLoopFor(SI->getParent());
                if(L){
                   Value* Ind = TC.getInduction(L);
@@ -281,14 +282,14 @@ bool ReduceCode::runOnFunction(Function& F)
                      if(Ind != SI->getPointerOperand()){
                         //XXX not stable, because it doesn't use domtree info
                         flag = noused(SI->getOperandUse(1));
-                        REASON(flag, *SI);
+                        REASON(flag, *SI, (GEP==nullptr));
                      }
                   }// if it is in loop, and we can't get induction, we ignore it
                }else{
                   // a store inst not in loop, and it isn't used after
                   // then it can be removed
                   flag = noused(SI->getOperandUse(1));
-                  REASON(flag, *SI);
+                  REASON(flag, *SI, (GEP==nullptr));
                }
             }
          }
