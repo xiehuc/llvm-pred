@@ -29,11 +29,15 @@ script
 unit test
 ---------
 
-we provide some unit test in ``unit`` dir
+we provide some unit test in ``unit`` dir. to compile them, you need `google
+test`_ and `google mock`_
+
+.. _google test: https://code.google.com/p/googletest
+.. _google mock: https://code.google.com/p/googlemock
 
 .. code:: bash
 
    $ cmake .. -DUNIT_TEST=On
    $ make
    $ cd unit
-   $ ./*test
+   $ ./unit_test

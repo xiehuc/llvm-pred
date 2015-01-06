@@ -11,12 +11,14 @@ link_directories(
 add_definitions(-fno-rtti)
 add_definitions(-Wall --std=c++11)
 
-add_executable(cg_filter_test
+add_executable(unit_test
    CGFilterTest.cpp
+   GEPFilterTest.cpp
    )
-target_link_libraries(cg_filter_test
+target_link_libraries(unit_test
 	${LLVM_DYNAMIC_LIBRARY}
    LLVMPred
    gtest
-   gtest_main
+   gmock
+   gmock_main
 	)

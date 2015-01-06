@@ -710,7 +710,8 @@ CallGraphNode* last_valid_child(CallGraphNode* N, set<Value*>& Only)
    else return found->second;
 }
 
-/** CGFilter : 用于求解在全局范围内, 给出一条指令作为基准点, 查询其它指令是基于CG在其之前还是之后.
+/** CGFilter : 利用CallGraph信息, 求解两条指令的偏序关系, 即给出一条指令作为基
+ * 准点, 查询其它指令是基于CG在其之前还是之后.
  * 例如: 
  *   MAIN
  *     ├─ setup_submatrix_info (c)

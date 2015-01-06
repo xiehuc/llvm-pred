@@ -1,39 +1,14 @@
-#include <llvm/IR/Module.h>
+#include "internal.h"
 #include <llvm/Analysis/CallGraph.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/Support/SourceMgr.h>
-#include <llvm/Support/ErrorHandling.h>
-#include <llvm/AsmParser/Parser.h>
 #include <gtest/gtest.h>
-#include <memory>
 
 #include "Resolver.h"
 #include "util.h"
 using namespace llvm;
 using namespace lle;
-namespace {
-
-std::unique_ptr<Module> parseAssembly(const char *Assembly) {
-  auto M = make_unique<Module>("Module", getGlobalContext());
-
-  SMDiagnostic Error;
-  bool Parsed =
-      ParseAssemblyString(Assembly, M.get(), Error, M->getContext()) == M.get();
-
-  std::string ErrMsg;
-  raw_string_ostream OS(ErrMsg);
-  Error.print("", OS);
-
-  // A failure here means that the test itself is buggy.
-  if (!Parsed)
-    report_fatal_error(OS.str().c_str());
-
-  return M;
-}
 
 inline unsigned order_map(CGFilter& CGF, Function* F) {
    return CGF.order_map[F].first;
-}
 }
 
 // test for std::less<Instruction>
@@ -135,7 +110,7 @@ entry:             ; *       call @b: 1
    call void @d()  ; *       call @c: 4          
    %3 = alloca i32 ; *       6
    ret void        ; *       call @d: 7
-}                  ; *       8 
+}                  ; *       8                 
 define void @b(){  
 entry:             
    %0 = alloca i32
