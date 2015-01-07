@@ -327,6 +327,23 @@ void ReduceCode::walkThroughCg(llvm::CallGraphNode * CGN)
    deleteDeadCaller(F);
 }
 
+void RemoveDeadFunction(Module& M, bool focusDeclation)
+{
+   for(auto F = M.begin(), E = M.end(); F!=E;){
+      bool ignore = false;
+      ignore |= F->getName()=="main";
+      ignore |= focusDeclation ^ F->isDeclaration();
+      if(!ignore){
+         F->removeDeadConstantUsers();
+         if(F->use_empty()){
+            F = M.getFunctionList().erase(F);
+            continue;
+         }
+      }
+      ++F;
+   }
+}
+
 bool ReduceCode::runOnModule(Module &M)
 {
    dse.prepare(this);
@@ -340,6 +357,10 @@ bool ReduceCode::runOnModule(Module &M)
 
    walkThroughCg(root);
 
+   //first remove unused function
+   RemoveDeadFunction(M, 0);
+   //then remove unused declation
+   RemoveDeadFunction(M, 1);
    return true;
 }
 void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
