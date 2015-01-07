@@ -73,6 +73,9 @@ namespace lle
       std::for_each(F, T, [&C](UseT U){C.insert(U);});
    }
 
+   // insert a constant to module, and return a getelementptr constant expr
+   llvm::Constant* insertConstantString(llvm::Module*, const std::string);
+
    //=========================NUMERIC BEGIN=================================//
 
    inline uint64_t extract(llvm::ConstantInt* CI){

@@ -339,6 +339,7 @@ bool ReduceCode::runOnModule(Module &M)
    root = Main?CG[Main]:CG.getExternalCallingNode();
 
    walkThroughCg(root);
+
    return true;
 }
 void ReduceCode::getAnalysisUsage(AnalysisUsage& AU) const
@@ -428,6 +429,20 @@ static constexpr AttributeFlags direct_return(CallInst* CI, AttributeFlags flags
    return flags;
 }
 
+static AttributeFlags mpi_comm_replace(CallInst* CI, const char* Env)
+{
+   Module* M = CI->getParent()->getParent()->getParent();
+   LLVMContext& C = M->getContext();
+   Type* CharPTy = Type::getInt8PtrTy(C);
+   Constant* getenvF = M->getOrInsertFunction("getenv", CharPTy, CharPTy, NULL);
+   Constant* atoiF = M->getOrInsertFunction("atoi", Type::getInt32Ty(C), CharPTy, NULL);
+   Value* RankVariable = CI->getOperand(1);
+   Value* Environment = CallInst::Create(getenvF, {insertConstantString(M, Env)}, "", CI);
+   Value* Rank = CallInst::Create(atoiF, {Environment}, "", CI);
+   new StoreInst(Rank, RankVariable, CI);
+   return AttributeFlags::IsDeletable;
+}
+
 
 ReduceCode::ReduceCode():ModulePass(ID), 
    dse(createDeadStoreEliminationPass()),
@@ -453,6 +468,8 @@ ReduceCode::ReduceCode():ModulePass(ID),
 //              int tag, MPI_Comm comm, MPI_Request *request)
 //Deletable if buf is no used
    Attributes["mpi_irecv_"] = std::bind(mpi_nouse_at, _1, 0);
+   Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, "MPI_RANK");
+   Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, "MPI_SIZE");
    auto DirectDelete = std::bind(direct_return, _1, AttributeFlags::IsDeletable);
    auto DirectDeleteCascade = std::bind(direct_return, _1, 
          AttributeFlags::IsDeletable | AttributeFlags::Cascade);
@@ -460,6 +477,8 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["mpi_wtime_"] = DirectDeleteCascade;
    Attributes["mpi_wait_"] = DirectDelete;
    Attributes["mpi_barrier_"] = DirectDelete;
+   Attributes["mpi_init_"] = DirectDelete;
+   Attributes["mpi_finalize_"] = DirectDelete;
    Attributes["main"] = std::bind(direct_return, _1, AttributeFlags::None);
 }
 

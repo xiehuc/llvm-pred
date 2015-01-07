@@ -1,6 +1,7 @@
 #include "preheader.h"
 
 #include <llvm/ADT/Twine.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/InstrTypes.h>
@@ -353,4 +354,17 @@ bool std::less<Instruction>::operator()(Instruction* L, Instruction* R)
    unsigned L_idx = std::distance(B->begin(), BasicBlock::iterator(L));
    unsigned R_idx = std::distance(B->begin(), BasicBlock::iterator(R));
    return L_idx < R_idx;
+}
+
+Constant* lle::insertConstantString(Module* M, const string Inserted) 
+{
+   LLVMContext& C = M->getContext();
+   Type* ATy = ArrayType::get(Type::getInt8Ty(C), Inserted.size()+1);
+   Constant* initial = ConstantDataArray::getString(C, Inserted);
+   GlobalVariable* str = new GlobalVariable(*M, ATy, true, GlobalValue::PrivateLinkage, initial);
+   str->setUnnamedAddr(true);
+
+   Constant* Constant_0 = ConstantInt::get(Type::getInt32Ty(C), 0);
+   Constant* Indicies[] = {Constant_0, Constant_0};
+   return ConstantExpr::getGetElementPtr(str, Indicies);
 }
