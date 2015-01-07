@@ -27,7 +27,10 @@
 #include "SlashShrink.h"
 #include "debug.h"
 
-#define REASON(flag, what, tag) DEBUG(if(flag){errs()<<what<<" removed in line: "<<__LINE__<<':'<<tag<<"\n";})
+#define REASON(flag, what, tag) DEBUG(if(flag){\
+      errs()<<(what)<<" removed in line: "<<__LINE__<<':'<<tag<<"\n";\
+      errs()<<"which with "<<*(what).getPointerOperand()<<"\n";\
+      })
 
 using namespace std;
 using namespace lle;

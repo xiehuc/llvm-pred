@@ -22,10 +22,10 @@ endif()
 
 add_library(LLVMPred SHARED
 	KnownLibCallInfo.cpp
+   InsertTripCount.cpp
    ServiceLibrary.cpp
    BlockFreqExpr.cpp
 	LoopTripCount.cpp
-   LoopSimplify.cpp
    DSEAdaptive.cpp
    DAEAdaptive.cpp
    LibFReshape.cpp
