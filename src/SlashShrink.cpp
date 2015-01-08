@@ -490,18 +490,27 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["_gfortran_transfer_real_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
+   auto mpi_nouse_recvbuf = std::bind(mpi_nouse_at, _1, 1);
+   auto mpi_nouse_buf = std::bind(mpi_nouse_at, _1, 0);
 //int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
 //               MPI_Op op, int root, MPI_Comm comm)
 //Deletable if recvbuf is no used
-   Attributes["mpi_reduce_"] = std::bind(mpi_nouse_at, _1, 1);
+   Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
+//int MPI_Allreduce(const void *sendbuf, void *recvbuf, int count,
+//                  MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
+   Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
+//Deletable if recvbuf is no used
 //int MPI_Send(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
 //             MPI_Comm comm)
 //Deletable if buf is no used
-   Attributes["mpi_send_"] = std::bind(mpi_nouse_at, _1, 0);
+   Attributes["mpi_send_"] = mpi_nouse_buf;
 //int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
 //              int tag, MPI_Comm comm, MPI_Request *request)
 //Deletable if buf is no used
-   Attributes["mpi_irecv_"] = std::bind(mpi_nouse_at, _1, 0);
+   Attributes["mpi_irecv_"] = mpi_nouse_buf;
+//int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
+//               MPI_Comm comm )
+   Attributes["mpi_bcast_"] = mpi_nouse_buf;
    Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, "MPI_RANK");
    Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, "MPI_SIZE");
    auto DirectDelete = std::bind(direct_return, _1, AttributeFlags::IsDeletable);
@@ -509,10 +518,13 @@ ReduceCode::ReduceCode():ModulePass(ID),
          AttributeFlags::IsDeletable | AttributeFlags::Cascade);
    //always delete mpi_wtime_
    Attributes["mpi_wtime_"] = DirectDeleteCascade;
+   Attributes["mpi_error_string_"] = DirectDelete;
    Attributes["mpi_wait_"] = DirectDelete;
+   Attributes["mpi_waitall_"] = DirectDelete;
    Attributes["mpi_barrier_"] = DirectDelete;
    Attributes["mpi_init_"] = DirectDelete;
    Attributes["mpi_finalize_"] = DirectDelete;
+   Attributes["mpi_abort_"] = DirectDelete;
    Attributes["main"] = std::bind(direct_return, _1, AttributeFlags::None);
 }
 

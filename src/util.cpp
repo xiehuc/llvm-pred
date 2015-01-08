@@ -362,7 +362,6 @@ Constant* lle::insertConstantString(Module* M, const string Inserted)
    Type* ATy = ArrayType::get(Type::getInt8Ty(C), Inserted.size()+1);
    Constant* initial = ConstantDataArray::getString(C, Inserted);
    GlobalVariable* str = new GlobalVariable(*M, ATy, true, GlobalValue::PrivateLinkage, initial);
-   str->setUnnamedAddr(true);
 
    Constant* Constant_0 = ConstantInt::get(Type::getInt32Ty(C), 0);
    Constant* Indicies[] = {Constant_0, Constant_0};
