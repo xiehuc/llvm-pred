@@ -227,17 +227,19 @@ Value* LoopTripCount::insertTripCount(AnalysisedLoop AL, StringRef HeaderName, I
    int OneStep = AL.AdjustStep;
 	//if there are no predecessor, we can insert code into start value basicblock
 	IRBuilder<> Builder(InsertPos);
+   Type* I32Ty = Builder.getInt32Ty();
 	Assert(start->getType()->isIntegerTy() && END->getType()->isIntegerTy() , " why increment is not integer type");
-	if(start->getType() != END->getType()){
-		start = Builder.CreateCast(CastInst::getCastOpcode(start, false,
-					END->getType(), false),start,END->getType());
-	}
-   if(Step->getType() != END->getType()){
-      //Because Step is a Constant, so it casted is constant
-		Step = dyn_cast<ConstantInt>(Builder.CreateCast(CastInst::getCastOpcode(Step, false,
-					END->getType(), false),Step,END->getType()));
-      AssertRuntime(Step, "");
-   }
+
+#define AdjustType(v) ((v->getType() != I32Ty)?\
+         Builder.CreateCast(CastInst::getCastOpcode(v, false, I32Ty, false), v, I32Ty):\
+         v)
+   // adjust type to int 32
+   start = AdjustType(start);
+   END = AdjustType(END);
+   Step = dyn_cast<ConstantInt>(AdjustType(Step));
+   AssertRuntime(Step, "");
+#undef AdjustType
+
 	if(Step->isMinusOne())
 		RES = Builder.CreateSub(start,END);
 	else//Step Couldn't be zero

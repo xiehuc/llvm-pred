@@ -131,23 +131,22 @@ BasicBlock* PerformPred::promote(Instruction* LoopTC)
    DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
    SmallVector<Instruction*, 4> depends;
-   std::deque<Instruction*> targets;
+   SmallVector<Instruction*, 4> targets;
    targets.push_back(LoopTC);
 
-   auto Ite = targets.begin();
-   while(Ite != targets.end()){
-      Instruction* I = *Ite;
+   unsigned Idx = 0;
+   while(Idx != targets.size()){
+      Instruction* I = targets[Idx];
       for(auto O = I->op_begin(), E = I->op_end(); O!=E; ++O){
          if(Instruction* OI = dyn_cast<Instruction>(O->get())){
             if(O->get()->getNumUses() > 1)
                depends.push_back(OI);
             else{
-               OI->removeFromParent();
                targets.push_back(OI);
             }
          }
       }
-      ++Ite;
+      ++Idx;
    }
 
    BasicBlock* InsertInto, *dep;
