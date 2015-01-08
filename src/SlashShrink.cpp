@@ -313,6 +313,7 @@ bool ReduceCode::runOnFunction(Function& F)
 void ReduceCode::walkThroughCg(llvm::CallGraphNode * CGN)
 {
    Function* F = CGN->getFunction();
+   if(ErasedFunc.count(F)) return;// this function has already erased
    if(!F || F->isDeclaration()) return; // this is a external function
 
    runOnFunction(*F);
@@ -326,7 +327,10 @@ void ReduceCode::walkThroughCg(llvm::CallGraphNode * CGN)
    washFunction(F);
 
    // eliminate function's argument
-   dae.runOnFunction(*F);
+   if(dae.runOnFunction(*F)){
+      ErasedFunc.insert(F);
+      return;
+   }
    deleteDeadCaller(F);
 }
 

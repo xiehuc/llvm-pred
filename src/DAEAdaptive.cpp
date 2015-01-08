@@ -23,9 +23,12 @@ void DAE_Adaptive::prepare(Module* M)
       dae->SurveyFunction(*I);
 }
 
-void DAE_Adaptive::runOnFunction(Function &F)
+bool DAE_Adaptive::runOnFunction(Function &F)
 {
    ::DAE* dae = static_cast<::DAE*>(opaque);
-   dae->RemoveDeadStuffFromFunction(&F);
+   //this function has already removed from module
+   if(dae->RemoveDeadStuffFromFunction(&F))
+      return true;
    dae->RemoveDeadArgumentsFromCallers(F);
+   return false;
 }

@@ -45,7 +45,7 @@ struct DAE_Adaptive{
 
    DAE_Adaptive(llvm::ModulePass* DAE);
    void prepare(llvm::Module* M);
-   void runOnFunction(llvm::Function& F);
+   bool runOnFunction(llvm::Function& F);
 };
 
 struct Adaptive{

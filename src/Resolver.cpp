@@ -787,6 +787,8 @@ unsigned CGFilter::indexof(llvm::Instruction *I)
 {
    Function* ParentF = I->getParent()->getParent();
    CallGraphNode* Parent = order_map[ParentF].second;
+   // this function doesn't in call graph
+   if(Parent==NULL) return UINT_MAX;
    if(Parent->empty()) return order_map[ParentF].first;
 
    Function* Fmatch = NULL;

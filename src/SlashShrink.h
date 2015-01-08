@@ -76,7 +76,7 @@ class lle::ReduceCode: public llvm::ModulePass
 {
    typedef std::function<AttributeFlags(llvm::CallInst*)> Attribute_;
    std::unordered_map<std::string, Attribute_> Attributes;
-   AttributeFlags getAttribute(llvm::CallInst*) const;
+   llvm::SmallSet<llvm::Function*, 4> ErasedFunc;
    llvm::CallGraphNode* root;
    llvm::DominatorTree* DomT;
 
@@ -84,6 +84,7 @@ class lle::ReduceCode: public llvm::ModulePass
    DAE_Adaptive dae;
    Adaptive ic, simpCFG;
 
+   AttributeFlags getAttribute(llvm::CallInst*) const;
    void walkThroughCg(llvm::CallGraphNode*);
    void washFunction(llvm::Function* F);
    void deleteDeadCaller(llvm::Function* F);
