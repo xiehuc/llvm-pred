@@ -417,7 +417,13 @@ static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C)
    RE.addRule(RE.ibase_rule);
    InitRule ir(RE.iuse_rule);
    RE.addRule(std::ref(ir));
-   Value* Visit = RE.find_visit(U, C);
+   Value* Pointed = U.get();
+   Use* ToSearch = &U;
+   if(auto GEP = dyn_cast<GetElementPtrInst>(Pointed)){
+      RE.addFilter(GEPFilter(GEP));
+      ToSearch = &GEP->getOperandUse(0);
+   }
+   Value* Visit = RE.find_visit(*ToSearch, C);
    ir.clear();
 #ifndef NDEBUG
    if(Dbg_EnablePrintGraph){
