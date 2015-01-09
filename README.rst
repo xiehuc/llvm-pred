@@ -41,3 +41,14 @@ test`_ and `google mock`_
    $ make
    $ cd unit
    $ ./unit_test
+
+documents
+----------
+
+we provide documents on wiki pages, you can use git submodule to sync them into
+doc folder.
+
+.. code:: bash
+
+   $ git submodule init
+   $ git submodule update

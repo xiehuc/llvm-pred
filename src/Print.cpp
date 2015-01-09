@@ -95,6 +95,7 @@ bool PrintLibCall::runOnFunction(Function &F)
 class lle::PrintCgTree: public ModulePass
 {
    static void print_cg(CallGraphNode* node);
+   static Function* getFunction(Value* Call);
    public:
    static char ID;
    PrintCgTree():ModulePass(ID) {}
@@ -103,6 +104,13 @@ class lle::PrintCgTree: public ModulePass
 char PrintCgTree::ID = 0;
 static RegisterPass<PrintCgTree> Y("Cg", "print Callgraph Tree", true, true);
 
+Function* PrintCgTree::getFunction(Value *Call)
+{
+   if(Call==NULL) return NULL;
+   CallInst* CI = dyn_cast<CallInst>(Call);
+   if(CI==NULL) return NULL;
+   return dyn_cast<Function>(castoff(CI->getCalledValue()));
+}
 void PrintCgTree::print_cg(CallGraphNode *node)
 {
    static vector<bool> level;
@@ -113,13 +121,15 @@ void PrintCgTree::print_cg(CallGraphNode *node)
    auto lastC = node->begin();
    level.push_back(1);
    for(auto I = node->begin(), E = node->end(); I!=E; ++I){
-      Function* F = I->second->getFunction();
-      if(!F || F->empty()) continue; // this is a external function
+      Function* F = getFunction(I->first);
+      if(F==NULL || (!F->getName().startswith("mpi_") && F->isDeclaration())) 
+         continue; // this is a external function
       lastC = I;
    }
    for(auto I = node->begin(), E = node->end(); I!=E; ++I){
-      Function* F = I->second->getFunction();
-      if(!F || F->empty()) continue; // this is a external function
+      Function* F = getFunction(I->first);
+      if(F==NULL || (!F->getName().startswith("mpi_") && F->isDeclaration())) 
+         continue; // this is a external function
       bool is_last = I == lastC;
 
       for(auto b = level.begin();b!=level.end()-1;++b) errs()<<(*b?ancient:empty);
