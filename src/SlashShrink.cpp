@@ -271,7 +271,7 @@ bool ReduceCode::runOnFunction(Function& F)
    BasicBlock* entry = &F.getEntryBlock();
    std::vector<BasicBlock*> blocks(po_begin(entry), po_end(entry));
    bool MadeChange, Ret = false;
-   errs()<<F.getName()<<"\n";
+   DEBUG(errs()<<F.getName()<<"\n");
    // use deep first visit order , then reverse it. can get what we need order.
    for(auto BB = blocks.begin(), BBE = blocks.end(); BB != BBE;){
       dse.runOnBasicBlock(**BB);
@@ -353,11 +353,6 @@ void ReduceCode::walkThroughCg(llvm::CallGraphNode * CGN)
    runOnFunction(*F);
    washFunction(F);
 
-   // eliminate function's argument
-   if(dae.runOnFunction(*F)){
-      ErasedFunc.insert(F);
-      return;
-   }
    deleteDeadCaller(F);
 }
 
@@ -381,7 +376,6 @@ void RemoveDeadFunction(Module& M, bool focusDeclation)
 bool ReduceCode::runOnModule(Module &M)
 {
    dse.prepare(this);
-   dae.prepare(&M);
    ic.prepare(this);
    simpCFG.prepare(this);
 
@@ -514,7 +508,6 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
 
 ReduceCode::ReduceCode():ModulePass(ID), 
    dse(createDeadStoreEliminationPass()),
-   dae(createDeadArgEliminationPass()),
    ic(createInstructionCombiningPass()),
    simpCFG(createCFGSimplificationPass())
 {
@@ -535,7 +528,8 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
 //int MPI_Allreduce(const void *sendbuf, void *recvbuf, int count,
 //                  MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
-   Attributes["mpi_allreduce_"] = Force? mpi_allreduce_force : mpi_nouse_recvbuf;
+   if(Force) Attributes["mpi_allreduce_"] = mpi_allreduce_force;
+   else Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
 //Deletable if recvbuf is no used
 //int MPI_Send(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
 //             MPI_Comm comm)
