@@ -226,6 +226,30 @@ static AttributeFlags noused_param(Argument* Arg)
          });
    return all_deletable ? IsDeletable : AttributeFlags::None;
 }
+
+static AttributeFlags noused(llvm::Value* V)
+{
+   ResolveEngine RE;
+   RE.addRule(RE.ibase_rule);
+   Value* Visit = RE.find_visit(V);
+   if(Visit == NULL) return IsDeletable;
+   else return AttributeFlags::None;
+}
+static AttributeFlags noused_ret_rep(ReturnInst* RI)
+{
+   Value* Ret = RI->getReturnValue();
+   if(Ret == NULL || isa<UndefValue>(Ret)) return AttributeFlags::None;
+
+   Function* F = RI->getParent()->getParent();
+   if(F->getName() == "main") return AttributeFlags::None;
+
+   bool all_deletable = std::all_of(F->user_begin(), F->user_end(), [](User* C){
+         return noused(C);
+         });
+   if(all_deletable)
+      ReturnInst::Create(F->getContext(), UndefValue::get(Ret->getType()), RI->getParent());
+   return all_deletable ? IsDeletable : AttributeFlags::None;
+}
 AttributeFlags ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP)
 {
    ResolveEngine RE;
@@ -256,6 +280,8 @@ bool ReduceCode::runOnFunction(Function& F)
          AttributeFlags flag = AttributeFlags::None;
          if(CallInst* CI = dyn_cast<CallInst>(Inst)){
             flag = getAttribute(CI);
+         }else if(ReturnInst* RI = dyn_cast<ReturnInst>(Inst)){
+            flag = noused_ret_rep(RI);
          }else if(StoreInst* SI = dyn_cast<StoreInst>(Inst)){
             Argument* Arg = dyn_cast<Argument>(SI->getPointerOperand());
             AllocaInst* Alloca = dyn_cast<AllocaInst>(SI->getPointerOperand());
