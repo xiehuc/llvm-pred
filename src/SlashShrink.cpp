@@ -200,6 +200,7 @@ static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C = ResolveEn
 #ifndef NDEBUG
 static bool Dbg_EnablePrintGraph = false;
 #endif
+cl::opt<bool> Force("Force", cl::desc("Enable Force Reduce Mode"));
 
 
 AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
@@ -503,6 +504,13 @@ static AttributeFlags mpi_comm_replace(CallInst* CI, const char* Env)
    return AttributeFlags::IsDeletable;
 }
 
+static AttributeFlags mpi_allreduce_force(CallInst* CI)
+{
+   Value* Send = CI->getArgOperand(0);
+   Value* Recv = CI->getArgOperand(1);
+   Recv->replaceAllUsesWith(Send);
+   return AttributeFlags::IsDeletable;
+}
 
 ReduceCode::ReduceCode():ModulePass(ID), 
    dse(createDeadStoreEliminationPass()),
@@ -518,13 +526,16 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
    auto mpi_nouse_recvbuf = std::bind(mpi_nouse_at, _1, 1);
    auto mpi_nouse_buf = std::bind(mpi_nouse_at, _1, 0);
+   auto DirectDelete = std::bind(direct_return, _1, AttributeFlags::IsDeletable);
+   auto DirectDeleteCascade = std::bind(direct_return, _1, 
+         AttributeFlags::IsDeletable | AttributeFlags::Cascade);
 //int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
 //               MPI_Op op, int root, MPI_Comm comm)
 //Deletable if recvbuf is no used
    Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
 //int MPI_Allreduce(const void *sendbuf, void *recvbuf, int count,
 //                  MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
-   Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
+   Attributes["mpi_allreduce_"] = Force? mpi_allreduce_force : mpi_nouse_recvbuf;
 //Deletable if recvbuf is no used
 //int MPI_Send(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
 //             MPI_Comm comm)
@@ -540,12 +551,10 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["mpi_irecv_"] = mpi_nouse_buf;
 //int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
 //               MPI_Comm comm )
-   Attributes["mpi_bcast_"] = mpi_nouse_buf;
+   // 由于模拟的时候只有一个进程, 所以不需要扩散变量.
+   Attributes["mpi_bcast_"] = /*mpi_nouse_buf;*/DirectDelete;
    Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, "MPI_RANK");
    Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, "MPI_SIZE");
-   auto DirectDelete = std::bind(direct_return, _1, AttributeFlags::IsDeletable);
-   auto DirectDeleteCascade = std::bind(direct_return, _1, 
-         AttributeFlags::IsDeletable | AttributeFlags::Cascade);
    //always delete mpi_wtime_
    Attributes["mpi_wtime_"] = DirectDeleteCascade;
    Attributes["mpi_error_string_"] = DirectDelete;
