@@ -528,11 +528,15 @@ ReduceCode::ReduceCode():ModulePass(ID),
 //Deletable if recvbuf is no used
 //int MPI_Send(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
 //             MPI_Comm comm)
-//Deletable if buf is no used
+//int MPI_Recv(void *buf, int count, MPI_Datatype datatype, int source, int tag,
+//             MPI_Comm comm, MPI_Status *status)
    Attributes["mpi_send_"] = mpi_nouse_buf;
+   Attributes["mpi_recv_"] = mpi_nouse_buf;
 //int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
 //              int tag, MPI_Comm comm, MPI_Request *request)
-//Deletable if buf is no used
+//int MPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
+//              MPI_Comm comm, MPI_Request *request)
+   Attributes["mpi_isend_"] = mpi_nouse_buf;
    Attributes["mpi_irecv_"] = mpi_nouse_buf;
 //int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
 //               MPI_Comm comm )
