@@ -507,7 +507,7 @@ struct find_visit
             ret=Ur;
          else if(CallInst* CI = dyn_cast<CallInst>(Ur)){//call inst also is a kind of visit
             if(Function* F = dyn_cast<Function>(castoff(CI->getCalledValue())))
-               if(!F->getName().startswith("llvm."))//llvm call should ignore
+               if(!F->getName().startswith("llvm.lifetime"))//some llvm call should ignore
                   ret=CI;
          }
       }
