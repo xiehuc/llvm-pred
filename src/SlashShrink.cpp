@@ -513,7 +513,7 @@ static AttributeFlags mpi_comm_replace(CallInst* CI, SmallPtrSetImpl<StoreInst*>
    Type* CharPTy = Type::getInt8PtrTy(C);
    Constant* getenvF = M->getOrInsertFunction("getenv", CharPTy, CharPTy, NULL);
    Constant* atoiF = M->getOrInsertFunction("atoi", Type::getInt32Ty(C), CharPTy, NULL);
-   Value* RankVariable = CI->getOperand(1);
+   Value* RankVariable = CI->getArgOperand(1);
    Value* Environment = CallInst::Create(getenvF, {insertConstantString(M, Env)}, "", CI);
    Value* Rank = CallInst::Create(atoiF, {Environment}, "", CI);
    Protected->insert(new StoreInst(Rank, RankVariable, CI)); // 因为它是最后加入的, 所以排在use列表的最后.
@@ -522,8 +522,30 @@ static AttributeFlags mpi_comm_replace(CallInst* CI, SmallPtrSetImpl<StoreInst*>
 
 static AttributeFlags mpi_allreduce_force(CallInst* CI)
 {
+   //FIXME should replaced with memcpy
    Value* Send = CI->getArgOperand(0);
    Value* Recv = CI->getArgOperand(1);
+
+   // if there are free of Send and free of Recv, we replace Recv Use with
+   // send, then we free Send twice. this is bad, 
+   // we can remove Send's Use for now
+   ResolveEngine RE;
+   RE.addRule(RE.ibase_rule);
+   RE.addRule(RE.iuse_rule);
+   std::vector<Instruction*> MarkToDel;
+   RE.resolve(CI->getArgOperandUse(0), [&MarkToDel](Use* U){
+         CallInst* Call = dyn_cast<CallInst>(U->getUser());
+         Function* F = NULL;
+         if(Call && (F = Call->getCalledFunction())){
+            if(F->getName()=="free"){
+               Call->setArgOperand(0, UndefValue::get(Call->getArgOperand(0)->getType()));
+               Call->removeFromParent();
+            }
+            MarkToDel.push_back(Call);
+         }
+         return false;
+         });
+
    Recv->replaceAllUsesWith(Send);
    return AttributeFlags::IsDeletable;
 }
