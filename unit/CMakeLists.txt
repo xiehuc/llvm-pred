@@ -14,6 +14,7 @@ add_definitions(-Wall --std=c++11)
 add_executable(unit_test
    CGFilterTest.cpp
    GEPFilterTest.cpp
+   NousedTest.cpp
    )
 target_link_libraries(unit_test
 	${LLVM_DYNAMIC_LIBRARY}
