@@ -8,6 +8,7 @@
 
 #include <unordered_map>
 
+#include "LoopTripCount.h"
 #include "Resolver.h"
 #include "Adaptive.h"
 
@@ -76,14 +77,16 @@ class lle::ReduceCode: public llvm::ModulePass
 {
    typedef std::function<AttributeFlags(llvm::CallInst*)> Attribute_;
    std::unordered_map<std::string, Attribute_> Attributes;
-   llvm::SmallSet<llvm::Function*, 4> ErasedFunc;
+   llvm::SmallSet<llvm::StoreInst*, 4> Protected;
    llvm::CallGraphNode* root;
    llvm::DominatorTree* DomT;
+   LoopTripCount* LTC;
 
    DSE_Adaptive dse;
    Adaptive ic, simpCFG;
 
-   AttributeFlags getAttribute(llvm::CallInst*) const;
+   AttributeFlags getAttribute(llvm::CallInst*);
+   AttributeFlags getAttribute(llvm::StoreInst*);
    void walkThroughCg(llvm::CallGraphNode*);
    void washFunction(llvm::Function* F);
    void deleteDeadCaller(llvm::Function* F);

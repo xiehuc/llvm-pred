@@ -213,7 +213,7 @@ static void Dbg_PrintGraph_(DataDepGraph&& ddg, User* Ur)
 #endif
 
 
-AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
+AttributeFlags ReduceCode::getAttribute(CallInst * CI)
 {
    StringRef Name = castoff(CI->getCalledValue())->getName();
    auto Found = Attributes.find(Name);
@@ -273,9 +273,60 @@ AttributeFlags ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP)
    else return AttributeFlags::None;
 }
 
+AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
+{
+   AttributeFlags flag = AttributeFlags::None;
+   Argument* Arg = dyn_cast<Argument>(SI->getPointerOperand());
+   AllocaInst* Alloca = dyn_cast<AllocaInst>(SI->getPointerOperand());
+   auto GEP = dyn_cast<GetElementPtrInst>(SI->getPointerOperand());
+
+   if(Protected.count(SI)) return AttributeFlags::None;
+
+   if(GEP){
+      Arg = dyn_cast<Argument>(GEP->getPointerOperand());
+      Alloca = dyn_cast<AllocaInst>(GEP->getPointerOperand());
+      // 过于激进的删除
+      if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
+         flag = noused_global(GV, GEP);
+         REASON(flag, *SI, 0);
+         return flag;
+      }
+   }
+
+   if(Arg){
+      flag = noused(SI->getOperandUse(1));
+      flag = AttributeFlags(flag & noused_param(Arg));
+      REASON(flag, *SI, (GEP==nullptr));
+   }else if(Alloca){
+      Loop* L = LTC->getLoopFor(SI->getParent());
+      if(L){
+         Value* Ind = LTC->getInduction(L);
+         if(Ind != NULL){
+            // a store inst in loop, and it isn't used after loop
+            // and it isn't induction, then it can be removed
+            if(LoadInst* LI = dyn_cast<LoadInst>(Ind))
+               Ind = LI->getOperand(0);
+            if(Ind != SI->getPointerOperand()){
+               //XXX not stable, because it doesn't use domtree info
+               flag = noused(SI->getOperandUse(1));
+               REASON(flag, *SI, (GEP==nullptr));
+            }
+         }// if it is in loop, and we can't get induction, we ignore it
+      }else{
+         // a store inst not in loop, and it isn't used after
+         // then it can be removed
+         Dbg_EnablePrintGraph = true;
+         flag = noused(SI->getOperandUse(1));
+         Dbg_EnablePrintGraph = false;
+         REASON(flag, *SI, (GEP==nullptr));
+      }
+   }
+   return flag;
+}
+
 bool ReduceCode::runOnFunction(Function& F)
 {
-   LoopTripCount& TC = getAnalysis<LoopTripCount>(F);
+   LTC = &getAnalysis<LoopTripCount>(F);
    DomT = &getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
    dse.prepare(&F, this);
    BasicBlock* entry = &F.getEntryBlock();
@@ -294,47 +345,7 @@ bool ReduceCode::runOnFunction(Function& F)
          }else if(ReturnInst* RI = dyn_cast<ReturnInst>(Inst)){
             flag = noused_ret_rep(RI);
          }else if(StoreInst* SI = dyn_cast<StoreInst>(Inst)){
-            Argument* Arg = dyn_cast<Argument>(SI->getPointerOperand());
-            AllocaInst* Alloca = dyn_cast<AllocaInst>(SI->getPointerOperand());
-            auto GEP = dyn_cast<GetElementPtrInst>(SI->getPointerOperand());
-            if(GEP){
-               Arg = dyn_cast<Argument>(GEP->getPointerOperand());
-               Alloca = dyn_cast<AllocaInst>(GEP->getPointerOperand());
-               // 过于激进的删除
-               if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
-                  flag = noused_global(GV, GEP);
-                  REASON(flag, *SI, 0);
-               }
-            }
-
-            if(Arg){
-               flag = noused(SI->getOperandUse(1));
-               flag = AttributeFlags(flag & noused_param(Arg));
-               REASON(flag, *SI, (GEP==nullptr));
-            }else if(Alloca){
-               Loop* L = TC.getLoopFor(SI->getParent());
-               if(L){
-                  Value* Ind = TC.getInduction(L);
-                  if(Ind != NULL){
-                     // a store inst in loop, and it isn't used after loop
-                     // and it isn't induction, then it can be removed
-                     if(LoadInst* LI = dyn_cast<LoadInst>(Ind))
-                        Ind = LI->getOperand(0);
-                     if(Ind != SI->getPointerOperand()){
-                        //XXX not stable, because it doesn't use domtree info
-                        flag = noused(SI->getOperandUse(1));
-                        REASON(flag, *SI, (GEP==nullptr));
-                     }
-                  }// if it is in loop, and we can't get induction, we ignore it
-               }else{
-                  // a store inst not in loop, and it isn't used after
-                  // then it can be removed
-                  Dbg_EnablePrintGraph = true;
-                  flag = noused(SI->getOperandUse(1));
-                  Dbg_EnablePrintGraph = false;
-                  REASON(flag, *SI, (GEP==nullptr));
-               }
-            }
+            flag = getAttribute(SI);
          }
          if(flag & IsDeletable){
             (flag & Cascade)? dse.DeleteCascadeInstruction(Inst): 
@@ -353,7 +364,6 @@ bool ReduceCode::runOnFunction(Function& F)
 void ReduceCode::walkThroughCg(llvm::CallGraphNode * CGN)
 {
    Function* F = CGN->getFunction();
-   if(ErasedFunc.count(F)) return;// this function has already erased
    if(!F || F->isDeclaration()) return; // this is a external function
 
    runOnFunction(*F);
@@ -369,7 +379,7 @@ void ReduceCode::walkThroughCg(llvm::CallGraphNode * CGN)
    deleteDeadCaller(F);
 }
 
-void RemoveDeadFunction(Module& M, bool focusDeclation)
+static void RemoveDeadFunction(Module& M, bool focusDeclation)
 {
    for(auto F = M.begin(), E = M.end(); F!=E;){
       bool ignore = false;
@@ -496,7 +506,7 @@ static constexpr AttributeFlags direct_return(CallInst* CI, AttributeFlags flags
    return flags;
 }
 
-static AttributeFlags mpi_comm_replace(CallInst* CI, const char* Env)
+static AttributeFlags mpi_comm_replace(CallInst* CI, SmallPtrSetImpl<StoreInst*>* Protected, const char* Env)
 {
    Module* M = CI->getParent()->getParent()->getParent();
    LLVMContext& C = M->getContext();
@@ -506,7 +516,7 @@ static AttributeFlags mpi_comm_replace(CallInst* CI, const char* Env)
    Value* RankVariable = CI->getOperand(1);
    Value* Environment = CallInst::Create(getenvF, {insertConstantString(M, Env)}, "", CI);
    Value* Rank = CallInst::Create(atoiF, {Environment}, "", CI);
-   new StoreInst(Rank, RankVariable, CI);
+   Protected->insert(new StoreInst(Rank, RankVariable, CI)); // 因为它是最后加入的, 所以排在use列表的最后.
    return AttributeFlags::IsDeletable;
 }
 
@@ -559,8 +569,8 @@ ReduceCode::ReduceCode():ModulePass(ID),
 //               MPI_Comm comm )
    // 由于模拟的时候只有一个进程, 所以不需要扩散变量.
    Attributes["mpi_bcast_"] = /*mpi_nouse_buf;*/DirectDelete;
-   Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, "MPI_RANK");
-   Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, "MPI_SIZE");
+   Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, &Protected, "MPI_RANK");
+   Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, &Protected, "MPI_SIZE");
    //always delete mpi_wtime_
    Attributes["mpi_wtime_"] = DirectDeleteCascade;
    Attributes["mpi_error_string_"] = DirectDelete;
