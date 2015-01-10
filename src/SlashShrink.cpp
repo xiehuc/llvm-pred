@@ -197,10 +197,20 @@ char ReduceCode::ID = 0;
 static RegisterPass<ReduceCode> Y("Reduce", "Slash and Shrink Code to make a minicore program");
 static AttributeFlags noused_exclude(llvm::Use& U, llvm::SmallPtrSetImpl<User*>& exclude);
 static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C = ResolveEngine::always_false);
+cl::opt<bool> Force("Force", cl::desc("Enable Force Reduce Mode"));
 #ifndef NDEBUG
 static bool Dbg_EnablePrintGraph = false;
+static void Dbg_PrintGraph_(DataDepGraph&& ddg, User* Ur)
+{
+   Instruction* I = dyn_cast<Instruction>(Ur);
+   BasicBlock* Block = I?I->getParent():NULL;
+   StringRef FName = Block?Block->getParent()->getName():"test";
+   WriteGraph(&ddg, FName);
+}
+#define Dbg_PrintGraph(ddg, Ur) if(Dbg_EnablePrintGraph) Dbg_PrintGraph_(ddg, Ur)
+#else
+#define Dbg_PrintGraph(ddg, Ur)
 #endif
-cl::opt<bool> Force("Force", cl::desc("Enable Force Reduce Mode"));
 
 
 AttributeFlags ReduceCode::getAttribute(CallInst * CI) const
@@ -319,7 +329,9 @@ bool ReduceCode::runOnFunction(Function& F)
                }else{
                   // a store inst not in loop, and it isn't used after
                   // then it can be removed
+                  Dbg_EnablePrintGraph = true;
                   flag = noused(SI->getOperandUse(1));
+                  Dbg_EnablePrintGraph = false;
                   REASON(flag, *SI, (GEP==nullptr));
                }
             }
@@ -453,7 +465,13 @@ static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C)
       ToSearch = &GEP->getOperandUse(0);
       ir.clear();
       if(RE.find_visit(*ToSearch, C)) return AttributeFlags::None;
+      else {
+         ir.clear();
+         Dbg_PrintGraph(RE.resolve(*ToSearch, C), U.getUser());
+      }
    }
+   ir.clear();
+   Dbg_PrintGraph(RE.resolve(U, C), U.getUser());
    return AttributeFlags::IsDeletable;
 }
 
