@@ -297,8 +297,9 @@ bool ReduceCode::runOnFunction(Function& F)
                }
             }
 
-            if(Arg && noused(SI->getOperandUse(1))){
-               flag = noused_param(Arg);
+            if(Arg){
+               flag = noused(SI->getOperandUse(1));
+               flag = AttributeFlags(flag & noused_param(Arg));
                REASON(flag, *SI, (GEP==nullptr));
             }else if(Alloca){
                Loop* L = TC.getLoopFor(SI->getParent());
@@ -444,23 +445,16 @@ static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C)
    RE.addRule(std::ref(ir));
    Value* Pointed = U.get();
    Use* ToSearch = &U;
+   if(RE.find_visit(*ToSearch, C)) return AttributeFlags::None;
    if(auto GEP = dyn_cast<GetElementPtrInst>(Pointed)){
+      // if we didn't find direct visit on Pointed, we tring find visit on
+      // GEP->getPointerOperand()
       RE.addFilter(GEPFilter(GEP));
       ToSearch = &GEP->getOperandUse(0);
+      ir.clear();
+      if(RE.find_visit(*ToSearch, C)) return AttributeFlags::None;
    }
-   Value* Visit = RE.find_visit(*ToSearch, C);
-   ir.clear();
-#ifndef NDEBUG
-   if(Dbg_EnablePrintGraph){
-      auto ddg = RE.resolve(U, C);
-      Instruction* I = dyn_cast<Instruction>(U.getUser());
-      BasicBlock* Block = I?I->getParent():NULL;
-      StringRef FName = Block?Block->getParent()->getName():"test";
-      WriteGraph(&ddg, FName);
-   }
-#endif
-   if(Visit == NULL) return IsDeletable;
-   else return AttributeFlags::None;
+   return AttributeFlags::IsDeletable;
 }
 
 static AttributeFlags mpi_nouse_at(llvm::CallInst* CI, unsigned Which)

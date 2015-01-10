@@ -81,7 +81,6 @@ class lle::ReduceCode: public llvm::ModulePass
    llvm::DominatorTree* DomT;
 
    DSE_Adaptive dse;
-   DAE_Adaptive dae;
    Adaptive ic, simpCFG;
 
    AttributeFlags getAttribute(llvm::CallInst*) const;
