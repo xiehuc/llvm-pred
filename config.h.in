@@ -6,8 +6,6 @@
 #ifndef NO_DEBUG
 #cmakedefine NO_DEBUG
 #endif
-//#define PRED_TYPE_@PRED_TYPE@
-#define PRED_TYPE_block_freq
 #define TIMING_@TIMING@
 #define TIMING_SOURCE_@TIMING_SOURCE@
 
