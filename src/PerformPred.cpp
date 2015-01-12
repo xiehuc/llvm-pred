@@ -47,6 +47,7 @@ class lle::PerformPred : public llvm::FunctionPass
       }data;
    };
    std::vector<Classify> pred_cls; // 对每个block进行分类, 并且储存关键的属性.
+   llvm::DenseMap<llvm::Instruction*, llvm::Value*> Promoted;
    llvm::BranchProbabilityInfo* BPI;
 
    public:
@@ -90,6 +91,33 @@ static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbabilit
    }
    if(n!=1) Ret = Builder.CreateMul(Ret, ConstantInt::get(I32Ty, n));
    return Builder.CreateSDiv(Ret, ConstantInt::get(I32Ty, d));
+}
+
+Value* selectBranch(IRBuilder<>& Builder, Value* True, BasicBlock* From, BasicBlock* To)
+{
+   if(From == NULL || To == NULL || From == To) return True;
+   if(From == &From->getParent()->getEntryBlock()) return True;
+   Value* False = ConstantInt::get(True->getType(), 0);
+   auto Term = From->getTerminator();
+   unsigned N = Term->getNumSuccessors();
+   if(N < 2) return True;
+   auto Path = getPath(From, To);
+   int succ = -1;
+   for(unsigned i = 0; i<N; ++i){
+      BasicBlock* Succ = Term->getSuccessor(i);
+      if(find(Path.begin(), Path.end(), Succ) != Path.end()){
+         succ = i;
+         break;
+      }
+   }
+   errs()<<From->getName()<<":"<<succ<<"\n";
+   if(succ!=-1){
+      if(BranchInst* Br = dyn_cast<BranchInst>(Term)){
+         if(succ == 0) return Builder.CreateSelect(Br->getCondition(), True, False);
+         else return Builder.CreateSelect(Br->getCondition(), False, True);
+      }
+   }
+   return True;
 }
 
 void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
@@ -156,10 +184,12 @@ BasicBlock* PerformPred::promote(Instruction* LoopTC)
 
 BranchProbability PerformPred::getPathProbability(BasicBlock *From, BasicBlock *To)
 {
-   size_t n=1,d=1;
-   if(From == To) return BranchProbability(n,d);
+   BranchProbability empty(1,1);
+   if(From == NULL || To == NULL || From == To) return empty;
+   if(From == &From->getParent()->getEntryBlock()) return empty;
    auto Path = getPath(From, To);
-   if(Path.size()<2) return BranchProbability(n,d);
+   if(Path.size()<2) return empty;
+   size_t n=1,d=1;
    for(unsigned i = 0, e = Path.size()-1; i<e; ++i){
       BranchProbability p2 = BPI->getEdgeProbability(Path[i], Path[i+1]);
       n *= p2.getNumerator();
@@ -171,6 +201,7 @@ BranchProbability PerformPred::getPathProbability(BasicBlock *From, BasicBlock *
 bool PerformPred::runOnFunction(Function &F)
 {
    if( F.isDeclaration() ) return false;
+   Promoted.clear();
    BPI = &getAnalysis<BranchProbabilityInfo>();
    BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
    DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
@@ -202,26 +233,33 @@ bool PerformPred::runOnFunction(Function &F)
    for(auto& BB : F){
       auto FreqExpr = BFE.getBlockFreqExpr(&BB);
       Value* LoopTC = FreqExpr.second;
-      BranchProbability PathProb(1, 1);
       if(LoopTC == NULL) continue;
       // process all loops
       if(Instruction* LoopTCI = dyn_cast<Instruction>(FreqExpr.second)){
-         BasicBlock* Ori = LoopTCI->getParent();
-         AssertRuntime(Ori->getParent()==&F, "");
-         BasicBlock* Promoted = promote(LoopTCI);
-         if(Promoted != &F.getEntryBlock()){
-            PathProb = getPathProbability(Promoted, Ori);
-            errs()<<PathProb<<"\n";
+         auto found = Promoted.find(LoopTCI);
+         if(found == Promoted.end()){
+            BasicBlock* Ori = LoopTCI->getParent();
+            AssertRuntime(Ori->getParent()==&F, "");
+            BasicBlock* Pro = promote(LoopTCI);
+            // promote insert point
+            Builder.SetInsertPoint(Pro->getTerminator());
+#if defined(PROMOTE_FREQ_path_prob)
+            LoopTC = CreateMul(Builder, LoopTC, getPathProbability(Pro, Ori));
+#endif
+#if defined(PROMOTE_FREQ_select)
+            LoopTC = selectBranch(Builder, LoopTC, Pro, Ori);
+#endif
+            Promoted[LoopTCI] = LoopTC;
+         }else{
+            Builder.SetInsertPoint(LoopTCI->getParent()->getTerminator());
+            LoopTC = found->second;
          }
-         // promote insert point
-         Builder.SetInsertPoint(Promoted->getTerminator());
       }else
          Builder.SetInsertPoint(F.getEntryBlock().getTerminator());
       SumRhs = count(BB, Builder);
       if(LoopTC->getType()!= I32Ty)
          LoopTC = Builder.CreateCast(Instruction::SExt, LoopTC, I32Ty);
       Value* freq = CreateMul(Builder, LoopTC, FreqExpr.first); // \psi * \frac {bfreq_LLVM(N)} {bfreq_LLVM(H)}
-      freq = CreateMul(Builder, freq, PathProb);
       SumRhs = Builder.CreateMul(freq, SumRhs); // cost = freq * count
       SumRhs->setName(BB.getName()+".bfreq");
       if(ConstantInt* CI = dyn_cast<ConstantInt>(SumRhs)){
@@ -231,10 +269,8 @@ bool PerformPred::runOnFunction(Function &F)
 
       force_insert(SumRhs, Builder, BB.getName()+".bfreq");
       PredBlockProfiler::increaseBlockCounter(&BB, SumRhs, Builder.GetInsertPoint());
-      MarkPreserve::mark(dyn_cast<Instruction>(SumRhs));
    }
    PrintSum = SumLhs;
-   //ValueProfiler::insertValueTrap(PrintSum, Builder.GetInsertPoint());
 
    return true;
 }
