@@ -1,5 +1,6 @@
 #include "preheader.h"
 
+#include <llvm/IR/CFG.h>
 #include <llvm/ADT/Twine.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Function.h>
@@ -8,6 +9,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/IR/GlobalVariable.h>
+#include <llvm/ADT/DepthFirstIterator.h>
 
 #include <set>
 #include <string>
@@ -366,4 +368,18 @@ Constant* lle::insertConstantString(Module* M, const string Inserted)
    Constant* Constant_0 = ConstantInt::get(Type::getInt32Ty(C), 0);
    Constant* Indicies[] = {Constant_0, Constant_0};
    return ConstantExpr::getGetElementPtr(str, Indicies);
+}
+
+std::vector<BasicBlock*> lle::getPath(BasicBlock *From, BasicBlock *To)
+{
+   std::vector<BasicBlock*> Path;
+   for(auto I = df_begin(From), E = df_end(From); I!=E; ++I){
+      if(*I == To){
+         unsigned N = I.getPathLength();
+         Path.resize(N);
+         for(unsigned i=0;i<N;++i)
+            Path[i] = I.getPath(i);
+      }
+   }
+   return Path;
 }

@@ -1,7 +1,6 @@
 #include "preheader.h"
+#include <llvm/Analysis/BranchProbabilityInfo.h>
 #include <llvm/Support/raw_ostream.h>
-#include <llvm/Analysis/RegionInfo.h>
-#include <llvm/Support/GraphWriter.h>
 #include <llvm/Analysis/LoopInfo.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Instructions.h>
@@ -50,6 +49,7 @@ class lle::PerformPred : public llvm::FunctionPass
    };
    std::vector<Classify> pred_cls; // 对每个block进行分类, 并且储存关键的属性.
    llvm::TimingSource source;
+   llvm::BranchProbabilityInfo* BPI;
 
    public:
    static char ID;
@@ -62,6 +62,7 @@ class lle::PerformPred : public llvm::FunctionPass
    llvm::Value* count(llvm::BasicBlock& BB, llvm::IRBuilder<>& Builder);
    llvm::BasicBlock* promote(llvm::Instruction* LoopTC);
    llvm::BasicBlock* findCriticalBlock(llvm::BasicBlock* From, llvm::BasicBlock* To);
+   llvm::BranchProbability getPathProbability(llvm::BasicBlock* From, llvm::BasicBlock* To);
 };
 
 using namespace llvm;
@@ -78,16 +79,15 @@ inline Value* force_insert(llvm::Value* V, IRBuilder<>& Builder, const Twine& Na
    return isa<Constant>(V)?CastInst::CreateSExtOrBitCast(V, V->getType(), Name, Builder.GetInsertPoint()):V;
 }
 
-
 static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbability prob)
 {
+   static double square = std::sqrt(INT32_MAX);
    prob = scale(prob);
    uint32_t n = prob.getNumerator(), d = prob.getDenominator();
    if(n == d) return TripCount; /* TC * 1.0 */
    Type* I32Ty = Type::getInt32Ty(TripCount->getContext());
    Type* FloatTy = Type::getFloatTy(TripCount->getContext());
    Value* Ret = TripCount;
-   double square = std::sqrt(INT32_MAX);
    if(n>square){
       // it may overflow, use float to caculate
       Ret = Builder.CreateFMul(Builder.CreateSIToFP(Ret, FloatTy), ConstantFP::get(FloatTy, (double)n/d));
@@ -109,7 +109,7 @@ void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
 {
    AU.addRequired<BlockFreqExpr>();
    AU.addRequired<DominatorTreeWrapperPass>();
-   AU.addRequired<RegionInfoPass>();
+   AU.addRequired<BranchProbabilityInfo>();
    AU.setPreservesCFG();
 }
 BasicBlock* PerformPred::findCriticalBlock(BasicBlock *From, BasicBlock *To)
@@ -167,13 +167,29 @@ BasicBlock* PerformPred::promote(Instruction* LoopTC)
    return InsertInto;
 }
 
+BranchProbability PerformPred::getPathProbability(BasicBlock *From, BasicBlock *To)
+{
+   size_t n=1,d=1;
+   if(From == To) return BranchProbability(n,d);
+   auto Path = getPath(From, To);
+   if(Path.size()<2) return BranchProbability(n,d);
+   for(unsigned i = 0, e = Path.size()-1; i<e; ++i){
+      BranchProbability p2 = BPI->getEdgeProbability(Path[i], Path[i+1]);
+      n *= p2.getNumerator();
+      d *= p2.getDenominator();
+   }
+   return scale(BranchProbability(n,d));
+}
+
 bool PerformPred::runOnFunction(Function &F)
 {
    if( F.isDeclaration() ) return false;
+   BPI = &getAnalysis<BranchProbabilityInfo>();
    BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
    DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
    pred_cls.clear();
    Type* I32Ty = Type::getInt32Ty(F.getContext());
+   errs()<<F.getName()<<"\n";
 
    source.init(F.getParent(), I32Ty);
 
@@ -206,19 +222,26 @@ bool PerformPred::runOnFunction(Function &F)
    for(auto& BB : F){
       auto FreqExpr = BFE.getBlockFreqExpr(&BB);
       Value* LoopTC = FreqExpr.second;
+      BranchProbability PathProb(1, 1);
       if(LoopTC == NULL) continue;
       // process all loops
       if(Instruction* LoopTCI = dyn_cast<Instruction>(FreqExpr.second)){
-         AssertRuntime(LoopTCI->getParent()->getParent()==&F, "");
-         Instruction* InsertPos = promote(LoopTCI)->getTerminator();
+         BasicBlock* Ori = LoopTCI->getParent();
+         AssertRuntime(Ori->getParent()==&F, "");
+         BasicBlock* Promoted = promote(LoopTCI);
+         if(Promoted != &F.getEntryBlock()){
+            PathProb = getPathProbability(Promoted, Ori);
+            errs()<<PathProb<<"\n";
+         }
          // promote insert point
-         Builder.SetInsertPoint(InsertPos);
+         Builder.SetInsertPoint(Promoted->getTerminator());
       }else
          Builder.SetInsertPoint(F.getEntryBlock().getTerminator());
       SumRhs = count(BB, Builder);
       if(LoopTC->getType()!= I32Ty)
          LoopTC = Builder.CreateCast(Instruction::SExt, LoopTC, I32Ty);
       Value* freq = CreateMul(Builder, LoopTC, FreqExpr.first); // \psi * \frac {bfreq_LLVM(N)} {bfreq_LLVM(H)}
+      freq = CreateMul(Builder, freq, PathProb);
       SumRhs = Builder.CreateMul(freq, SumRhs); // cost = freq * count
       SumRhs->setName(BB.getName()+".bfreq");
       if(ConstantInt* CI = dyn_cast<ConstantInt>(SumRhs)){
@@ -269,13 +292,6 @@ non_inst:
    PrintSum = SumLhs;
    //ValueProfiler::insertValueTrap(PrintSum, Builder.GetInsertPoint());
    memset(Loads, 0, sizeof(Value*)*NumGroups);
-
-   if(Ddg){
-      lle::Resolver<NoResolve> R;
-      auto Res = R.resolve(PrintSum);
-      DDGraph ddg(Res, PrintSum);
-      WriteGraph(&ddg, F.getName()+"-ddg");
-   }
 
 #ifdef PRED_TYPE_exec_time
    if(F.getName() == "main"){

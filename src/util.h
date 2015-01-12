@@ -45,15 +45,6 @@ namespace lle
    inline llvm::Use* findCallInstParameter(llvm::Argument* Arg, llvm::CallInst* CI){
       return &CI->getArgOperandUse(Arg->getArgNo());
    }
-#if 0
-   //find where to use V on instuction I
-   inline llvm::Use* findOpUseOnInstruction(llvm::Instruction* I, llvm::Value* V){
-      for(auto O = I->op_begin(), E = I->op_end(); O!=E; ++O){
-         if(O->get() == V) return &*O;
-      }
-      return nullptr;
-   }
-#endif
    // convert a Use to use_iterator
    inline llvm::Value::use_iterator find_iterator(llvm::Use& U){
       llvm::Value* V = U.get();
@@ -76,13 +67,11 @@ namespace lle
    // insert a constant to module, and return a getelementptr constant expr
    llvm::Constant* insertConstantString(llvm::Module*, const std::string);
 
-   //=========================NUMERIC BEGIN=================================//
-
    inline uint64_t extract(llvm::ConstantInt* CI){
       return CI?CI->getZExtValue():UINT64_MAX;
    }
 
-   //=========================NUMERIC END==================================//
+   std::vector<llvm::BasicBlock*> getPath(llvm::BasicBlock* From, llvm::BasicBlock* To);
 }
 namespace std{
 // return true if BasicBlock L is 'before' R
