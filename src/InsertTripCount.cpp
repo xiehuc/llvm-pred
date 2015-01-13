@@ -10,9 +10,9 @@
 #include "ddg.h"
 #include "util.h"
 #include "GVInfo.h"
+#include "Reduce.h"
 #include "config.h"
 #include "Resolver.h"
-#include "SlashShrink.h"
 #include "LoopTripCount.h"
 
 #include "debug.h"
@@ -62,12 +62,7 @@ bool InsertLoopTripCount::runOnLoop(llvm::Loop *L)
 
    RP->getResolver<GVResolve>().get_impl().initial(&getAnalysis<GVInfo>());
    auto R = RP->getResolverSet<UseOnlyResolve, SpecialResolve, GVResolve>();
-   ResolveResult RR = R.resolve(CC, [](Value* V){
-         if(Instruction* I = dyn_cast<Instruction>(V))
-            MarkPreserve::mark(I, "loop");
-         });
-   for( auto V : std::get<1>(RR) )
-      MarkPreserve::mark_all<NoResolve>(V, "loop");
+   ResolveResult RR = R.resolve(CC);
 
    if(Ddg && std::get<0>(RR).size()>1){
       string loop_name;

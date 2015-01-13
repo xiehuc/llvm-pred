@@ -28,13 +28,13 @@ add_library(LLVMPred SHARED
    DSEAdaptive.cpp
    DAEAdaptive.cpp
    LibFReshape.cpp
-   SlashShrink.cpp
    PerformPred.cpp
    InstTiming.cpp
    Adaptive.cpp
    Resolver.cpp
    LockInst.cpp
    GVInfo.cpp
+   Reduce.cpp
    Print.cpp
 	util.cpp
    ddg.cpp

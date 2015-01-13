@@ -12,8 +12,8 @@
 #include <PredBlockProfiling.h>
 
 #include "BlockFreqExpr.h"
-#include "SlashShrink.h"
 #include "Resolver.h"
+#include "Reduce.h"
 #include "ddg.h"
 #include "debug.h"
 
@@ -222,7 +222,6 @@ bool PerformPred::runOnFunction(Function &F)
       SumRhs->setName(BB.getName()+".bfreq");
       SumRhs = force_insert(SumRhs, Builder, BB.getName()+".bfreq");
       PredBlockProfiler::increaseBlockCounter(&BB, SumRhs, Builder.GetInsertPoint());
-      MarkPreserve::mark(dyn_cast<Instruction>(SumRhs));
       pred_cls.emplace_back(BFE.inLoop(&BB)?STATIC_LOOP:STATIC_BLOCK, &BB, freq);
    }
 

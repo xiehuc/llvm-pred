@@ -35,7 +35,6 @@ class lle::PrintEnv: public ModulePass
    PrintEnv():ModulePass(ID) {}
    bool runOnModule(Module& M) override{
 #define printenv(env) errs()<<env<<":   "<<(getenv(env)?:"")<<"\n";
-      printenv("SHRINK_LEVEL");
       printenv("LIBCALL_FILE");
       printenv("LIBFDEF_FILE");
       printenv("IGNOREFUNC_FILE");
