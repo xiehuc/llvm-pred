@@ -90,6 +90,7 @@ class lle::ReduceCode: public llvm::ModulePass
    void walkThroughCg(llvm::CallGraphNode*);
    void washFunction(llvm::Function* F);
    void deleteDeadCaller(llvm::Function* F);
+   AttributeFlags noused_param(llvm::Argument*);
    AttributeFlags noused_global(llvm::GlobalVariable* , llvm::Instruction* );
    public:
    static char ID;

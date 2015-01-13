@@ -202,7 +202,7 @@ cl::opt<bool> Force("Force", cl::desc("Enable Force Reduce Mode"));
 static bool Dbg_EnablePrintGraph = false;
 static void Dbg_PrintGraph_(DataDepGraph&& ddg, User* Ur)
 {
-   Instruction* I = dyn_cast<Instruction>(Ur);
+   Instruction* I = Ur?dyn_cast<Instruction>(Ur):NULL;
    BasicBlock* Block = I?I->getParent():NULL;
    StringRef FName = Block?Block->getParent()->getName():"test";
    WriteGraph(&ddg, FName);
@@ -221,18 +221,23 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI)
    return Found->second(CI);
 }
 
-static AttributeFlags noused_param(Argument* Arg)
+AttributeFlags ReduceCode::noused_param(Argument* Arg)
 {
    Function* F = Arg->getParent();
    llvm::SmallSet<User*, 3> S;
    insert_to(F->user_begin(), F->user_end(), S);
-   bool all_deletable = std::all_of(F->user_begin(), F->user_end(), [Arg, &S](User* C){
-         llvm::Use* Para = findCallInstParameter(Arg, dyn_cast<CallInst>(C));
+   ReduceCode* Self = this;
+   bool all_deletable = std::all_of(F->user_begin(), F->user_end(), [Self, Arg, &S](User* C){
+         CallInst* CI = dyn_cast<CallInst>(C);
+         llvm::Use* Para = findCallInstParameter(Arg, CI);
          if(Para == NULL) return 0;
          auto f = (noused_exclude(*Para, S) & IsDeletable);
          Argument* NestArg = dyn_cast<Argument>(Para->get());
-         if(f && NestArg)
-            f &= noused_param(NestArg);
+         if(f && NestArg) f &= Self->noused_param(NestArg);
+         GlobalVariable* GV = NULL;
+         GetElementPtrInst* GEP = NULL;
+         if(f && isRefGlobal(Para->get(), &GV, &GEP))
+            f &= Self->noused_global(GV, CI);
          return f;
          });
    return all_deletable ? IsDeletable : AttributeFlags::None;
@@ -269,6 +274,7 @@ AttributeFlags ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP)
    if(GEPI) RE.addFilter(GEPFilter(GEPI));
    RE.addFilter(CGFilter(root, GEP));
    Value* Visit = RE.find_visit(GV);
+   Dbg_PrintGraph(RE.resolve(GV), nullptr);
    if(Visit == NULL) return AttributeFlags::IsDeletable;
    else return AttributeFlags::None;
 }
