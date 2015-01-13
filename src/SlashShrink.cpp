@@ -321,9 +321,7 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
       }else{
          // a store inst not in loop, and it isn't used after
          // then it can be removed
-         Dbg_EnablePrintGraph = true;
          flag = noused(SI->getOperandUse(1));
-         Dbg_EnablePrintGraph = false;
          REASON(flag, *SI, (GEP==nullptr));
       }
    }
@@ -537,9 +535,9 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
    // we can remove Send's Use for now
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
-   RE.addRule(RE.iuse_rule);
-   std::vector<Instruction*> MarkToDel;
-   RE.resolve(CI->getArgOperandUse(0), [&MarkToDel](Use* U){
+   InitRule ir(RE.iuse_rule);
+   RE.addRule(std::ref(ir));
+   RE.resolve(CI->getArgOperandUse(0), [](Use* U){
          CallInst* Call = dyn_cast<CallInst>(U->getUser());
          Function* F = NULL;
          if(Call && (F = Call->getCalledFunction())){
@@ -547,10 +545,23 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
                Call->setArgOperand(0, UndefValue::get(Call->getArgOperand(0)->getType()));
                Call->removeFromParent();
             }
-            MarkToDel.push_back(Call);
          }
          return false;
-         });
+      });
+   ir.clear();
+   auto ddg = RE.resolve(CI->getArgOperandUse(1), [](Use* U){
+         errs()<<*U->getUser()<<"\n";
+         CallInst* Call = dyn_cast<CallInst>(U->getUser());
+         Function* F = NULL;
+         if(Call && (F = Call->getCalledFunction())){
+            if(F->getName()=="llvm.lifetime.end"){
+               Call->setArgOperand(1, UndefValue::get(Call->getArgOperand(1)->getType()));
+               Call->removeFromParent();
+            }
+         }
+         return false;
+      });
+   WriteGraph(&ddg, "test");
 
    Recv->replaceAllUsesWith(Send);
    return AttributeFlags::IsDeletable;
@@ -562,16 +573,18 @@ ReduceCode::ReduceCode():ModulePass(ID),
    simpCFG(createCFGSimplificationPass())
 {
    using std::placeholders::_1;
-   Attributes["_gfortran_transfer_character_write"] = gfortran_write_stdout;
-   Attributes["_gfortran_transfer_integer_write"] = gfortran_write_stdout;
-   Attributes["_gfortran_transfer_real_write"] = gfortran_write_stdout;
-   Attributes["_gfortran_st_write"] = gfortran_write_stdout;
-   Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
    auto mpi_nouse_recvbuf = std::bind(mpi_nouse_at, _1, 1);
    auto mpi_nouse_buf = std::bind(mpi_nouse_at, _1, 0);
    auto DirectDelete = std::bind(direct_return, _1, AttributeFlags::IsDeletable);
    auto DirectDeleteCascade = std::bind(direct_return, _1, 
          AttributeFlags::IsDeletable | AttributeFlags::Cascade);
+
+   Attributes["_gfortran_transfer_character_write"] = gfortran_write_stdout;
+   Attributes["_gfortran_transfer_integer_write"] = gfortran_write_stdout;
+   Attributes["_gfortran_transfer_real_write"] = gfortran_write_stdout;
+   Attributes["_gfortran_st_write"] = gfortran_write_stdout;
+   Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
+   Attributes["_gfortran_system_clock_4"] = DirectDelete;
 //int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
 //               MPI_Op op, int root, MPI_Comm comm)
 //Deletable if recvbuf is no used
