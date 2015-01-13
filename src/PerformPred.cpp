@@ -96,7 +96,6 @@ static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbabilit
 Value* selectBranch(IRBuilder<>& Builder, Value* True, BasicBlock* From, BasicBlock* To)
 {
    if(From == NULL || To == NULL || From == To) return True;
-   if(From == &From->getParent()->getEntryBlock()) return True;
    Value* False = ConstantInt::get(True->getType(), 0);
    auto Term = From->getTerminator();
    unsigned N = Term->getNumSuccessors();
@@ -186,7 +185,6 @@ BranchProbability PerformPred::getPathProbability(BasicBlock *From, BasicBlock *
 {
    BranchProbability empty(1,1);
    if(From == NULL || To == NULL || From == To) return empty;
-   if(From == &From->getParent()->getEntryBlock()) return empty;
    auto Path = getPath(From, To);
    if(Path.size()<2) return empty;
    size_t n=1,d=1;

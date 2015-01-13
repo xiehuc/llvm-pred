@@ -18,8 +18,8 @@ set(TIMING "tsc" CACHE STRINGS "Select timing implement")
 set_property(CACHE TIMING PROPERTY STRINGS "tsc" "tscp" "clock_gettime")
 set(TIMING_SOURCE "lmbench" CACHE STRINGS "Select cycle timging source")
 set_property(CACHE TIMING_SOURCE PROPERTY STRINGS "lmbench")
-set(PROMOTE_FREQ "select" CACHE STRINGS "Select how to fix promote errors in performance predication")
-set_property(CACHE PROMOTE_FREQ PROPERTY STRINGS "select" "path_prob")
+set(PROMOTE_FREQ "path_prob" CACHE STRINGS "Select how to fix promote errors in performance predication")
+set_property(CACHE PROMOTE_FREQ PROPERTY STRINGS "none" "select" "path_prob")
 option(UNIT_TEST "Enable Build Unit Test" Off)
 
 
