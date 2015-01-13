@@ -255,7 +255,7 @@ static AttributeFlags noused_ret_rep(ReturnInst* RI)
    if(F->getName() == "main") return AttributeFlags::None;
 
    bool all_deletable = std::all_of(F->user_begin(), F->user_end(), [](User* C){
-         return noused(C);
+         return C->use_empty();
          });
    if(all_deletable)
       ReturnInst::Create(F->getContext(), UndefValue::get(Ret->getType()), RI->getParent());
