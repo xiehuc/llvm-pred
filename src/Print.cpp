@@ -37,7 +37,6 @@ class lle::PrintEnv: public ModulePass
 #define printenv(env) errs()<<env<<":   "<<(getenv(env)?:"")<<"\n";
       printenv("LIBCALL_FILE");
       printenv("LIBFDEF_FILE");
-      printenv("IGNOREFUNC_FILE");
 #undef printenv
       return false;
    }
