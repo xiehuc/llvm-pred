@@ -17,7 +17,8 @@ add_library(predicate_rt-raw STATIC
    PredBlockProfiling.c
    )
 add_custom_target(predicate_rt ALL 
-   COMMAND ${CMAKE_AR} rc libpredicate_rt.a 
+   COMMAND rm libpredicate_rt.a
+   COMMAND ${CMAKE_AR} rcT libpredicate_rt.a 
    $<TARGET_FILE:profile_rt-static> $<TARGET_FILE:predicate_rt-raw>)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall --std=c++11 -fno-rtti")
