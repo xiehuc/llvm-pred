@@ -20,8 +20,7 @@ add_custom_target(predicate_rt ALL
    COMMAND ${CMAKE_AR} rc libpredicate_rt.a 
    $<TARGET_FILE:profile_rt-static> $<TARGET_FILE:predicate_rt-raw>)
 
-add_definitions(-fno-rtti)
-add_definitions(-Wall --std=c++11)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall --std=c++11 -fno-rtti")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DNO_DEBUG")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
 
