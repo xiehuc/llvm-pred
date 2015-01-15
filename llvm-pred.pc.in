@@ -1,0 +1,12 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+
+predicate_so=${libdir}/libLLVMPred.so
+predicate_rt_lib=-L${libdir} -lprofile_rt
+
+Name: llvm-pred
+URL: http://github.com/xiehuc/llvm-pred
+Description: llvm predication library
+Libs: -L${libdir} -lLLVMPred
+Cflags: -I${includedir}

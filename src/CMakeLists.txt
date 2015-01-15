@@ -9,6 +9,15 @@ link_directories(
    ${LLVM_LIBRARY_DIRS} 
    ${LLVM_PROF_LIBRARY_DIRS}
    )
+
+add_library(predicate_rt STATIC
+   PredBlockProfiling.c
+   )
+
+target_link_libraries(predicate_rt
+   profile_rt
+   )
+
 add_definitions(-fno-rtti)
 add_definitions(-Wall --std=c++11)
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DNO_DEBUG")
@@ -21,6 +30,7 @@ else()
 endif()
 
 add_library(LLVMPred SHARED
+   PredBlockProfiling.cpp
 	KnownLibCallInfo.cpp
    InsertTripCount.cpp
    BlockFreqExpr.cpp
@@ -45,16 +55,4 @@ target_link_libraries(LLVMPred
 	${LLVM_PROF_LIBRARIES}
 	)
 
-
-if(LLVM_VERSION VERSION_EQUAL "3.4")
-# print Asm code for a bitcode
-add_executable(lle-llc
-   MyAsmPrinter.cpp
-   llc.cpp
-   )
-
-target_link_libraries(lle-llc
-   ${LLVM_DYNAMIC_LIBRARY}
-   )
-
-endif()
+install(TARGETS LLVMPred predicate_rt DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)

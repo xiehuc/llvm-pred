@@ -31,6 +31,10 @@ if(NOT WITH_DEBUG)
    set(NO_DEBUG On)
 endif()
 configure_file(config.h.in config.h)
+configure_file(llvm-pred.pc.in llvm-pred.pc @ONLY)
+install(FILES ${CMAKE_BINARY_DIR}/llvm-pred.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/pkgconfig)
+message(STATUS "Add ${CMAKE_INSTALL_PREFIX}/lib/pkgconfig to $PKG_CONFIG_PATH "
+"environment variable to let pkg-config find llvm-pred.pc")
 
 add_subdirectory(timing)
 add_subdirectory(src)
