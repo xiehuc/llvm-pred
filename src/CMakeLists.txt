@@ -10,13 +10,15 @@ link_directories(
    ${LLVM_PROF_LIBRARY_DIRS}
    )
 
-add_library(predicate_rt STATIC
+add_library(profile_rt-static STATIC IMPORTED)
+set_property(TARGET profile_rt-static PROPERTY
+   IMPORTED_LOCATION ${LLVM_PROF_LIBRARY_DIRS}/libprofile_rt.a)
+add_library(predicate_rt-raw STATIC
    PredBlockProfiling.c
    )
-
-target_link_libraries(predicate_rt
-   profile_rt
-   )
+add_custom_target(predicate_rt ALL 
+   COMMAND ${CMAKE_AR} rc libpredicate_rt.a 
+   $<TARGET_FILE:profile_rt-static> $<TARGET_FILE:predicate_rt-raw>)
 
 add_definitions(-fno-rtti)
 add_definitions(-Wall --std=c++11)
@@ -55,4 +57,6 @@ target_link_libraries(LLVMPred
 	${LLVM_PROF_LIBRARIES}
 	)
 
-install(TARGETS LLVMPred predicate_rt DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+install(TARGETS LLVMPred DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libpredicate_rt.a 
+   DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
