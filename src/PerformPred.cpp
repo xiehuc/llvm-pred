@@ -1,20 +1,11 @@
 #include "preheader.h"
 #include <llvm/Analysis/BranchProbabilityInfo.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/Analysis/LoopInfo.h>
-#include <llvm/IR/GlobalVariable.h>
-#include <llvm/IR/Instructions.h>
 #include <llvm/IR/Dominators.h>
 #include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/CFG.h>
 
-#include <deque>
-#include <PredBlockProfiling.h>
-
+#include "PredBlockProfiling.h"
 #include "BlockFreqExpr.h"
-#include "Resolver.h"
-#include "Reduce.h"
-#include "ddg.h"
+#include "util.h"
 #include "debug.h"
 
 

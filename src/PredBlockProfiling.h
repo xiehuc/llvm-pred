@@ -1,11 +1,11 @@
 #ifndef LLVM_PRED_BLOCK_PROFILER_H_H
 #define LLVM_PRED_BLOCK_PROFILER_H_H
 #include <llvm/Pass.h>
-#include <llvm/IR/Value.h>
 #include <llvm/ADT/DenseMap.h>
 #include <vector>
 
 namespace llvm{
+   class Value;
 	class PredBlockProfiler: public ModulePass
 	{
       static PredBlockProfiler* ins;
