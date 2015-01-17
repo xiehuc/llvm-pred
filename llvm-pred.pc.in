@@ -3,7 +3,6 @@ exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 
 predicate_so=${libdir}/libLLVMPred.so
-predicate_rt_lib=-L${libdir} -lpredicate_rt
 
 Name: llvm-pred
 URL: http://github.com/xiehuc/llvm-pred

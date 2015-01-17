@@ -10,17 +10,6 @@ link_directories(
    ${LLVM_PROF_LIBRARY_DIRS}
    )
 
-add_library(profile_rt-static STATIC IMPORTED)
-set_property(TARGET profile_rt-static PROPERTY
-   IMPORTED_LOCATION ${LLVM_PROF_LIBRARY_DIRS}/libprofile_rt.a)
-add_library(predicate_rt-raw STATIC
-   PredBlockProfiling.c
-   )
-add_custom_target(predicate_rt ALL 
-   COMMAND rm libpredicate_rt.a
-   COMMAND ${CMAKE_AR} rcT libpredicate_rt.a 
-   $<TARGET_FILE:profile_rt-static> $<TARGET_FILE:predicate_rt-raw>)
-
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall --std=c++11 -fno-rtti")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -DNO_DEBUG")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
@@ -32,7 +21,6 @@ else()
 endif()
 
 add_library(LLVMPred SHARED
-   PredBlockProfiling.cpp
 	KnownLibCallInfo.cpp
    InsertTripCount.cpp
    BlockFreqExpr.cpp
@@ -58,5 +46,3 @@ target_link_libraries(LLVMPred
 	)
 
 install(TARGETS LLVMPred DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libpredicate_rt.a 
-   DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
