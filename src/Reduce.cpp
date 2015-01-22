@@ -55,7 +55,7 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI)
 AttributeFlags ReduceCode::noused_param(Argument* Arg)
 {
    Function* F = Arg->getParent();
-   llvm::SmallSet<User*, 3> S;
+   llvm::SmallSet<User*, 3> S;// should we delete it?
    insert_to(F->user_begin(), F->user_end(), S);
    ReduceCode* Self = this;
    bool all_deletable = std::all_of(F->user_begin(), F->user_end(), [Self, Arg, &S](User* C){
@@ -91,7 +91,7 @@ static AttributeFlags noused_ret_rep(ReturnInst* RI)
    if(F->getName() == "main") return AttributeFlags::None;
 
    bool all_deletable = std::all_of(F->user_begin(), F->user_end(), [](User* C){
-         return C->use_empty();
+         return C->use_empty();//find_visit doesn't consider store, we temporary doesn't use it
          });
    if(all_deletable)
       ReturnInst::Create(F->getContext(), UndefValue::get(Ret->getType()), RI->getParent());
