@@ -20,7 +20,6 @@
 namespace lle{
    class InsertLoopTripCount:public llvm::FunctionPass
    {
-      llvm::Loop* CurL;
       LoopTripCount* LTC;
       ResolverPass* RP;
       public:
@@ -52,7 +51,6 @@ void InsertLoopTripCount::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 
 bool InsertLoopTripCount::runOnLoop(llvm::Loop *L)
 {
-	CurL = L;
 	Value* CC = LTC->getOrInsertTripCount(L);
    
 	if(!CC) return false;
@@ -98,14 +96,13 @@ void InsertLoopTripCount::print(llvm::raw_ostream &OS, const llvm::Module *M) co
 
    for(Loop* Top : LI)
       for(auto L = df_begin(Top), E = df_end(Top); L!=E; ++L){
-         Value* CC = LTC->getTripCount(CurL);
+         Value* CC = LTC->getTripCount(*L);
          if(!CC) continue;
 
          lle::Resolver<UseOnlyResolve> R; /* print is not a part of normal process
                                              . so don't make it modify resolver cache*/
          ResolveResult RR = R.resolve(CC);
-         OS<<"in Function:\t"<<CurL->getHeader()->getParent()->getName()<<"\n";
-         OS<<*CurL;
+         OS<<**L;
          OS<<"Cycles:";
 #ifdef CYCLE_EXPR_USE_DDG
          DDGraph d(RR, CC);
