@@ -181,43 +181,20 @@ static void pretty_print(PHINode* PH,raw_ostream& o)
 
 static void pretty_print(LoadInst* LI, raw_ostream& O, bool E)
 {
-  // O<<"*";
    if(E) lle::pretty_print(LI->getOperand(0),O);
    else{
-      string S;
-      raw_string_ostream SS(S);
-      LI->getOperand(0)->print(SS);
-      if(isa<ConstantExpr>(LI->getOperand(0))){
-         unsigned t1 = SS.str().find('@');
-         unsigned t2 = SS.str().find(')');
-         S = SS.str().substr(t1,t2-t1);
-         bool flag = true;
-         unsigned tmp_t,tmp_t1;
-         string tmp_s;
-         while(!S.empty()){
-            tmp_t = S.find(',');
-            if(tmp_t != std::string::npos){
-               if(flag){
-                  tmp_s = S.substr(0,tmp_t);
-                  O<<tmp_s;
-                  S = S.substr(tmp_t+1);
-                  flag = false;
-                  continue;
-               }
-               O<<'['<<S[tmp_t-1]<<']';
-               S = S.substr(tmp_t+1);
-            }
-            else{
-               tmp_t1 = S.find_last_of(' ');
-               O<<'['<<S.substr(tmp_t1+1)<<']';
-               return;
-            }
-         }
+      if(auto CE = dyn_cast<ConstantExpr>(LI->getPointerOperand())){
+         pretty_print(CE->getAsInstruction(), O, E);
+      }else{
+         O<<"*";
+         string S;
+         raw_string_ostream SS(S);
+         LI->getOperand(0)->print(SS);
+         int beg = SS.str().find_first_not_of(" ");
+         int end = SS.str().find(" =");
+         S = SS.str().substr(beg,end-beg);
+         O<<S;
       }
-      int beg = SS.str().find_first_not_of(" ");
-      int end = SS.str().find(" =");
-      S = SS.str().substr(beg,end-beg);
-      O<<S;
    }
 }
 
