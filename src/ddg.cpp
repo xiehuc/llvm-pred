@@ -166,6 +166,7 @@ static void to_expr(Constant* C, DDGNode* N, int& R)
    else{
       raw_string_ostream O(N->expr_buf);
       pretty_print(C,O);
+      O.str();
       N->set_expr(N->expr_buf);
    }
 }
@@ -217,8 +218,8 @@ static void to_expr(Value* V, DDGNode* N, int& ref_num)
    }else if(isa<SelectInst>(V)){
       Assert(N->impl().size()==3,"");
       raw_string_ostream SS(N->expr_buf);
-      SS<<"("<<LHS(N).expr()<<")?";
-      N->set_expr(SS.str()+N->impl()[1]->second.expr(),":"+RHS(N).expr());
+      SS<<"("<<LHS(N).expr()<<")?(";
+      N->set_expr(SS.str()+N->impl()[1]->second.expr()+")",":("+RHS(N).expr()+")");
    }else if(isa<ExtractElementInst>(V)){
       Assert(N->impl().size()==2,"");
       N->set_expr(LHS(N).expr()+"[", RHS(N).expr(14)+"]", 0);
