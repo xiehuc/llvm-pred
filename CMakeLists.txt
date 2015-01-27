@@ -36,7 +36,6 @@ install(FILES ${CMAKE_BINARY_DIR}/llvm-pred.pc DESTINATION ${CMAKE_INSTALL_PREFI
 message(STATUS "Add ${CMAKE_INSTALL_PREFIX}/lib/pkgconfig to $PKG_CONFIG_PATH "
 "environment variable to let pkg-config find llvm-pred.pc")
 
-add_subdirectory(timing)
 add_subdirectory(src)
 if(UNIT_TEST)
 add_subdirectory(unit)

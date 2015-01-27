@@ -3,7 +3,6 @@ include_directories(
 	${LLVM_PROF_INCLUDE_DIRS}
 	${PROJECT_BINARY_DIR}
 	${LLVM_INCLUDE_DIRS} 
-   ${PROJECT_SOURCE_DIR}/timing
 	)
 link_directories(
    ${LLVM_LIBRARY_DIRS} 
@@ -29,7 +28,6 @@ add_library(LLVMPred SHARED
    DAEAdaptive.cpp
    LibFReshape.cpp
    PerformPred.cpp
-   InstTiming.cpp
    Adaptive.cpp
    Resolver.cpp
    LockInst.cpp
