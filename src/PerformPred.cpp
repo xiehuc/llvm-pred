@@ -100,7 +100,6 @@ Value* selectBranch(IRBuilder<>& Builder, Value* True, BasicBlock* From, BasicBl
          break;
       }
    }
-   errs()<<From->getName()<<":"<<succ<<"\n";
    if(succ!=-1){
       if(BranchInst* Br = dyn_cast<BranchInst>(Term)){
          if(succ == 0) return Builder.CreateSelect(Br->getCondition(), True, False);
@@ -196,7 +195,6 @@ bool PerformPred::runOnFunction(Function &F)
    DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
    pred_cls.clear();
    Type* I32Ty = Type::getInt32Ty(F.getContext());
-   errs()<<F.getName()<<"\n";
 
    IRBuilder<> Builder(F.getEntryBlock().getTerminator());
    Value* SumLhs = NULL, *SumRhs = NULL;

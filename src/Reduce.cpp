@@ -2,6 +2,7 @@
 
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Dominators.h>
+#include <llvm/Transforms/IPO.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Support/GraphWriter.h>
@@ -200,6 +201,7 @@ void ReduceCode::walkThroughCg(llvm::CallGraphNode * CGN)
 {
    Function* F = CGN->getFunction();
    if(!F || F->isDeclaration()) return; // this is a external function
+   if(ErasedFunc.count(F)) return; // this function has already erased
 
    runOnFunction(*F);
    washFunction(F);
@@ -211,6 +213,10 @@ void ReduceCode::walkThroughCg(llvm::CallGraphNode * CGN)
    runOnFunction(*F);
    washFunction(F);
 
+   if(dae.runOnFunction(*F)){
+      ErasedFunc.insert(F);
+      return;
+   }
    deleteDeadCaller(F);
 }
 
@@ -234,6 +240,7 @@ static void RemoveDeadFunction(Module& M, bool focusDeclation)
 bool ReduceCode::runOnModule(Module &M)
 {
    dse.prepare(this);
+   dae.prepare(&M);
    ic.prepare(this);
    simpCFG.prepare(this);
 
@@ -400,6 +407,7 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
 
 ReduceCode::ReduceCode():ModulePass(ID), 
    dse(createDeadStoreEliminationPass()),
+   dae(createDeadArgEliminationPass()),
    ic(createInstructionCombiningPass()),
    simpCFG(createCFGSimplificationPass())
 {

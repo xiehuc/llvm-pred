@@ -26,6 +26,7 @@ void DAE_Adaptive::prepare(Module* M)
 bool DAE_Adaptive::runOnFunction(Function &F)
 {
    ::DAE* dae = static_cast<::DAE*>(opaque);
+   dae->SurveyFunction(F);
    //this function has already removed from module
    if(dae->RemoveDeadStuffFromFunction(&F))
       return true;

@@ -25,11 +25,13 @@ class lle::ReduceCode: public llvm::ModulePass
    typedef std::function<AttributeFlags(llvm::CallInst*)> Attribute_;
    std::unordered_map<std::string, Attribute_> Attributes;
    llvm::SmallSet<llvm::StoreInst*, 4> Protected;
+   llvm::SmallSet<llvm::Function*, 4> ErasedFunc;
    llvm::CallGraphNode* root;
    llvm::DominatorTree* DomT;
    LoopTripCount* LTC;
 
    DSE_Adaptive dse;
+   DAE_Adaptive dae;
    Adaptive ic, simpCFG;
 
    AttributeFlags getAttribute(llvm::CallInst*);

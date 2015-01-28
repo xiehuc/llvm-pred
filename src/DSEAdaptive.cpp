@@ -52,6 +52,10 @@ void DSE_Adaptive::DeleteCascadeInstruction(llvm::Instruction* I)
    lle::ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
    auto ddg = RE.resolve(I);
+   if(ddg.empty()){
+      DeleteDeadInstruction(I);
+      return;
+   }
    // FIXME there should use ipo_begin, ipo_end
    // because inversed search for ResolveEngine always return a single link
    // so, it can also use df_begin, df_end
