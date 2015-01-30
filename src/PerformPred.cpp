@@ -8,7 +8,6 @@
 
 #include "PredBlockProfiling.h"
 #include "LoopTripCount.h"
-#include "BlockFreqExpr.h"
 #include "util.h"
 #include "debug.h"
 
@@ -70,7 +69,7 @@ using namespace lle;
 char PerformPred::ID = 0;
 static RegisterPass<PerformPred> X("PerfPred", "get Performance Predication Model");
 
-inline Value* force_insert(llvm::Value* V, IRBuilder<>& Builder, const Twine& Name="")
+static Value* force_insert(llvm::Value* V, IRBuilder<>& Builder, const Twine& Name="")
 {
    if(isa<Constant>(V) || V->hasName())
       return CastInst::CreateSExtOrBitCast(V, V->getType(), Name, Builder.GetInsertPoint());
@@ -85,6 +84,47 @@ static llvm::Value* one(T& t)
    auto I32Ty = Type::getInt32Ty(t.getContext());
    return ConstantInt::get(I32Ty,1);
 }
+// integer log2 of a float
+static inline int32_t ilog2(float x)
+{
+	uint32_t ix = (uint32_t&)x;
+	uint32_t exp = (ix >> 23) & 0xFF;
+	int32_t log2 = int32_t(exp) - 127;
+
+	return log2;
+}
+// http://stereopsis.com/log2.html
+// x should > 0
+static inline int32_t ilog2(uint32_t x) {
+	return ilog2((float)x);
+}
+
+static uint32_t GCD(uint32_t A, uint32_t B) // 最大公约数
+{
+   uint32_t Max=A, Min=B;
+   A<B?Max=B,Min=A:0;
+   do{
+      A=Min,B=Max%Min;
+      A<B?Max=B,Min=A:Max=A,Min=B;
+   }while(B!=0);
+   return A;
+}
+static BranchProbability scale(const BranchProbability& prob)
+{
+   uint32_t n = prob.getNumerator(), d = prob.getDenominator();
+   uint32_t gcd = GCD(n,d);
+   return BranchProbability(n/gcd, d/gcd);
+}
+static BranchProbability operator/(const BlockFrequency& LHS, const BlockFrequency& RHS)
+{
+   uint64_t n = LHS.getFrequency(), d = RHS.getFrequency();
+   if(n > UINT32_MAX || d > UINT32_MAX){
+      unsigned bit = std::max(ilog2(uint32_t(n>>32)),ilog2(uint32_t(d>>32)))+1;
+      n >>= bit;
+      d >>= bit;
+   }
+   return scale(BranchProbability(n, d));
+}
 
 static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbability prob)
 {
@@ -98,7 +138,7 @@ static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbabilit
       // it may overflow, use float to caculate
       Ret = Builder.CreateFMul(Builder.CreateSIToFP(Ret, FloatTy), ConstantFP::get(FloatTy, (double)n/d));
       std::string hint;
-      raw_string_ostream(hint)<<n<<"/"<<d<<"="<<format("%.3f",(float)n/d);
+      raw_string_ostream(hint)<<"hint."<<n<<"."<<d<<"."<<format("%.3f",(float)n/d);
       LLVMContext& C = Builder.getContext();
       cast<Instruction>(Ret)->setMetadata(hint, MDNode::get(C, MDString::get(C,"lle")));
       return Builder.CreateFPToSI(Ret, I32Ty);
@@ -107,7 +147,7 @@ static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbabilit
    return Builder.CreateSDiv(Ret, ConstantInt::get(I32Ty, d));
 }
 
-Value* selectBranch(IRBuilder<>& Builder, Value* True, BasicBlock* From, BasicBlock* To)
+static Value* selectBranch(IRBuilder<>& Builder, Value* True, BasicBlock* From, BasicBlock* To)
 {
    if(From == NULL || To == NULL || From == To) return True;
    Value* False = ConstantInt::get(True->getType(), 0);
@@ -136,7 +176,6 @@ void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
 {
    AU.addRequired<LoopInfo>();
    AU.addRequired<LoopTripCount>();
-   //AU.addRequired<BlockFreqExpr>();
    AU.addRequired<DominatorTreeWrapperPass>();
    AU.addRequired<BranchProbabilityInfo>();
    AU.addRequired<BlockFrequencyInfo>();
@@ -245,17 +284,15 @@ bool PerformPred::runOnFunction(Function &F)
    Promoted.clear();
    ViewPort.clear();
    BPI = &getAnalysis<BranchProbabilityInfo>();
-   //BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
    LI = &getAnalysis<LoopInfo>();
    LTC = &getAnalysis<LoopTripCount>();
    BFI = &getAnalysis<BlockFrequencyInfo>();
    DomT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
    pred_cls.clear();
-   Type* I32Ty = Type::getInt32Ty(F.getContext());
    LTC->updateCache(*LI);
 
    IRBuilder<> Builder(F.getEntryBlock().getTerminator());
-   Value* SumLhs = NULL, *SumRhs = NULL;
+   Value* SumRhs = NULL;
    BasicBlock* Entry = &F.getEntryBlock();
 
    Loop* L;
@@ -275,8 +312,6 @@ bool PerformPred::runOnFunction(Function &F)
       pred_cls.emplace_back(LI->getLoopFor(BB)?STATIC_LOOP:STATIC_BLOCK, BB, freq);
    }
 
-   //SmallVector<Instruction*, 20> BfreqStack;
-   //if(SumLhs)BfreqStack.push_back(dyn_cast<Instruction>(SumLhs)); // the last instr in entry block
    for(auto BB : AllBlocks){
       L = LI->getLoopFor(BB);
       TC = L?LTC->getOrInsertTripCount(L):NULL;
@@ -353,6 +388,5 @@ void PerformPred::print(llvm::raw_ostream & OS, const llvm::Module * M) const
       }
    }
    OS<<"\n";
-
 }
 
