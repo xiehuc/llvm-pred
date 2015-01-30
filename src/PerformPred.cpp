@@ -1,9 +1,11 @@
 #include "preheader.h"
 #include <llvm/Analysis/BranchProbabilityInfo.h>
+#include <llvm/Analysis/BlockFrequencyInfo.h>
 #include <llvm/IR/Dominators.h>
 #include <llvm/IR/IRBuilder.h>
 
 #include "PredBlockProfiling.h"
+#include "LoopTripCount.h"
 #include "BlockFreqExpr.h"
 #include "util.h"
 #include "debug.h"
@@ -15,7 +17,6 @@ namespace lle {
 
 class lle::PerformPred : public llvm::FunctionPass
 {
-   llvm::Value* PrintSum; // a sum value used for print
    enum ClassifyType {
       STATIC_BLOCK,        // 静态预测的普通基本块
       STATIC_LOOP,         // 静态预测的循环
@@ -39,7 +40,12 @@ class lle::PerformPred : public llvm::FunctionPass
    };
    std::vector<Classify> pred_cls; // 对每个block进行分类, 并且储存关键的属性.
    llvm::DenseMap<llvm::Instruction*, llvm::Value*> Promoted;
+   llvm::DenseMap<llvm::BasicBlock*, std::pair<llvm::BasicBlock*, llvm::Value*> > ViewPort; // Header -> (E_P, B_P,N)
    llvm::BranchProbabilityInfo* BPI;
+   llvm::BlockFrequencyInfo* BFI;
+   llvm::LoopInfo* LI;
+   LoopTripCount* LTC;
+   llvm::DominatorTree* DomT;
 
    public:
    static char ID;
@@ -49,10 +55,11 @@ class lle::PerformPred : public llvm::FunctionPass
    void print(llvm::raw_ostream&,const llvm::Module*) const override;
 
    private:
-   llvm::Value* count(llvm::BasicBlock& BB, llvm::IRBuilder<>& Builder);
-   llvm::BasicBlock* promote(llvm::Instruction* LoopTC);
+   llvm::BasicBlock* promote(llvm::Instruction* LoopTC, llvm::Loop* L);
    llvm::BasicBlock* findCriticalBlock(llvm::BasicBlock* From, llvm::BasicBlock* To);
-   llvm::BranchProbability getPathProbability(llvm::BasicBlock* From, llvm::BasicBlock* To);
+   llvm::BranchProbability getPathProb(llvm::BasicBlock* From, llvm::BasicBlock* To);
+   llvm::BranchProbability getPathProb(llvm::BasicBlock *From, llvm::BlockFrequency To);
+   llvm::BlockFrequency in_freq(llvm::Loop* L);
 };
 
 using namespace llvm;
@@ -64,6 +71,13 @@ static RegisterPass<PerformPred> X("PerfPred", "get Performance Predication Mode
 inline Value* force_insert(llvm::Value* V, IRBuilder<>& Builder, const Twine& Name="")
 {
    return isa<Constant>(V)?CastInst::CreateSExtOrBitCast(V, V->getType(), Name, Builder.GetInsertPoint()):V;
+}
+
+template<class T>
+static llvm::Value* one(T& t)
+{
+   auto I32Ty = Type::getInt32Ty(t.getContext());
+   return ConstantInt::get(I32Ty,1);
 }
 
 static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbability prob)
@@ -111,9 +125,12 @@ Value* selectBranch(IRBuilder<>& Builder, Value* True, BasicBlock* From, BasicBl
 
 void PerformPred::getAnalysisUsage(AnalysisUsage &AU) const
 {
-   AU.addRequired<BlockFreqExpr>();
+   AU.addRequired<LoopInfo>();
+   AU.addRequired<LoopTripCount>();
+   //AU.addRequired<BlockFreqExpr>();
    AU.addRequired<DominatorTreeWrapperPass>();
    AU.addRequired<BranchProbabilityInfo>();
+   AU.addRequired<BlockFrequencyInfo>();
    AU.setPreservesCFG();
 }
 BasicBlock* PerformPred::findCriticalBlock(BasicBlock *From, BasicBlock *To)
@@ -130,21 +147,19 @@ BasicBlock* PerformPred::findCriticalBlock(BasicBlock *From, BasicBlock *To)
    return Last;
 }
 
-BasicBlock* PerformPred::promote(Instruction* LoopTC)
+BasicBlock* PerformPred::promote(Instruction* LoopTC, Loop* L)
 {
-   DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-
-   SmallVector<Instruction*, 4> depends;
+   SmallVector<BasicBlock*, 4> depends;
    SmallVector<Instruction*, 4> targets;
-   targets.push_back(LoopTC);
 
+   if(LoopTC) targets.push_back(LoopTC);
    unsigned Idx = 0;
    while(Idx != targets.size()){
       Instruction* I = targets[Idx];
       for(auto O = I->op_begin(), E = I->op_end(); O!=E; ++O){
          if(Instruction* OI = dyn_cast<Instruction>(O->get())){
             if(O->get()->getNumUses() > 1)
-               depends.push_back(OI);
+               depends.push_back(OI->getParent());
             else{
                targets.push_back(OI);
             }
@@ -152,29 +167,38 @@ BasicBlock* PerformPred::promote(Instruction* LoopTC)
       }
       ++Idx;
    }
+   Loop* PL = L->getParentLoop();
+   if(PL) depends.push_back(ViewPort[PL->getHeader()].first);
+   
 
    BasicBlock* InsertInto, *dep;
-   Assert(depends.size() > 0,"");
-   InsertInto = depends.front()->getParent();
+   if(depends.empty())
+      return &L->getHeader()->getParent()->getEntryBlock();
+
+   InsertInto = depends.front();
    if(depends.size()>1){
       /* let C is insert point, 
        * dep1 dom C, dep2 dom C => dep1 dom dep2 or dep2 dom dep1 */
       for(auto Ite = depends.begin()+1, E = depends.end(); Ite != E; ++Ite){
-         dep = (*Ite)->getParent();
-         InsertInto = DomT.dominates(InsertInto, dep)?dep:InsertInto;
+         dep = *Ite;
+         InsertInto = DomT->dominates(InsertInto, dep)?dep:InsertInto;
       }
    }
-   if(LoopTC->getParent() == InsertInto) return InsertInto;
 
-   for(auto I = targets.rbegin(), E = targets.rend(); I!=E; ++I)
-      (*I)->moveBefore(InsertInto->getTerminator());
+   if(targets.size() > 0 && targets.front()->getParent() != InsertInto){
+      for(auto I = targets.rbegin(), E = targets.rend(); I!=E; ++I)
+         (*I)->moveBefore(InsertInto->getTerminator());
+   }
    return InsertInto;
 }
 
-BranchProbability PerformPred::getPathProbability(BasicBlock *From, BasicBlock *To)
+BranchProbability PerformPred::getPathProb(BasicBlock *From, BasicBlock *To)
 {
    BranchProbability empty(1,1);
    if(From == NULL || To == NULL || From == To) return empty;
+   Loop* F_L = LI->getLoopFor(From), *T_L = LI->getLoopFor(To);
+   if(F_L == T_L) // they are in same loop level
+      return BFI->getBlockFreq(To)/BFI->getBlockFreq(From);
    auto Path = getPath(From, To);
    if(Path.size()<2) return empty;
    size_t n=1,d=1;
@@ -185,68 +209,107 @@ BranchProbability PerformPred::getPathProbability(BasicBlock *From, BasicBlock *
    }
    return scale(BranchProbability(n,d));
 }
+BranchProbability PerformPred::getPathProb(BasicBlock *From, BlockFrequency To)
+{
+   //Assume they are in same loop level
+   //(F-->T) = bfreq_LLVM(T)/bfreq_LLVM(F)
+   return BFI->getBlockFreq(From)/To;
+}
+
+BlockFrequency PerformPred::in_freq(Loop* L)
+{
+   BasicBlock* P = L->getLoopPreheader();
+   if(P) return BFI->getBlockFreq(P);
+   BlockFrequency in;
+   BasicBlock* H = L->getHeader();
+   for(auto P = pred_begin(H), E = pred_end(H); P!=E; ++P){
+      BasicBlock* Pred = *P;
+      if(L->contains(Pred)) continue;
+      in += BFI->getBlockFreq(Pred) * BPI->getEdgeProbability(Pred, H);
+   }
+   return in;
+}
 
 bool PerformPred::runOnFunction(Function &F)
 {
    if( F.isDeclaration() ) return false;
    Promoted.clear();
+   ViewPort.clear();
    BPI = &getAnalysis<BranchProbabilityInfo>();
-   BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
-   DominatorTree& DomT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+   //BlockFreqExpr& BFE = getAnalysis<BlockFreqExpr>();
+   LI = &getAnalysis<LoopInfo>();
+   LTC = &getAnalysis<LoopTripCount>();
+   BFI = &getAnalysis<BlockFrequencyInfo>();
+   DomT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
    pred_cls.clear();
    Type* I32Ty = Type::getInt32Ty(F.getContext());
+   LTC->updateCache(*LI);
 
    IRBuilder<> Builder(F.getEntryBlock().getTerminator());
    Value* SumLhs = NULL, *SumRhs = NULL;
-   BlockFrequency EntryFreq = BFE.getBlockFreq(&F.getEntryBlock());
+   BasicBlock* Entry = &F.getEntryBlock();
+
+   Loop* L;
+   Value* TC;
 
    for(auto& BB : F){
-      auto FreqExpr = BFE.getBlockFreqExpr(&BB);
-      if(FreqExpr.second != NULL) continue;
+      L = LI->getLoopFor(&BB);
+      TC = L?LTC->getOrInsertTripCount(L):NULL;
+      if(TC!=NULL) continue;
       // process other blocks outside loops
-      SumRhs = count(BB, Builder);
-      // XXX use scale in caculate
-      BranchProbability freq = BFE.getBlockFreq(&BB)/EntryFreq;
-      SumRhs = CreateMul(Builder, SumRhs, freq);
+      BranchProbability freq = getPathProb(Entry, &BB);
+      SumRhs = CreateMul(Builder, one(BB), freq); //(\[GothicE]-->BB)
       SumRhs->setName(BB.getName()+".bfreq");
       SumRhs = force_insert(SumRhs, Builder, BB.getName()+".bfreq");
       PredBlockProfiler::increaseBlockCounter(&BB, SumRhs, Builder.GetInsertPoint());
-      pred_cls.emplace_back(BFE.inLoop(&BB)?STATIC_LOOP:STATIC_BLOCK, &BB, freq);
+      pred_cls.emplace_back(LI->getLoopFor(&BB)?STATIC_LOOP:STATIC_BLOCK, &BB, freq);
    }
 
    SmallVector<Instruction*, 20> BfreqStack;
    if(SumLhs)BfreqStack.push_back(dyn_cast<Instruction>(SumLhs)); // the last instr in entry block
    for(auto& BB : F){
-      auto FreqExpr = BFE.getBlockFreqExpr(&BB);
-      Value* LoopTC = FreqExpr.second;
-      if(LoopTC == NULL) continue;
-      // process all loops
-      if(Instruction* LoopTCI = dyn_cast<Instruction>(FreqExpr.second)){
-         auto found = Promoted.find(LoopTCI);
-         if(found == Promoted.end()){
-            BasicBlock* Ori = LoopTCI->getParent();
-            AssertRuntime(Ori->getParent()==&F, "");
-            BasicBlock* Pro = promote(LoopTCI);
-            // promote insert point
-            Builder.SetInsertPoint(Pro->getTerminator());
+      L = LI->getLoopFor(&BB);
+      TC = L?LTC->getOrInsertTripCount(L):NULL;
+      Value* freq;
+      if(TC==NULL) continue;
+
+      if(&BB == L->getHeader()){
+         BlockFrequency P = in_freq(L); // in_freq(L) == bfreq(Preheader)
+         Loop* PL = L->getParentLoop();
+         BasicBlock* E_V = promote(dyn_cast<Instruction>(TC), L);// view point
+         Builder.SetInsertPoint(E_V->getTerminator());
+         Value* B_PN = NULL;
+         if(PL==NULL){// TC(V-->P)
 #if defined(PROMOTE_FREQ_path_prob)
-            LoopTC = CreateMul(Builder, LoopTC, getPathProbability(Pro, Ori));
+            B_PN = CreateMul(Builder, TC, getPathProb(E_V, P)); 
 #endif
 #if defined(PROMOTE_FREQ_select)
-            LoopTC = selectBranch(Builder, LoopTC, Pro, Ori);
+            B_PN = selectBranch(Builder, TC, E_V, L->getHeader());
 #endif
-            Promoted[LoopTCI] = LoopTC;
          }else{
-            Builder.SetInsertPoint(LoopTCI->getParent()->getTerminator());
-            LoopTC = found->second;
+            BasicBlock* E_Vn = ViewPort[PL->getHeader()].first; // parent loop's view point
+            if(E_Vn == E_V){
+               B_PN = ViewPort[PL->getHeader()].second;// parent loop's view probability
+               B_PN = CreateMul(Builder, B_PN, getPathProb(PL->getHeader(), P)); // B_PN (H-->P)
+               B_PN = Builder.CreateMul(B_PN, TC); // B_PN (H--P) %tc
+            }else{
+               B_PN = one(BB);
+               for(PL = L->getParentLoop(); PL==NULL||PL->contains(E_V); L = PL){
+                  B_PN = Builder.CreateMul(B_PN, LTC->getOrInsertTripCount(L));
+                  B_PN = CreateMul(Builder, B_PN, getPathProb(PL->getHeader(), in_freq(L)));
+               }
+               B_PN = Builder.CreateMul(B_PN, LTC->getOrInsertTripCount(L));
+               B_PN = CreateMul(Builder, B_PN, getPathProb(E_V, in_freq(L)));
+            }
          }
-      }else
-         Builder.SetInsertPoint(F.getEntryBlock().getTerminator());
-      SumRhs = count(BB, Builder);
-      if(LoopTC->getType()!= I32Ty)
-         LoopTC = Builder.CreateCast(Instruction::SExt, LoopTC, I32Ty);
-      Value* freq = CreateMul(Builder, LoopTC, FreqExpr.first); // \psi * \frac {bfreq_LLVM(N)} {bfreq_LLVM(H)}
-      SumRhs = Builder.CreateMul(freq, SumRhs); // cost = freq * count
+         ViewPort[&BB] = std::make_pair(E_V, B_PN);
+         freq = B_PN;
+      }else{
+         auto View = ViewPort[L->getHeader()];
+         Builder.SetInsertPoint(View.first->getTerminator());
+         freq = CreateMul(Builder, View.second, getPathProb(L->getHeader(), &BB));
+      }
+      SumRhs = freq;
       SumRhs->setName(BB.getName()+".bfreq");
       if(ConstantInt* CI = dyn_cast<ConstantInt>(SumRhs)){
          pred_cls.emplace_back(&BB, CI->getSExtValue()); /* DYNAMIC_LOOP_CONST */
@@ -256,7 +319,6 @@ bool PerformPred::runOnFunction(Function &F)
       force_insert(SumRhs, Builder, BB.getName()+".bfreq");
       PredBlockProfiler::increaseBlockCounter(&BB, SumRhs, Builder.GetInsertPoint());
    }
-   PrintSum = SumLhs;
 
    return true;
 }
@@ -265,35 +327,24 @@ void PerformPred::print(llvm::raw_ostream & OS, const llvm::Module * M) const
 {
    static size_t idx = 0;
    for(auto classify : pred_cls){
-      OS<<"No."<<idx++<<"\t";
+      OS<<"No."<<idx++<<"\t\""<<classify.block->getName()<<"\"\t";
       switch(classify.type){
          case STATIC_BLOCK: 
          case STATIC_LOOP:  
-            OS<<(classify.type==STATIC_BLOCK?"Static Block:\t\"":"Static Loop Block:\t\"")<<
-               classify.block->getName()<<"\"\t"<<
+            OS<<(classify.type==STATIC_BLOCK?"Static Block:\t":"Static Loop Block:\t")<<
                classify.data.freq<<"\n";
             break;
          case DYNAMIC_LOOP_CONST: 
-            OS<<"Dynamic Loop Constant Trip Count:\t\""<<
-               classify.block->getName()<<"\"\t"<<classify.data.ext_val<<"\n"; 
+            OS<<"Dynamic Loop Constant Trip Count:\t"<<
+               classify.data.ext_val<<"\n"; 
             break;
          case DYNAMIC_LOOP_INST:  
-            OS<<"Dynamic Loop Instrumented Trip Count\t\""<<
-               classify.block->getName()<<"\"\t"<<
+            OS<<"Dynamic Loop Instrumented Trip Count\t"<<
                *classify.data.value<<"\n"; 
             break;
       }
    }
-   OS<<"# Block Sum:"<<*PrintSum<<"\n";
    OS<<"\n";
 
 }
-
-
-llvm::Value* PerformPred::count(BasicBlock& BB, IRBuilder<>& Builder)
-{
-   auto I32Ty = Type::getInt32Ty(BB.getContext());
-   return ConstantInt::get(I32Ty,1);
-}
-
 
