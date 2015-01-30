@@ -1,8 +1,10 @@
 #include "preheader.h"
 #include <llvm/Analysis/BranchProbabilityInfo.h>
 #include <llvm/Analysis/BlockFrequencyInfo.h>
+#include <llvm/Support/Format.h>
 #include <llvm/IR/Dominators.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Metadata.h>
 
 #include "PredBlockProfiling.h"
 #include "LoopTripCount.h"
@@ -91,15 +93,17 @@ static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbabilit
    uint32_t n = prob.getNumerator(), d = prob.getDenominator();
    if(n == d) return TripCount; /* TC * 1.0 */
    Type* I32Ty = Type::getInt32Ty(TripCount->getContext());
-   Type* FloatTy = Type::getFloatTy(TripCount->getContext());
+   Type* FloatTy = Type::getDoubleTy(TripCount->getContext());
    Value* Ret = TripCount;
-#if 0
    if(n>square){
       // it may overflow, use float to caculate
       Ret = Builder.CreateFMul(Builder.CreateSIToFP(Ret, FloatTy), ConstantFP::get(FloatTy, (double)n/d));
+      std::string hint;
+      raw_string_ostream(hint)<<n<<"/"<<d<<"="<<format("%.3f",(float)n/d);
+      LLVMContext& C = Builder.getContext();
+      cast<Instruction>(Ret)->setMetadata(hint, MDNode::get(C, MDString::get(C,"lle")));
       return Builder.CreateFPToSI(Ret, I32Ty);
    }
-#endif
    if(n!=1) Ret = Builder.CreateMul(Ret, ConstantInt::get(I32Ty, n));
    return Builder.CreateSDiv(Ret, ConstantInt::get(I32Ty, d));
 }
@@ -219,7 +223,7 @@ BranchProbability PerformPred::getPathProb(BasicBlock *From, BlockFrequency To)
 {
    //Assume they are in same loop level
    //(F-->T) = bfreq_LLVM(T)/bfreq_LLVM(F)
-   return scale(BFI->getBlockFreq(From)/To);
+   return scale(To/BFI->getBlockFreq(From));
 }
 
 BlockFrequency PerformPred::in_freq(Loop* L)
