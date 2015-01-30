@@ -52,12 +52,33 @@ bool BlockFreqExpr::inLoop(BasicBlock *BB) const
    return getAnalysis<LoopInfo>().getLoopFor(BB) != NULL;
 }
 
+// integer log2 of a float
+static inline int32_t ilog2(float x)
+{
+	uint32_t ix = (uint32_t&)x;
+	uint32_t exp = (ix >> 23) & 0xFF;
+	int32_t log2 = int32_t(exp) - 127;
+
+	return log2;
+}
+// http://stereopsis.com/log2.html
+// x should > 0
+static inline int32_t ilog2(uint32_t x) {
+	return ilog2((float)x);
+}
+
 
 BranchProbability lle::operator/(
       const BlockFrequency& LHS, 
       const BlockFrequency& RHS)
 {
-   return scale(BranchProbability(LHS.getFrequency(), RHS.getFrequency()));
+   uint64_t n = LHS.getFrequency(), d = RHS.getFrequency();
+   if(n > UINT32_MAX || d > UINT32_MAX){
+      unsigned bit = std::max(ilog2(uint32_t(n>>32)),ilog2(uint32_t(d>>32)))+1;
+      n >>= bit;
+      d >>= bit;
+   }
+   return scale(BranchProbability(n, d));
 }
 
 static uint32_t GCD(uint32_t A, uint32_t B) // 最大公约数

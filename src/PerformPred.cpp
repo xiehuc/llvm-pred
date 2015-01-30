@@ -89,7 +89,6 @@ static llvm::Value* one(T& t)
 static Value* CreateMul(IRBuilder<>& Builder, Value* TripCount, BranchProbability prob)
 {
    static double square = std::sqrt(INT32_MAX);
-   prob = scale(prob);
    uint32_t n = prob.getNumerator(), d = prob.getDenominator();
    if(n == d) return TripCount; /* TC * 1.0 */
    Type* I32Ty = Type::getInt32Ty(TripCount->getContext());
