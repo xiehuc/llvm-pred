@@ -34,7 +34,7 @@
 #define AssertRuntime(expr, msg) if( !(expr) ){ \
    llvm::errs()<<"Assert Failed:"<<__FILE__<<":"<<__LINE__<<"\n"; \
    llvm::errs()<<msg<<"\n";\
-   assert(#expr);\
+   assert(expr);\
    exit(-1);\
 }
 

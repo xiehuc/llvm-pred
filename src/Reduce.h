@@ -27,7 +27,6 @@ class lle::ReduceCode: public llvm::ModulePass
    std::unordered_map<std::string, Attribute_> Attributes;
    llvm::SmallSet<llvm::StoreInst*, 4> Protected;
    llvm::SmallSet<llvm::Function*, 4> ErasedFunc;
-   llvm::CallGraphNode* root;
    llvm::DominatorTree* DomT;
    LoopTripCount* LTC;
 

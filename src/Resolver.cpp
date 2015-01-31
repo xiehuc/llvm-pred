@@ -740,6 +740,14 @@ CallGraphNode* last_valid_child(CallGraphNode* N, set<Value*>& Only)
  *
  * 具体的示例可以参考单元测试. 以便取得更加深刻的理解.
  */
+#ifndef NDEBUG
+void DebugCGFilter(CGFilter* F)
+{
+   for(auto& I : F->order_map){
+      errs()<<I.first->getName()<<":["<<I.second.first<<","<<I.second.last<<")\n";
+   }
+}
+#endif
 
 CGFilter::CGFilter(CallGraphNode* root_, Instruction* threshold_inst_): root(root_)
 {

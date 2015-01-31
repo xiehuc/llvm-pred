@@ -239,19 +239,56 @@ static void RemoveDeadFunction(Module& M, bool focusDeclation)
    }
 }
 
+
 bool ReduceCode::runOnModule(Module &M)
 {
-   dse.prepare(this);
    dae.prepare(&M);
+   dse.prepare(this);
    ic.prepare(this);
    simpCFG.prepare(this);
 
+   DenseMap<Function*, bool> DirtyFunc;
+recaculate:
    CallGraph CG(M);
    Function* Main = M.getFunction("main");
-   root = Main?CG[Main]:CG.getExternalCallingNode();
+   auto root = Main?CG[Main]:CG.getExternalCallingNode();
    CGF = new CGFilter(root,NULL);
+   DirtyFunc.clear();
+   for(auto& F : M){
+      if(!F.isDeclaration() && CGF->count(&F)) DirtyFunc[&F] = true;
+   }
 
-   walkThroughCg(root);
+   bool Dirty;
+   do{
+      Dirty = false;
+      for(auto I = DirtyFunc.begin(); I!= DirtyFunc.end(); ){
+         Function* F = I->first;
+         if(I->second == false) {
+            ++I;continue;
+         }
+         if((I->second = runOnFunction(*F))){
+            Dirty = true;
+            washFunction(F);
+            for(auto I = F->use_begin(), E = F->use_end(); I!=E; ++I){
+               CallInst* CI = dyn_cast<CallInst>(I->getUser());
+               if(CI == NULL) continue;
+               Function* Parent = CI->getParent()->getParent();
+               DirtyFunc[Parent] = true;
+            }
+            for(auto I = CG[F]->begin(), E = CG[F]->end(); I!=E; ++I){
+               Function* Child = I->second->getFunction();
+               if(Child && !Child->isDeclaration()) DirtyFunc[Child] = true;
+            }
+            string FName = F->getName();
+            if(dae.runOnFunction(*F)){
+               errs()<<"\nbad things\n";
+               delete CGF;
+               // CG would be auto finalized
+               goto recaculate;
+            }
+         }
+      }
+   }while(Dirty);
 
    //first remove unused function
    RemoveDeadFunction(M, 0);
@@ -283,6 +320,10 @@ void ReduceCode::deleteDeadCaller(llvm::Function *F)
       Function* Parent = BB->getParent();
       washFunction(Parent);
    }
+}
+ReduceCode::~ReduceCode()
+{
+   delete CGF;
 }
 
 
@@ -421,6 +462,8 @@ ReduceCode::ReduceCode():ModulePass(ID),
    auto DirectDeleteCascade = std::bind(direct_return, _1, 
          AttributeFlags::IsDeletable | AttributeFlags::Cascade);
 
+   CGF = NULL;
+
    Attributes["_gfortran_transfer_character_write"] = gfortran_write_stdout;
    Attributes["_gfortran_transfer_integer_write"] = gfortran_write_stdout;
    Attributes["_gfortran_transfer_real_write"] = gfortran_write_stdout;
@@ -464,10 +507,6 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["mpi_finalize_"] = DirectDelete;
    Attributes["mpi_abort_"] = DirectDelete;
    Attributes["main"] = std::bind(direct_return, _1, AttributeFlags::None);
-}
-ReduceCode::~ReduceCode()
-{
-   delete CGF;
 }
 
 //==================================ATTRIBUTE END===============================//

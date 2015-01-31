@@ -338,6 +338,9 @@ struct lle::CGFilter
    CGFilter(llvm::CallGraphNode* main, llvm::Instruction* threshold=nullptr);
    unsigned indexof(llvm::Instruction*);
    void update(llvm::Instruction* threshold);
+   bool count(llvm::Function* F) {
+      return order_map.count(F);
+   }
    bool operator()(llvm::Use*);
 };
 
