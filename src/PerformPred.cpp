@@ -308,6 +308,8 @@ bool PerformPred::runOnFunction(Function &F)
       BranchProbability freq = getPathProb(Entry, BB);
       SumRhs = CreateMul(Builder, one(*BB), freq); //(\[GothicE]-->BB)
       SumRhs = force_insert(SumRhs, Builder, BB->getName()+".bfreq");
+      if(L && BB == L->getHeader())
+         ViewPort[L] = std::make_pair(Entry, SumRhs);
       PredBlockProfiler::increaseBlockCounter(BB, SumRhs, Builder.GetInsertPoint());
       pred_cls.emplace_back(LI->getLoopFor(BB)?STATIC_LOOP:STATIC_BLOCK, BB, freq);
    }
@@ -339,12 +341,13 @@ bool PerformPred::runOnFunction(Function &F)
                B_PN = Builder.CreateMul(B_PN, TC); // B_PN (H--P) %tc
             }else{
                B_PN = one(*BB);
-               for(PL = L->getParentLoop(); PL==NULL||PL->contains(E_V); L = PL){
-                  B_PN = Builder.CreateMul(B_PN, LTC->getOrInsertTripCount(L));
-                  B_PN = CreateMul(Builder, B_PN, getPathProb(PL->getHeader(), in_freq(L)));
+               Loop* IL;
+               for(IL=L,PL=L->getParentLoop(); PL!=NULL&&!PL->contains(E_V);IL=PL,PL=PL->getParentLoop()){
+                  B_PN = Builder.CreateMul(B_PN, LTC->getOrInsertTripCount(IL));
+                  B_PN = CreateMul(Builder, B_PN, getPathProb(PL->getHeader(), in_freq(IL)));
                }
-               B_PN = Builder.CreateMul(B_PN, LTC->getOrInsertTripCount(L));
-               B_PN = CreateMul(Builder, B_PN, getPathProb(E_V, in_freq(L)));
+               B_PN = Builder.CreateMul(B_PN, LTC->getOrInsertTripCount(IL));
+               B_PN = CreateMul(Builder, B_PN, getPathProb(E_V, in_freq(IL)));
             }
          }
          ViewPort[L] = std::make_pair(E_V, B_PN);
