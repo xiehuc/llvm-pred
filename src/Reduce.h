@@ -37,9 +37,7 @@ class lle::ReduceCode: public llvm::ModulePass
 
    AttributeFlags getAttribute(llvm::CallInst*);
    AttributeFlags getAttribute(llvm::StoreInst*);
-   void walkThroughCg(llvm::CallGraphNode*);
    void washFunction(llvm::Function* F);
-   void deleteDeadCaller(llvm::Function* F);
    AttributeFlags noused_param(llvm::Argument*);
    AttributeFlags noused_global(llvm::GlobalVariable* , llvm::Instruction* );
    public:

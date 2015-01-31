@@ -199,29 +199,6 @@ bool ReduceCode::runOnFunction(Function& F)
    return Ret;
 }
 
-void ReduceCode::walkThroughCg(llvm::CallGraphNode * CGN)
-{
-   Function* F = CGN->getFunction();
-   if(!F || F->isDeclaration()) return; // this is a external function
-   if(ErasedFunc.count(F)) return; // this function has already erased
-
-   runOnFunction(*F);
-   washFunction(F);
-
-   CallGraphNode::CalledFunctionsVector vec(CGN->begin(), CGN->end());
-   for(auto I = vec.rbegin(), E = vec.rend(); I!=E; ++I)
-      walkThroughCg(I->second);
-
-   runOnFunction(*F);
-   washFunction(F);
-
-   if(dae.runOnFunction(*F)){
-      ErasedFunc.insert(F);
-      return;
-   }
-   deleteDeadCaller(F);
-}
-
 static void RemoveDeadFunction(Module& M, bool focusDeclation)
 {
    for(auto F = M.begin(), E = M.end(); F!=E;){
@@ -311,16 +288,6 @@ void ReduceCode::washFunction(llvm::Function *F)
    simpCFG.runOnFunction(*F);
 }
 
-void ReduceCode::deleteDeadCaller(llvm::Function *F)
-{
-   for(auto I = F->use_begin(), E = F->use_end(); I!=E; ++I){
-      CallInst* CI = dyn_cast<CallInst>(I->getUser());
-      if(CI == NULL) continue;
-      BasicBlock* BB = CI->getParent();
-      Function* Parent = BB->getParent();
-      washFunction(Parent);
-   }
-}
 ReduceCode::~ReduceCode()
 {
    delete CGF;
