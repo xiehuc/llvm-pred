@@ -34,6 +34,7 @@ namespace lle
    // return true, and set @param 2 to global variable,
    // if it is referenced by a gep inst, set @param 3 to this gep inst
    bool isRefGlobal(llvm::Value* V, llvm::GlobalVariable** = nullptr, llvm::GetElementPtrInst** = nullptr);
+   llvm::GetElementPtrInst* isRefGEP(llvm::Instruction* I);
 
 	//remove cast instruction for a value
 	//because cast means the original value and the returned value is

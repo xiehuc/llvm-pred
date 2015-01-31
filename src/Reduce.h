@@ -6,6 +6,7 @@
 #include "Adaptive.h"
 
 namespace lle {
+   class CGFilter;
    class LoopTripCount;
    struct MarkPreserve;
    class SlashShrink;
@@ -33,6 +34,7 @@ class lle::ReduceCode: public llvm::ModulePass
    DSE_Adaptive dse;
    DAE_Adaptive dae;
    Adaptive ic, simpCFG;
+   CGFilter* CGF;
 
    AttributeFlags getAttribute(llvm::CallInst*);
    AttributeFlags getAttribute(llvm::StoreInst*);
@@ -44,6 +46,7 @@ class lle::ReduceCode: public llvm::ModulePass
    public:
    static char ID;
    ReduceCode();
+   ~ReduceCode();
    void getAnalysisUsage(llvm::AnalysisUsage& AU) const override;
    bool runOnModule(llvm::Module& M) override;
    bool runOnFunction(llvm::Function& F);

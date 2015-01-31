@@ -102,9 +102,10 @@ AttributeFlags ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP)
 {
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
-   GetElementPtrInst* GEPI = dyn_cast<GetElementPtrInst>(GEP);
+   GetElementPtrInst* GEPI = isRefGEP(GEP);
    if(GEPI) RE.addFilter(GEPFilter(GEPI));
-   RE.addFilter(CGFilter(root, GEP));
+   CGF->update(GEP);
+   RE.addFilter(*CGF);
    Value* Visit = RE.find_visit(GV);
    Dbg_PrintGraph(RE.resolve(GV), nullptr);
    if(Visit == NULL) return AttributeFlags::IsDeletable;
@@ -116,7 +117,7 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
    AttributeFlags flag = AttributeFlags::None;
    Argument* Arg = dyn_cast<Argument>(SI->getPointerOperand());
    AllocaInst* Alloca = dyn_cast<AllocaInst>(SI->getPointerOperand());
-   auto GEP = dyn_cast<GetElementPtrInst>(SI->getPointerOperand());
+   auto GEP = isRefGEP(SI);
 
    if(Protected.count(SI)) return AttributeFlags::None;
 
@@ -125,7 +126,8 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
       Alloca = dyn_cast<AllocaInst>(GEP->getPointerOperand());
       // 过于激进的删除
       if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
-         flag = noused_global(GV, GEP);
+         if(GV->getName().endswith("Counters")) return AttributeFlags::None;
+         flag = noused_global(GV, SI);
          REASON(flag, *SI, 0);
          return flag;
       }
@@ -247,6 +249,7 @@ bool ReduceCode::runOnModule(Module &M)
    CallGraph CG(M);
    Function* Main = M.getFunction("main");
    root = Main?CG[Main]:CG.getExternalCallingNode();
+   CGF = new CGFilter(root,NULL);
 
    walkThroughCg(root);
 
@@ -461,6 +464,10 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["mpi_finalize_"] = DirectDelete;
    Attributes["mpi_abort_"] = DirectDelete;
    Attributes["main"] = std::bind(direct_return, _1, AttributeFlags::None);
+}
+ReduceCode::~ReduceCode()
+{
+   delete CGF;
 }
 
 //==================================ATTRIBUTE END===============================//
