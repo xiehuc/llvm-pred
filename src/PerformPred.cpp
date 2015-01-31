@@ -247,6 +247,8 @@ BranchProbability PerformPred::getPathProb(BasicBlock *From, BasicBlock *To)
    Loop* F_L = LI->getLoopFor(From), *T_L = LI->getLoopFor(To);
    if(F_L == T_L) // they are in same loop level
       return BFI->getBlockFreq(To)/BFI->getBlockFreq(From);
+   //XXX temporary for simplification
+   return BFI->getBlockFreq(To)/BFI->getBlockFreq(From);
    auto Path = getPath(From, To);
    if(Path.size()<2) return empty;
    size_t n=1,d=1;
