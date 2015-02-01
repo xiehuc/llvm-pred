@@ -433,18 +433,27 @@ ReduceCode::ReduceCode():ModulePass(ID),
 
    Attributes["_gfortran_transfer_character_write"] = gfortran_write_stdout;
    Attributes["_gfortran_transfer_integer_write"] = gfortran_write_stdout;
+   Attributes["_gfortran_transfer_complex_write"] = gfortran_write_stdout;
    Attributes["_gfortran_transfer_real_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
    Attributes["_gfortran_system_clock_4"] = DirectDelete;
+   if(Force){
 //int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
 //               MPI_Op op, int root, MPI_Comm comm)
 //Deletable if recvbuf is no used
-   Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
+      Attributes["mpi_reduce_"] = mpi_allreduce_force;
 //int MPI_Allreduce(const void *sendbuf, void *recvbuf, int count,
 //                  MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
-   if(Force) Attributes["mpi_allreduce_"] = mpi_allreduce_force;
-   else Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
+      Attributes["mpi_allreduce_"] = mpi_allreduce_force;
+   }else{
+      Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
+      Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
+   }
+//int MPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+//                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
+//                 MPI_Comm comm)
+   Attributes["mpi_alltoall_"] = std::bind(mpi_nouse_at, _1, 3);
 //Deletable if recvbuf is no used
 //int MPI_Send(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
 //             MPI_Comm comm)
@@ -462,6 +471,7 @@ ReduceCode::ReduceCode():ModulePass(ID),
 //               MPI_Comm comm )
    // 由于模拟的时候只有一个进程, 所以不需要扩散变量.
    Attributes["mpi_bcast_"] = /*mpi_nouse_buf;*/DirectDelete;
+   Attributes["mpi_comm_split_"] = DirectDelete;
    Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, &Protected, "MPI_RANK");
    Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, &Protected, "MPI_SIZE");
    //always delete mpi_wtime_
