@@ -258,7 +258,6 @@ recaculate:
             }
             string FName = F->getName();
             if(dae.runOnFunction(*F)){
-               errs()<<"\nbad things\n";
                delete CGF;
                // CG would be auto finalized
                goto recaculate;
