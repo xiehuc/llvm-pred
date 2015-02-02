@@ -280,11 +280,6 @@ class lle::ResolveEngine
    // update V if find a visit or store inst
    static CallBack findRef(llvm::Value*& V);
    // }
-   // return storeinst if found
-   llvm::Value* find_store(llvm::Use&, CallBack C = always_false);
-   // return loadinst or callinst
-   llvm::Value* find_visit(llvm::Use&, CallBack C = always_false);
-   llvm::Value* find_visit(llvm::Value*, CallBack C = always_false);
 };
 
 

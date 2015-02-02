@@ -17,6 +17,7 @@
 #include "config.h"
 #include "LoopTripCount.h"
 #include "Resolver.h"
+#include "ddg.h"
 #include "debug.h"
 
 using namespace std;
@@ -139,7 +140,8 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 		Value* PSi = IndOrNext->getOperand(0);//point type Step.i
 		int SICount[2] = {0};//store in predecessor count,store in loop body count
 
-      Value* Store = RE.find_store(IndOrNext->getOperandUse(0));
+      Value* Store;
+      RE.resolve(IndOrNext->getOperandUse(0), RE.findStore(Store));
       if(Store && isa<StoreInst>(Store)){
          StoreInst* SI = cast<StoreInst>(Store);
          if(L->isLoopInvariant(SI->getValueOperand())){

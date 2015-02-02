@@ -480,18 +480,6 @@ DataDepGraph ResolveEngine::resolve(Value* I, CallBack C)
    return G;
 }
 
-Value* ResolveEngine::find_store(Use& Tg, CallBack C)
-{
-   Value* ret = NULL;
-   resolve(Tg, [&ret, &C](Use* U){
-         User* Ur = U->getUser();
-         if(isa<StoreInst>(Ur))
-            ret=Ur;
-         return C(U);
-      });
-   return ret;
-}
-
 struct find_visit
 {
    llvm::Value*& ret;
@@ -542,20 +530,6 @@ ResolveEngine::CallBack ResolveEngine::findRef(Value *&V)
    return [visit, store](Use* U) {
       return visit(U)||store(U);
    };
-}
-
-Value* ResolveEngine::find_visit(Use& U, CallBack C)
-{
-   Value* ret = NULL;
-   resolve(U, ::find_visit(ret));
-   return ret;
-}
-
-Value* ResolveEngine::find_visit(Value* V, CallBack C)
-{
-   Value* ret = NULL;
-   resolve(V, ::find_visit(ret));
-   return ret;
 }
 
 //===========================RESOLVE RULES======================================//

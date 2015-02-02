@@ -107,7 +107,8 @@ AttributeFlags ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP)
    RE.addFilter(*CGF);
    GetElementPtrInst* GEPI = isRefGEP(GEP);
    if(GEPI) RE.addFilter(GEPFilter(GEPI));
-   Value* Visit = RE.find_visit(GV);
+   Value* Visit;
+   RE.resolve(GV, RE.findVisit(Visit));
    Dbg_PrintGraph(RE.resolve(GV), nullptr);
    if(Visit == NULL) return AttributeFlags::IsDeletable;
    else return AttributeFlags::None;
@@ -304,7 +305,8 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
    RE.addRule(RE.useonly_rule);
    RE.addFilter(GEPFilter{0,0,1});
    auto ddg = RE.resolve(st_parameter);
-   Value* Store = RE.find_store(st_parameter);
+   Value* Store;
+   RE.resolve(st_parameter, RE.findStore(Store));
    if(Store != NULL && isa<StoreInst>(Store)){
       auto u = extract(dyn_cast<ConstantInt>(cast<StoreInst>(Store)->getValueOperand()));
       if(u == 6 || u == 0) return IsPrint; // 6 means write to stdout, 0 means write to stderr
@@ -318,22 +320,26 @@ static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C)
    RE.addRule(RE.ibase_rule);
    InitRule ir(RE.iuse_rule);
    RE.addRule(std::ref(ir));
+   RE.addFilter(C);
    Use* ToSearch = &U;
-   if(RE.find_visit(*ToSearch, C)) return AttributeFlags::None;
+   Value* Searched;
+   RE.resolve(*ToSearch, RE.findVisit(Searched));
+   if(Searched) return AttributeFlags::None;
    if(auto GEP = isRefGEP(U)){
       // if we didn't find direct visit on Pointed, we tring find visit on
       // GEP->getPointerOperand()
       RE.addFilter(GEPFilter(GEP));
       ToSearch = &GEP->getOperandUse(0);
       ir.clear();
-      if(RE.find_visit(*ToSearch, C)) return AttributeFlags::None;
+      RE.resolve(*ToSearch, RE.findVisit(Searched));
+      if(Searched) return AttributeFlags::None;
       else {
          ir.clear();
-         Dbg_PrintGraph(RE.resolve(*ToSearch, C), U.getUser());
+         Dbg_PrintGraph(RE.resolve(*ToSearch), U.getUser());
       }
    }
    ir.clear();
-   Dbg_PrintGraph(RE.resolve(U, C), U.getUser());
+   Dbg_PrintGraph(RE.resolve(U), U.getUser());
    return AttributeFlags::IsDeletable;
 }
 
