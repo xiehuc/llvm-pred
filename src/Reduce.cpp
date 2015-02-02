@@ -18,7 +18,7 @@
 
 #define REASON(flag, what, tag) DEBUG(if(flag){\
       errs()<<(what)<<" removed in line: "<<__LINE__<<':'<<tag<<"\n";\
-      errs()<<"which with "<<*(what).getPointerOperand()<<"\n";\
+      errs()<<" -->"<<*(what).getPointerOperand()<<"\n";\
       })
 
 using namespace std;
@@ -102,10 +102,10 @@ AttributeFlags ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP)
 {
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
-   GetElementPtrInst* GEPI = isRefGEP(GEP);
-   if(GEPI) RE.addFilter(GEPFilter(GEPI));
    CGF->update(GEP);
    RE.addFilter(*CGF);
+   GetElementPtrInst* GEPI = isRefGEP(GEP);
+   if(GEPI) RE.addFilter(GEPFilter(GEPI));
    Value* Visit = RE.find_visit(GV);
    Dbg_PrintGraph(RE.resolve(GV), nullptr);
    if(Visit == NULL) return AttributeFlags::IsDeletable;
@@ -117,7 +117,7 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
    AttributeFlags flag = AttributeFlags::None;
    Argument* Arg = dyn_cast<Argument>(SI->getPointerOperand());
    AllocaInst* Alloca = dyn_cast<AllocaInst>(SI->getPointerOperand());
-   auto GEP = isRefGEP(SI);
+   auto GEP = isRefGEP(SI->getOperandUse(1));
 
    if(Protected.count(SI)) return AttributeFlags::None;
 
@@ -317,10 +317,9 @@ static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C)
    RE.addRule(RE.ibase_rule);
    InitRule ir(RE.iuse_rule);
    RE.addRule(std::ref(ir));
-   Value* Pointed = U.get();
    Use* ToSearch = &U;
    if(RE.find_visit(*ToSearch, C)) return AttributeFlags::None;
-   if(auto GEP = dyn_cast<GetElementPtrInst>(Pointed)){
+   if(auto GEP = isRefGEP(U)){
       // if we didn't find direct visit on Pointed, we tring find visit on
       // GEP->getPointerOperand()
       RE.addFilter(GEPFilter(GEP));
