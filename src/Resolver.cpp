@@ -495,14 +495,12 @@ Value* ResolveEngine::find_store(Use& Tg, CallBack C)
 struct find_visit
 {
    llvm::Value*& ret;
-   ResolveEngine::CallBack& C;
-   llvm::User* TgUr;
-   find_visit(llvm::Value*& ret, ResolveEngine::CallBack& C, llvm::User* Ur):
-      ret(ret), C(C), TgUr(Ur) {}
+   bool first;
+   find_visit(llvm::Value*& ret):
+      ret(ret), first(true) {}
    bool operator()(Use* U){
       User* Ur = U->getUser();
-      bool Pass = C(U);
-      if(Ur != TgUr && !Pass){// only it isn't itSelf and not banned by Caller
+      if(!first){//when first, it run on itself, so we should ignore
          if(isa<LoadInst>(Ur))
             ret=Ur;
          else if(CallInst* CI = dyn_cast<CallInst>(Ur)){//call inst also is a kind of visit
@@ -511,24 +509,52 @@ struct find_visit
                   ret=CI;
          }
       }
+      first = false;
       // most of time, we just care whether it has visitor,
       // so if we found one, we can stop search
-      return ret||Pass;
+      return ret;
    }
 };
+
+ResolveEngine::CallBack ResolveEngine::findVisit(Value*& V)
+{
+   V = NULL;
+   return ::find_visit(V);
+}
+
+ResolveEngine::CallBack ResolveEngine::findStore(Value *&V)
+{
+   V = NULL;
+   return [&V](Use* U){
+      User* Ur = U->getUser();
+      if(isa<StoreInst>(Ur)){
+         V=Ur;
+         return true;
+      }
+      return false;
+   };
+}
+
+ResolveEngine::CallBack ResolveEngine::findRef(Value *&V)
+{
+   auto visit = findVisit(V);
+   auto store = findStore(V);
+   return [visit, store](Use* U) {
+      return visit(U)||store(U);
+   };
+}
 
 Value* ResolveEngine::find_visit(Use& U, CallBack C)
 {
    Value* ret = NULL;
-   User* TgUr = U.getUser();
-   resolve(U, ::find_visit(ret, C, TgUr));
+   resolve(U, ::find_visit(ret));
    return ret;
 }
 
 Value* ResolveEngine::find_visit(Value* V, CallBack C)
 {
    Value* ret = NULL;
-   resolve(V, ::find_visit(ret, C, nullptr));
+   resolve(V, ::find_visit(ret));
    return ret;
 }
 

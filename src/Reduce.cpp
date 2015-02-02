@@ -79,8 +79,9 @@ static AttributeFlags noused(llvm::Value* V)
 {
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
-   Value* Visit = RE.find_visit(V);
-   if(Visit == NULL) return IsDeletable;
+   Value* Ref;
+   RE.resolve(V, RE.findRef(Ref));
+   if(Ref == NULL) return IsDeletable;
    else return AttributeFlags::None;
 }
 static AttributeFlags noused_ret_rep(ReturnInst* RI)
@@ -92,7 +93,7 @@ static AttributeFlags noused_ret_rep(ReturnInst* RI)
    if(F->getName() == "main") return AttributeFlags::None;
 
    bool all_deletable = std::all_of(F->user_begin(), F->user_end(), [](User* C){
-         return C->use_empty();//find_visit doesn't consider store, we temporary doesn't use it
+         return noused(C);//find_visit doesn't consider store, we temporary doesn't use it
          });
    if(all_deletable)
       ReturnInst::Create(F->getContext(), UndefValue::get(Ret->getType()), RI->getParent());

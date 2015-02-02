@@ -272,6 +272,14 @@ class lle::ResolveEngine
    // use with InitRule, a public rule used for 
    static const SolveRule iuse_rule;
    // }
+   // {
+   // update V if find a visit inst(load and call)
+   static CallBack findVisit(llvm::Value*& V);
+   // update V if find a store inst
+   static CallBack findStore(llvm::Value*& V);
+   // update V if find a visit or store inst
+   static CallBack findRef(llvm::Value*& V);
+   // }
    // return storeinst if found
    llvm::Value* find_store(llvm::Use&, CallBack C = always_false);
    // return loadinst or callinst
