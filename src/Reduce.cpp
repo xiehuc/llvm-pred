@@ -7,6 +7,7 @@
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Support/GraphWriter.h>
 #include <llvm/ADT/PostOrderIterator.h>
+#include <llvm/Transforms/Utils/BasicBlockUtils.h>
 
 #include <ValueProfiling.h>
 
@@ -364,16 +365,26 @@ static constexpr AttributeFlags direct_return(CallInst* CI, AttributeFlags flags
    return flags;
 }
 
-static AttributeFlags mpi_comm_replace(CallInst* CI, SmallPtrSetImpl<StoreInst*>* Protected, const char* Env)
+static AttributeFlags mpi_comm_replace(CallInst* CI, SmallPtrSetImpl<StoreInst*>* Protected, const std::string Env)
 {
    Module* M = CI->getParent()->getParent()->getParent();
    LLVMContext& C = M->getContext();
    Type* CharPTy = Type::getInt8PtrTy(C);
+   Type* I32Ty = Type::getInt32Ty(C);
+   Instruction* Res;
    Constant* getenvF = M->getOrInsertFunction("getenv", CharPTy, CharPTy, NULL);
-   Constant* atoiF = M->getOrInsertFunction("atoi", Type::getInt32Ty(C), CharPTy, NULL);
+   Constant* atoiF = M->getOrInsertFunction("atoi", I32Ty, CharPTy, NULL);
+   Constant* putsF = M->getOrInsertFunction("puts", I32Ty, CharPTy, NULL);
+   Constant* exitF = M->getOrInsertFunction("exit", Type::getVoidTy(C), I32Ty, NULL);
    Value* RankVariable = CI->getArgOperand(1);
-   Value* Environment = CallInst::Create(getenvF, {insertConstantString(M, Env)}, "", CI);
-   Value* Rank = CallInst::Create(atoiF, {Environment}, "", CI);
+   CallInst* Environment = CallInst::Create(getenvF, {insertConstantString(M, Env)}, "", CI);
+   Res = new ICmpInst(CI, ICmpInst::ICMP_EQ, Environment,
+         ConstantPointerNull::get(dyn_cast<PointerType>(Environment->getType())));
+   CallInst* Rank = CallInst::Create(atoiF, {Environment}, "", CI);
+   Res = SplitBlockAndInsertIfThen(Res, Rank, true);
+   CallInst::Create(putsF, {insertConstantString(M, 
+            "Please set environment "+Env+" variable")},"",Res);
+   CallInst::Create(exitF, {ConstantInt::getNullValue(I32Ty)}, "", Res);
    Protected->insert(new StoreInst(Rank, RankVariable, CI)); // 因为它是最后加入的, 所以排在use列表的最后.
    return AttributeFlags::IsDeletable;
 }
