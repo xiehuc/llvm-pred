@@ -4,6 +4,7 @@
 #include <llvm/ADT/SmallSet.h>
 #include <unordered_map>
 #include "Adaptive.h"
+#include "Resolver.h"
 
 namespace lle {
    class CGFilter;
@@ -19,6 +20,9 @@ namespace lle {
    };
    inline AttributeFlags operator|(AttributeFlags a, AttributeFlags b)
    {return static_cast<AttributeFlags>(static_cast<int>(a) | static_cast<int>(b));}
+};
+namespace llvm {
+   class Use;
 };
 
 class lle::ReduceCode: public llvm::ModulePass
@@ -39,7 +43,10 @@ class lle::ReduceCode: public llvm::ModulePass
    AttributeFlags getAttribute(llvm::StoreInst*);
    void washFunction(llvm::Function* F);
    AttributeFlags noused_param(llvm::Argument*);
-   AttributeFlags noused_global(llvm::GlobalVariable* , llvm::Instruction* );
+   llvm::Value *
+   noused_global(llvm::GlobalVariable *, llvm::Instruction *,
+                 ResolveEngine::CallBack = ResolveEngine::always_false);
+   llvm::Value* noused(llvm::Use&);
    public:
    static char ID;
    ReduceCode();

@@ -17,10 +17,24 @@
 #include "ddg.h"
 #include "debug.h"
 
-#define REASON(flag, what, tag) DEBUG(if(flag){\
-      errs()<<(what)<<" removed in line: "<<__LINE__<<':'<<tag<<"\n";\
-      errs()<<" -->"<<*(what).getPointerOperand()<<"\n";\
-      })
+#define WHY_RMED(flag, what, tag)                                              \
+  DEBUG(if (flag) {                                                            \
+    errs() << (what) << " removed in line: ";                                  \
+    errs() << __LINE__ << ':' << tag << "\n";                                  \
+    errs() << " -->" << *(what).getPointerOperand() << "\n";                   \
+  })
+#define WHAT_RMD(what)                                                         \
+  DEBUG({                                                                      \
+    errs() << *(what).getUser() << " removed in line ";                        \
+    errs() << __LINE__ << ":\n";                                               \
+    errs() << " -->" << *(what).get() << "\n";                                 \
+  })
+#define WHY_KEPT(what, searched)                                               \
+  DEBUG({                                                                      \
+    errs() << (what) << " couldn't removed because: \n";                       \
+    errs() << "found visit : " << (searched) << "\n";                          \
+  })
+#define FLAG(what) (what)?AttributeFlags::IsDeletable:AttributeFlags::None
 
 using namespace std;
 using namespace lle;
@@ -28,8 +42,6 @@ using namespace llvm;
 
 char ReduceCode::ID = 0;
 static RegisterPass<ReduceCode> Y("Reduce", "Slash and Shrink Code to make a minicore program");
-static AttributeFlags noused_exclude(llvm::Use& U, llvm::SmallPtrSetImpl<User*>& exclude);
-static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C = ResolveEngine::always_false);
 cl::opt<bool> Force("Force", cl::desc("Enable Force Reduce Mode"));
 #ifndef NDEBUG
 static bool Dbg_EnablePrintGraph = false;
@@ -45,6 +57,50 @@ static void Dbg_PrintGraph_(DataDepGraph&& ddg, User* Ur)
 #define Dbg_PrintGraph(ddg, Ur)
 #endif
 
+struct excluded{
+   llvm::SmallPtrSetImpl<User*>& ex;
+   excluded(llvm::SmallPtrSetImpl<User*>& e):ex(e) {}
+   bool operator()(Use* U){
+      if(ex.count(U->getUser())) return true;
+      return false;
+   }
+};
+
+// a simple basic noused check 
+static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = ResolveEngine::always_false)
+{
+   ResolveEngine RE;
+   RE.addRule(RE.ibase_rule);
+   InitRule ir(RE.iuse_rule);
+   RE.addRule(std::ref(ir));
+   RE.addFilter(C);
+   Use* ToSearch = &U;
+   Value* Searched;
+   RE.resolve(*ToSearch, RE.findVisit(Searched));
+   if(Searched){
+      WHY_KEPT(*U, *Searched);
+      return AttributeFlags::None;
+   }
+   if(auto GEP = isRefGEP(U)){
+      // if we didn't find direct visit on Pointed, we tring find visit on
+      // GEP->getPointerOperand()
+      RE.addFilter(GEPFilter(GEP));
+      ToSearch = &GEP->getOperandUse(0);
+      ir.clear();
+      RE.resolve(*ToSearch, RE.findVisit(Searched));
+      if (Searched) {
+         WHY_KEPT(*U, *Searched);
+         return AttributeFlags::None;
+      } else {
+         ir.clear();
+         Dbg_PrintGraph(RE.resolve(*ToSearch), U.getUser());
+      }
+   }
+   ir.clear();
+   Dbg_PrintGraph(RE.resolve(U), U.getUser());
+   WHAT_RMD(U);
+   return AttributeFlags::IsDeletable;
+}
 
 AttributeFlags ReduceCode::getAttribute(CallInst * CI)
 {
@@ -64,15 +120,16 @@ AttributeFlags ReduceCode::noused_param(Argument* Arg)
          CallInst* CI = dyn_cast<CallInst>(C);
          llvm::Use* Para = findCallInstParameter(Arg, CI);
          if(Para == NULL) return 0;
-         auto f = (noused_exclude(*Para, S) & IsDeletable);
+         auto f = (noused_flat(*Para, excluded(S)) & IsDeletable);
          Argument* NestArg = dyn_cast<Argument>(Para->get());
          if(f && NestArg) f &= Self->noused_param(NestArg);
          GlobalVariable* GV = NULL;
          GetElementPtrInst* GEP = NULL;
          if(f && isRefGlobal(Para->get(), &GV, &GEP))
-            f &= Self->noused_global(GV, CI);
+            f &= FLAG(Self->noused_global(GV, CI, excluded(S)));
          return f;
          });
+   if(all_deletable);
    return all_deletable ? IsDeletable : AttributeFlags::None;
 }
 
@@ -100,24 +157,53 @@ static AttributeFlags noused_ret_rep(ReturnInst* RI)
       ReturnInst::Create(F->getContext(), UndefValue::get(Ret->getType()), RI->getParent());
    return all_deletable ? IsDeletable : AttributeFlags::None;
 }
-AttributeFlags ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP)
+Value* ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP, ResolveEngine::CallBack C)
 {
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
    CGF->update(GEP);
    RE.addFilter(*CGF);
+   RE.addFilter(C);
    GetElementPtrInst* GEPI = isRefGEP(GEP);
    if(GEPI) RE.addFilter(GEPFilter(GEPI));
    Value* Visit;
    RE.resolve(GV, RE.findVisit(Visit));
    Dbg_PrintGraph(RE.resolve(GV), nullptr);
-   if(Visit == NULL) return AttributeFlags::IsDeletable;
-   else return AttributeFlags::None;
+   return Visit;
 }
+/*
+Value* ReduceCode::noused(llvm::Use &U)
+{
+   Argument* Arg = dyn_cast<Argument>(U.get());
+   AllocaInst* Alloca = dyn_cast<AllocaInst>(U.get());
+   auto GEP = isRefGEP(U);
+
+   if(GEP){
+      Arg = dyn_cast<Argument>(GEP->getPointerOperand());
+      Alloca = dyn_cast<AllocaInst>(GEP->getPointerOperand());
+      // 过于激进的删除
+      if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
+         if(GV->getName().endswith("Counters")) return NULL;
+         return noused_global(GV, SI);
+      }
+   }
+
+   if(Arg){
+      flag = noused_flat(U);
+      flag = AttributeFlags(flag & noused_param(Arg));
+      WHY_RMED(flag, *SI, (GEP==nullptr));
+   }else if(Alloca){
+      flag = noused_flat(U);
+      WHY_RMED(flag, *SI, (GEP==nullptr));
+   }
+   return flag;
+}
+*/
 
 AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
 {
    AttributeFlags flag = AttributeFlags::None;
+   Value* what;
    Argument* Arg = dyn_cast<Argument>(SI->getPointerOperand());
    AllocaInst* Alloca = dyn_cast<AllocaInst>(SI->getPointerOperand());
    auto GEP = isRefGEP(SI->getOperandUse(1));
@@ -130,16 +216,15 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
       // 过于激进的删除
       if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
          if(GV->getName().endswith("Counters")) return AttributeFlags::None;
-         flag = noused_global(GV, SI);
-         REASON(flag, *SI, 0);
-         return flag;
+         what = noused_global(GV, SI);
+         return FLAG(what);
       }
    }
 
    if(Arg){
-      flag = noused(SI->getOperandUse(1));
+      flag = noused_flat(SI->getOperandUse(1));
       flag = AttributeFlags(flag & noused_param(Arg));
-      REASON(flag, *SI, (GEP==nullptr));
+      WHY_RMED(flag, *SI, (GEP==nullptr));
    }else if(Alloca){
       Loop* L = LTC->getLoopFor(SI->getParent());
       if(L){
@@ -151,15 +236,15 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
                Ind = LI->getOperand(0);
             if(Ind != SI->getPointerOperand()){
                //XXX not stable, because it doesn't use domtree info
-               flag = noused(SI->getOperandUse(1));
-               REASON(flag, *SI, (GEP==nullptr));
+               flag = noused_flat(SI->getOperandUse(1));
+               WHY_RMED(flag, *SI, (GEP==nullptr));
             }
          }// if it is in loop, and we can't get induction, we ignore it
       }else{
          // a store inst not in loop, and it isn't used after
          // then it can be removed
-         flag = noused(SI->getOperandUse(1));
-         REASON(flag, *SI, (GEP==nullptr));
+         flag = noused_flat(SI->getOperandUse(1));
+         WHY_RMED(flag, *SI, (GEP==nullptr));
       }
    }
    return flag;
@@ -315,49 +400,11 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
    return AttributeFlags::None;
 }
 
-static AttributeFlags noused(llvm::Use& U, ResolveEngine::CallBack C)
-{
-   ResolveEngine RE;
-   RE.addRule(RE.ibase_rule);
-   InitRule ir(RE.iuse_rule);
-   RE.addRule(std::ref(ir));
-   RE.addFilter(C);
-   Use* ToSearch = &U;
-   Value* Searched;
-   RE.resolve(*ToSearch, RE.findVisit(Searched));
-   if(Searched) return AttributeFlags::None;
-   if(auto GEP = isRefGEP(U)){
-      // if we didn't find direct visit on Pointed, we tring find visit on
-      // GEP->getPointerOperand()
-      RE.addFilter(GEPFilter(GEP));
-      ToSearch = &GEP->getOperandUse(0);
-      ir.clear();
-      RE.resolve(*ToSearch, RE.findVisit(Searched));
-      if(Searched) return AttributeFlags::None;
-      else {
-         ir.clear();
-         Dbg_PrintGraph(RE.resolve(*ToSearch), U.getUser());
-      }
-   }
-   ir.clear();
-   Dbg_PrintGraph(RE.resolve(U), U.getUser());
-   return AttributeFlags::IsDeletable;
-}
 
 static AttributeFlags mpi_nouse_at(llvm::CallInst* CI, unsigned Which)
 {
    Use& buf = CI->getArgOperandUse(Which);
-   return noused(buf);
-}
-
-static AttributeFlags noused_exclude(llvm::Use& U, llvm::SmallPtrSetImpl<User*>& exclude)
-{
-   User* Self = U.getUser();
-   AttributeFlags ret = noused(U, [&exclude, Self](Use* U){
-         if(U->getUser() != Self && exclude.count(U->getUser())) return true;
-         return false;
-         });
-   return ret;
+   return noused_flat(buf);
 }
 
 static constexpr AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)
