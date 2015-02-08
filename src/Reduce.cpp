@@ -8,6 +8,7 @@
 #include <llvm/Support/GraphWriter.h>
 #include <llvm/ADT/PostOrderIterator.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
+#include <llvm/IR/IntrinsicInst.h>
 
 #include <ValueProfiling.h>
 
@@ -31,7 +32,7 @@
   })
 #define WHY_KEPT(what, searched)                                               \
   DEBUG({                                                                      \
-    errs() << (what) << " couldn't removed because: \n";                       \
+    errs() << *(what).getUser() << " couldn't removed because: \n";                       \
     errs() << "found visit : " << (searched) << "\n";                          \
   })
 #define FLAG(what) (what)?AttributeFlags::IsDeletable:AttributeFlags::None
@@ -78,7 +79,7 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
    Value* Searched;
    RE.resolve(*ToSearch, RE.findVisit(Searched));
    if(Searched){
-      WHY_KEPT(*U, *Searched);
+      WHY_KEPT(U, *Searched);
       return AttributeFlags::None;
    }
    if(auto GEP = isRefGEP(U)){
@@ -89,7 +90,7 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
       ir.clear();
       RE.resolve(*ToSearch, RE.findVisit(Searched));
       if (Searched) {
-         WHY_KEPT(*U, *Searched);
+         WHY_KEPT(U, *Searched);
          return AttributeFlags::None;
       } else {
          ir.clear();
@@ -105,6 +106,8 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
 AttributeFlags ReduceCode::getAttribute(CallInst * CI)
 {
    StringRef Name = castoff(CI->getCalledValue())->getName();
+   if(auto I = dyn_cast<IntrinsicInst>(CI))
+      Name = getName(I->getIntrinsicID());
    auto Found = Attributes.find(Name);
    if(Found == Attributes.end()) return AttributeFlags::None;
    return Found->second(CI);
@@ -129,7 +132,6 @@ AttributeFlags ReduceCode::noused_param(Argument* Arg)
             f &= FLAG(Self->noused_global(GV, CI, excluded(S)));
          return f;
          });
-   if(all_deletable);
    return all_deletable ? IsDeletable : AttributeFlags::None;
 }
 
@@ -401,7 +403,7 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
 }
 
 
-static AttributeFlags mpi_nouse_at(llvm::CallInst* CI, unsigned Which)
+static AttributeFlags nouse_at(llvm::CallInst* CI, unsigned Which)
 {
    Use& buf = CI->getArgOperandUse(Which);
    return noused_flat(buf);
@@ -486,8 +488,8 @@ ReduceCode::ReduceCode():ModulePass(ID),
    simpCFG(createCFGSimplificationPass())
 {
    using std::placeholders::_1;
-   auto mpi_nouse_recvbuf = std::bind(mpi_nouse_at, _1, 1);
-   auto mpi_nouse_buf = std::bind(mpi_nouse_at, _1, 0);
+   auto mpi_nouse_recvbuf = std::bind(nouse_at, _1, 1);
+   auto mpi_nouse_buf = std::bind(nouse_at, _1, 0);
    auto DirectDelete = std::bind(direct_return, _1, AttributeFlags::IsDeletable);
    auto DirectDeleteCascade = std::bind(direct_return, _1, 
          AttributeFlags::IsDeletable | AttributeFlags::Cascade);
@@ -501,6 +503,7 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["_gfortran_st_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
    Attributes["_gfortran_system_clock_4"] = DirectDelete;
+   Attributes["llvm.memset"] = std::bind(nouse_at, _1, 0);
    if(Force){
 //int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
 //               MPI_Op op, int root, MPI_Comm comm)
@@ -516,7 +519,7 @@ ReduceCode::ReduceCode():ModulePass(ID),
 //int MPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 //                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
 //                 MPI_Comm comm)
-   Attributes["mpi_alltoall_"] = std::bind(mpi_nouse_at, _1, 3);
+   Attributes["mpi_alltoall_"] = std::bind(nouse_at, _1, 3);
 //Deletable if recvbuf is no used
 //int MPI_Send(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
 //             MPI_Comm comm)
