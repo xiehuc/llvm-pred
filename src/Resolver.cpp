@@ -457,26 +457,17 @@ void ResolveEngine::do_solve(DataDepGraph& G, CallBack& C)
    }
 }
 
-DataDepGraph ResolveEngine::resolve(Use& U, CallBack C)
-{
-   DataDepGraph G;
-   // if is ::implicity_rule, it is dependency query.
-   G.isDependency(implicity_rule == ::implicity_rule);
-   iteration = 0;
-   G.addUnsolved(U);
-   do_solve(G, C);
-   G.setRoot(&U);
-   return G;
-}
-
-DataDepGraph ResolveEngine::resolve(Value* I, CallBack C)
+DataDepGraph ResolveEngine::resolve(QueryTy Q, CallBack C)
 {
    DataDepGraph G;
    G.isDependency(implicity_rule == ::implicity_rule);
    iteration = 0;
-   implicity_rule(I, G);
+   if(Q.is<Use*>())
+      G.addUnsolved(*Q.get<Use*>());
+   else
+      implicity_rule(Q.get<Value*>(), G);
+   G.setRoot(Q);
    do_solve(G, C);
-   G.setRoot(I);
    return G;
 }
 
@@ -610,10 +601,10 @@ static bool gep_rule_(Use* U, DataDepGraph& G)
    Use* Tg = U;
    bool ret = false;
    while( (Tg = Tg->getNext()) ){
-      auto V = Tg->getUser();
-      if(isa<GetElementPtrInst>(V) && V->getOperand(0) == Tg->get() ){
+      auto GEP = isGEP(Tg->getUser());
+      if(GEP && GEP->getPointerOperand() == Tg->get() ){
          // add all GEP to Unsolved
-         G.addSolved(U, V->getOperandUse(0));
+         G.addSolved(U, GEP->getOperandUse(0));
          ret = true;
       }
    }
@@ -663,7 +654,6 @@ void ResolveEngine::ibase_rule(ResolveEngine& RE)
    RE.addRule(SolveRule(direct_inverse_rule_));
    RE.implicity_rule = ::implicity_inverse_rule;
 }
-const ResolveEngine::CallBack ResolveEngine::always_false = [](Use* U){ return false; };
 const ResolveEngine::SolveRule ResolveEngine::useonly_rule = useonly_rule_;
 const ResolveEngine::SolveRule ResolveEngine::gep_rule = gep_rule_;
 const ResolveEngine::SolveRule ResolveEngine::iuse_rule = use_inverse_rule_;
@@ -698,16 +688,6 @@ bool GEPFilter::operator()(llvm::Use* U)
       return !eq;
    }
    return false;
-}
-CallGraphNode* last_valid_child(CallGraphNode* N, set<Value*>& Only)
-{
-   using RIte = std::reverse_iterator<CallGraphNode::iterator>;
-   auto found = find_if(RIte(N->end()), RIte(N->begin()), [&Only](RIte::value_type& P){
-            auto F = P.second->getFunction();
-            return Only.count(P.first) && F != NULL && !F->isDeclaration();
-         });
-   if(found == RIte(N->begin())) return NULL;
-   else return found->second;
 }
 
 /** CGFilter : 利用CallGraph信息, 求解两条指令的偏序关系, 即给出一条指令作为基
@@ -748,6 +728,16 @@ void DebugCGFilter(CGFilter* F)
    }
 }
 #endif
+static CallGraphNode* last_valid_child(CallGraphNode* N, set<Value*>& Only)
+{
+   using RIte = std::reverse_iterator<CallGraphNode::iterator>;
+   auto found = find_if(RIte(N->end()), RIte(N->begin()), [&Only](RIte::value_type& P){
+            auto F = P.second->getFunction();
+            return Only.count(P.first) && F != NULL && !F->isDeclaration();
+         });
+   if(found == RIte(N->begin())) return NULL;
+   else return found->second;
+}
 
 CGFilter::CGFilter(CallGraphNode* root_, Instruction* threshold_inst_): root(root_)
 {

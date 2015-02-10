@@ -35,7 +35,9 @@ namespace lle
    // if it is referenced by a gep inst, set @param 3 to this gep inst
    bool isRefGlobal(llvm::Value* V, llvm::GlobalVariable** = nullptr, llvm::GetElementPtrInst** = nullptr);
    // return if U.get() is GEP
-   llvm::GetElementPtrInst* isRefGEP(llvm::Use& U);
+   llvm::GetElementPtrInst* isGEP(llvm::Use& U);
+   // return if I is GEP
+   llvm::GetElementPtrInst* isGEP(llvm::User* I);
    // return if I is GEP or I's operand is GEP
    llvm::GetElementPtrInst* isRefGEP(llvm::Instruction* I);
 

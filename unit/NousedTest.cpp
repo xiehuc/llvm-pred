@@ -24,9 +24,9 @@ entry:
 
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
-   RE.addRule(RE.iuse_rule);
+   RE.addRule(InitRule(RE.iuse_rule));
 
    Value* V;
-   RE.resolve(SI->getOperandUse(1), RE.findVisit(V));
+   RE.resolve(&SI->getOperandUse(1), RE.findVisit(V));
    EXPECT_EQ(V, std::next(B_a_beg, 2));
 }

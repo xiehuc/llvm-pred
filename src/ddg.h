@@ -249,6 +249,7 @@ class DataDepGraph: public llvm::DenseMap<DDGraphKeyTy, DataDepNode>
    }
 
    void setRoot(DDGraphKeyTy K){ root = K; }
+   DDGraphKeyTy getRootKey() { return root; }
    value_type& getRoot() {return *this->find(root);}
    bool isDenpendency() const {return bottom_up;}
 };

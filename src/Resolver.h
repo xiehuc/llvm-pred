@@ -9,6 +9,7 @@
 
 #include <llvm/Pass.h>
 #include <llvm/IR/Instruction.h>
+#include <llvm/ADT/PointerUnion.h>
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Analysis/MemoryDependenceAnalysis.h>
 
@@ -222,6 +223,7 @@ class lle::ResolveEngine
    public:
    // if return true, means found a solve.
    typedef std::function<bool(llvm::Use*, DataDepGraph&)> SolveRule;
+   typedef llvm::PointerUnion<llvm::Value*, llvm::Use*> QueryTy;
    // if return true, stop solve in current branch
    typedef std::function<bool(llvm::Use*)> CallBack;
 
@@ -251,10 +253,11 @@ class lle::ResolveEngine
    }
 
    void setMaxIteration(size_t max) { max_iteration = max;}
-   DataDepGraph resolve(llvm::Value* I, CallBack C = always_false);
-   DataDepGraph resolve(llvm::Use& U, CallBack C = always_false);
+   DataDepGraph resolve(QueryTy Q, CallBack C = always_false);
 
-   static const CallBack always_false;
+   static bool always_false(llvm::Use*, QueryTy) {
+      return false;
+   }
    // { normal version: these used for lookup it use who
    // a public rule used for solve ssa dependency
    static void base_rule(ResolveEngine&);

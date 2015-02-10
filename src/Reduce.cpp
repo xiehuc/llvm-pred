@@ -77,28 +77,28 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
    RE.addFilter(C);
    Use* ToSearch = &U;
    Value* Searched;
-   RE.resolve(*ToSearch, RE.findVisit(Searched));
+   RE.resolve(ToSearch, RE.findVisit(Searched));
    if(Searched){
       WHY_KEPT(U, *Searched);
       return AttributeFlags::None;
    }
-   if(auto GEP = isRefGEP(U)){
+   if(auto GEP = isGEP(U)){
       // if we didn't find direct visit on Pointed, we tring find visit on
       // GEP->getPointerOperand()
       RE.addFilter(GEPFilter(GEP));
       ToSearch = &GEP->getOperandUse(0);
       ir.clear();
-      RE.resolve(*ToSearch, RE.findVisit(Searched));
+      RE.resolve(ToSearch, RE.findVisit(Searched));
       if (Searched) {
          WHY_KEPT(U, *Searched);
          return AttributeFlags::None;
       } else {
          ir.clear();
-         Dbg_PrintGraph(RE.resolve(*ToSearch), U.getUser());
+         Dbg_PrintGraph(RE.resolve(ToSearch), U.getUser());
       }
    }
    ir.clear();
-   Dbg_PrintGraph(RE.resolve(U), U.getUser());
+   Dbg_PrintGraph(RE.resolve(&U), U.getUser());
    WHAT_RMD(U);
    return AttributeFlags::IsDeletable;
 }
@@ -208,7 +208,7 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
    Value* what;
    Argument* Arg = dyn_cast<Argument>(SI->getPointerOperand());
    AllocaInst* Alloca = dyn_cast<AllocaInst>(SI->getPointerOperand());
-   auto GEP = isRefGEP(SI->getOperandUse(1));
+   auto GEP = isGEP(SI->getOperandUse(1));
 
    if(Protected.count(SI)) return AttributeFlags::None;
 
@@ -260,7 +260,7 @@ bool ReduceCode::runOnFunction(Function& F)
    BasicBlock* entry = &F.getEntryBlock();
    std::vector<BasicBlock*> blocks(po_begin(entry), po_end(entry));
    bool MadeChange, Ret = false;
-   DEBUG(errs()<<F.getName()<<"\n");
+   DEBUG(errs()<<"==============\n"<<F.getName()<<"\n===============\n");
    // use deep first visit order , then reverse it. can get what we need order.
    for(auto BB = blocks.begin(), BBE = blocks.end(); BB != BBE;){
       dse.runOnBasicBlock(**BB);
@@ -392,9 +392,8 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
    RE.addRule(RE.gep_rule);
    RE.addRule(RE.useonly_rule);
    RE.addFilter(GEPFilter{0,0,1});
-   auto ddg = RE.resolve(st_parameter);
    Value* Store;
-   RE.resolve(st_parameter, RE.findStore(Store));
+   RE.resolve(&st_parameter, RE.findStore(Store));
    if(Store != NULL && isa<StoreInst>(Store)){
       auto u = extract(dyn_cast<ConstantInt>(cast<StoreInst>(Store)->getValueOperand()));
       if(u == 6 || u == 0) return IsPrint; // 6 means write to stdout, 0 means write to stderr
@@ -451,7 +450,7 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
    RE.addRule(RE.ibase_rule);
    InitRule ir(RE.iuse_rule);
    RE.addRule(std::ref(ir));
-   RE.resolve(CI->getArgOperandUse(0), [](Use* U){
+   RE.resolve(&CI->getArgOperandUse(0), [](Use* U){
          CallInst* Call = dyn_cast<CallInst>(U->getUser());
          Function* F = NULL;
          if(Call && (F = Call->getCalledFunction())){
@@ -463,7 +462,7 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
          return false;
       });
    ir.clear();
-   auto ddg = RE.resolve(CI->getArgOperandUse(1), [](Use* U){
+   auto ddg = RE.resolve(&CI->getArgOperandUse(1), [](Use* U){
          errs()<<*U->getUser()<<"\n";
          CallInst* Call = dyn_cast<CallInst>(U->getUser());
          Function* F = NULL;
