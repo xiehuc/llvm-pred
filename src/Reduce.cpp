@@ -32,7 +32,7 @@
   })
 #define WHY_KEPT(what, searched)                                               \
   DEBUG({                                                                      \
-    errs() << *(what).getUser() << " couldn't removed because: \n";                       \
+    errs() << *(what).getUser() << " couldn't removed because: \n";            \
     errs() << "found visit : " << (searched) << "\n";                          \
   })
 #define FLAG(what) (what)?AttributeFlags::IsDeletable:AttributeFlags::None
@@ -48,9 +48,9 @@ cl::opt<bool> Force("Force", cl::desc("Enable Force Reduce Mode"));
 static bool Dbg_EnablePrintGraph = false;
 static void Dbg_PrintGraph_(DataDepGraph&& ddg, User* Ur)
 {
-   Instruction* I = Ur?dyn_cast<Instruction>(Ur):NULL;
-   BasicBlock* Block = I?I->getParent():NULL;
-   StringRef FName = Block?Block->getParent()->getName():"test";
+   Instruction* I = Ur ? dyn_cast<Instruction>(Ur) : NULL;
+   BasicBlock* Block = I ? I->getParent() : NULL;
+   StringRef FName = Block ? Block->getParent()->getName() : "test";
    WriteGraph(&ddg, FName);
 }
 #define Dbg_PrintGraph(ddg, Ur) if(Dbg_EnablePrintGraph) Dbg_PrintGraph_(ddg, Ur)
