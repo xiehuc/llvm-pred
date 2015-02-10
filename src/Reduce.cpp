@@ -75,8 +75,10 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
    InitRule ir(RE.iuse_rule);
    RE.addRule(std::ref(ir));
    RE.addFilter(C);
+   RE.addFilter(iUseFilter(&U));
    Use* ToSearch = &U;
    Value* Searched;
+   RE.addFilter(RE.exclude(&U));
    RE.resolve(ToSearch, RE.findVisit(Searched));
    if(Searched){
       WHY_KEPT(U, *Searched);
@@ -450,7 +452,10 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
    RE.addRule(RE.ibase_rule);
    InitRule ir(RE.iuse_rule);
    RE.addRule(std::ref(ir));
-   RE.resolve(&CI->getArgOperandUse(0), [](Use* U){
+   Use* Q = &CI->getArgOperandUse(0);
+   iUseFilter uf(Q);
+   RE.addFilter(std::ref(uf));
+   RE.resolve(Q, [](Use* U){
          CallInst* Call = dyn_cast<CallInst>(U->getUser());
          Function* F = NULL;
          if(Call && (F = Call->getCalledFunction())){
@@ -462,7 +467,9 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
          return false;
       });
    ir.clear();
-   auto ddg = RE.resolve(&CI->getArgOperandUse(1), [](Use* U){
+   Q = &CI->getArgOperandUse(1);
+   uf.update(Q);
+   auto ddg = RE.resolve(Q, [](Use* U){
          errs()<<*U->getUser()<<"\n";
          CallInst* Call = dyn_cast<CallInst>(U->getUser());
          Function* F = NULL;

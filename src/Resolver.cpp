@@ -439,6 +439,14 @@ ResolveEngine::ResolveEngine()
 
 void ResolveEngine::do_solve(DataDepGraph& G, CallBack& C)
 {
+   if(G.getRootKey().is<Use*>()){
+      // first time run rule, because some filter would directly refuse
+      // query itself, which make results empty, so we didn't run filter
+      // at first time.
+      Use* un = G.popUnsolved();
+      for(auto r = rules.rbegin(), e = rules.rend(); r!=e; ++r)
+         if((*r)(un, G)) break;
+   }
    while(Use* un = G.popUnsolved()){
       if(++iteration>max_iteration) break;
       bool jump = false;
@@ -451,9 +459,8 @@ void ResolveEngine::do_solve(DataDepGraph& G, CallBack& C)
          G.markIgnore(un); // if refused, this node is ignored.
          continue;
       }
-      for(auto r = rules.rbegin(), e = rules.rend(); r!=e; ++r){
+      for(auto r = rules.rbegin(), e = rules.rend(); r!=e; ++r)
          if((*r)(un, G)) break;
-      }
    }
 }
 
@@ -474,31 +481,45 @@ DataDepGraph ResolveEngine::resolve(QueryTy Q, CallBack C)
 struct find_visit
 {
    llvm::Value*& ret;
-   bool first;
-   find_visit(llvm::Value*& ret):
-      ret(ret), first(true) {}
+   find_visit(llvm::Value*& ret):ret(ret) {}
    bool operator()(Use* U){
       User* Ur = U->getUser();
-      if(!first){//when first, it run on itself, so we should ignore
-         if(isa<LoadInst>(Ur))
-            ret=Ur;
-         else if(CallInst* CI = dyn_cast<CallInst>(Ur)){//call inst also is a kind of visit
-            if(Function* F = dyn_cast<Function>(castoff(CI->getCalledValue())))
-               if(!F->getName().startswith("llvm.lifetime"))//some llvm call should ignore
-                  ret=CI;
-         }
+      if(isa<LoadInst>(Ur))
+         ret=Ur;
+      else if(CallInst* CI = dyn_cast<CallInst>(Ur)){//call inst also is a kind of visit
+         if(Function* F = dyn_cast<Function>(castoff(CI->getCalledValue())))
+            if(!F->getName().startswith("llvm.lifetime"))//some llvm call should ignore
+               ret=CI;
       }
-      first = false;
+
       // most of time, we just care whether it has visitor,
       // so if we found one, we can stop search
       return ret;
    }
 };
 
+ResolveEngine::CallBack ResolveEngine::exclude(QueryTy Q)
+{
+   User* Tg = (Q.is<Use*>()) ? Q.get<Use*>()->getUser() : dyn_cast<User>(Q.get<Value*>());
+   return [Tg](Use* U){
+      User* Ur = U->getUser();
+      return Tg == Ur;
+   };
+}
+
 ResolveEngine::CallBack ResolveEngine::findVisit(Value*& V)
 {
    V = NULL;
    return ::find_visit(V);
+}
+
+Value* ResolveEngine::find_visit(QueryTy Q)
+{
+   addFilter(exclude(Q));
+   Value* V = NULL;
+   resolve(Q, ::find_visit(V));
+   rmFilter(-1);
+   return V;
 }
 
 ResolveEngine::CallBack ResolveEngine::findStore(Value *&V)
@@ -568,8 +589,18 @@ static bool use_inverse_rule_(Use* U, DataDepGraph& G)
 {
    Value* V = U->get();
    std::vector<Use*> uses;
-   pushback_to(V->use_begin(), find_iterator(*U), uses);
+   auto bound = find_iterator(*U);
+   pushback_to(V->use_begin(), bound, uses);
    G.addSolved(U, uses.rbegin(), uses.rend());
+   // add all gep before inst, for dont' miss load like:
+   // %0 = getelementptr
+   // query
+   // load %0
+   for_each(bound, V->use_end(), [U, &G](Use& u) {
+      auto GEP = isGEP(u.getUser());
+      if(GEP && GEP->getPointerOperand() == u.get())
+         G.addSolved(U,u);
+   });
    return true;
 }
 static bool implicity_rule(Value* V, DataDepGraph& G)
@@ -835,5 +866,13 @@ bool CGFilter::operator()(Use* U)
       return !std::less<Instruction>()(threshold_inst, I);
    }
    return order < threshold;
+}
+bool iUseFilter::operator()(Use* U)
+{
+   if (pos == NULL) return false;
+   if (isGEP(U->getUser())) return false;
+   if (auto I = dyn_cast<Instruction>(U->getUser()))
+      if(std::less<Instruction>()(I, pos)) return true;
+   return false;
 }
 //==============================RESOLVE FILTERS END==============================//

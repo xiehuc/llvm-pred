@@ -42,6 +42,7 @@ namespace lle{
    struct MDARule;
    struct GEPFilter;
    struct CGFilter;
+   struct iUseFilter;
 };
 
 /**
@@ -252,10 +253,14 @@ class lle::ResolveEngine
       filters.push_back(filter);
    }
 
+   void rmFilter(int idx){
+      filters.erase(filters.begin()+idx%filters.size());
+   };
+
    void setMaxIteration(size_t max) { max_iteration = max;}
    DataDepGraph resolve(QueryTy Q, CallBack C = always_false);
 
-   static bool always_false(llvm::Use*, QueryTy) {
+   static bool always_false(llvm::Use*) {
       return false;
    }
    // { normal version: these used for lookup it use who
@@ -274,6 +279,12 @@ class lle::ResolveEngine
    static const SolveRule iuse_rule;
    // }
    // {
+   static CallBack exclude(QueryTy);
+   // find a visit(load and call) for Q, this behave like this:
+   // addFilter(exclude(Q))//ignore itself
+   // resolve(Q, if_is_load_then_store_it);
+   // rmFilter(exclude(Q))
+   llvm::Value* find_visit(QueryTy Q);
    // update V if find a visit inst(load and call)
    static CallBack findVisit(llvm::Value*& V);
    // update V if find a store inst
@@ -348,5 +359,32 @@ struct lle::CGFilter
    bool operator()(llvm::Use*);
 };
 
+// a inverse use filter is a tool that only let instructions 'after' pass
+// through, it use std::less<Instruction> to implement, so it only can
+// used in function inner. this is used with iuse_rule which import gep
+// 'before'. so this would ignore gep inst. 
+// this is special for such cases like:
+// %0 = getelementptr
+// load %0 <- ban
+// query
+// load %0 <- pass
+struct lle::iUseFilter
+{
+   llvm::Instruction* pos;
+   iUseFilter(ResolveEngine::QueryTy Q){
+      update(Q);
+   }
+   void update(ResolveEngine::QueryTy Q)
+   {
+      using V = llvm::Value*;
+      using U = llvm::Use*;
+      using I = llvm::Instruction;
+      pos = Q.is<V>() ? llvm::dyn_cast<I>(Q.get<V>()) :
+         llvm::dyn_cast<I>(Q.get<U>()->getUser());
+      if (pos->getParent() == NULL) pos = NULL;
+   }
+   bool operator()(llvm::Use*);
+
+};
 
 #endif
