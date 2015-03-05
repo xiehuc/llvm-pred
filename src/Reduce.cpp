@@ -25,6 +25,7 @@
       errs() << __LINE__ << ":\n";                                             \
       errs() << " -->" << *(what).getPointerOperand() << "\n";                 \
    })
+// a more deeper notice removed object
 #define WHAT_RMD(what)                                                         \
   DEBUG({                                                                      \
     errs() << *(what).getUser() << " removed in line ";                        \
@@ -40,6 +41,7 @@
 #else
 #define WHY_KEPT(what, searched)
 #endif
+#define FLAG(what) (what)?AttributeFlags::None:AttributeFlags::IsDeletable
 
 using namespace std;
 using namespace lle;
@@ -171,9 +173,9 @@ Value* ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP, ResolveEn
    RE.addRule(RE.ibase_rule);
    CGF->update(GEP);
    RE.addFilter(*CGF);
-   RE.addFilter(C);
    GetElementPtrInst* GEPI = isRefGEP(GEP);
    if(GEPI) RE.addFilter(GEPFilter(GEPI));
+   RE.addFilter(C);
    Value* Visit;
    RE.resolve(GV, RE.findVisit(Visit));
    Dbg_PrintGraph(RE.resolve(GV), nullptr);
