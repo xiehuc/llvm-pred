@@ -351,7 +351,8 @@ bool lle::isRefGlobal(Value* V, GlobalVariable** pGV, GetElementPtrInst** pGEP)
 bool std::less<BasicBlock>::operator()(BasicBlock* L, BasicBlock* R)
 {
    using std::placeholders::_1;
-   if(L->getParent() != R->getParent()) return false;
+   if (L == NULL || R == NULL) return false;
+   if (L->getParent() != R->getParent()) return false;
    Function* F = L->getParent();
    unsigned L_idx = std::distance(F->begin(), Function::iterator(L));
    unsigned R_idx = std::distance(F->begin(), Function::iterator(R));
@@ -360,9 +361,11 @@ bool std::less<BasicBlock>::operator()(BasicBlock* L, BasicBlock* R)
 
 bool std::less<Instruction>::operator()(Instruction* L, Instruction* R)
 {
+   if(L == NULL || R == NULL) return false;
    if(L->getParent() != R->getParent())
       return std::less<BasicBlock>()(L->getParent(), R->getParent());
    BasicBlock* B = L->getParent();
+   if (B == NULL) return false;
    unsigned L_idx = std::distance(B->begin(), BasicBlock::iterator(L));
    unsigned R_idx = std::distance(B->begin(), BasicBlock::iterator(R));
    return L_idx < R_idx;
