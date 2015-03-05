@@ -1,21 +1,56 @@
 #!/bin/bash
 #quick make a bitcode to loader
-#usage ./quick-make <bitcode>
+#usage ./quick-make [options] <bitcode>
+
+OPTS=$(getopt -o ecdh --long "echo,cgpop,edge,help" -n $(basename "$0") -- "$@")
+
+eval set -- "$OPTS"
+FRONT=
+LFLAGS=
+EDGE=0
+CGPOP=0
+
+function print_help
+{
+   echo "$0 [options] <bitcode>"
+   echo "options:"
+   echo "   --echo: echo all command"
+   echo "   --edge: used for compile edge profiling"
+   echo "   --help: show this help"
+   echo "   --cgpop: use for compile cgpop"
+   exit 0
+}
+
+while true; do
+   case "$1" in
+      --echo) FRONT=echo; shift ;;
+      --edge) EDGE=1; shift ;;
+      --cgpop) 
+         CGPOP=1; 
+         LFLAGS="-lnetcdf -lnetcdff" 
+         shift ;;
+      --help) print_help; shift;;
+      --) shift; break ;;
+      *) print_help ;;
+   esac
+done
+
+input="$1"
 name=$(basename $1)
 name=${name%.bc}
-if [ $# -ge 2 ]; then
-   if [ "$2" == "edge" ]; then
-      opt -load src/libLLVMPred.so -insert-edge-profiling $1 -o /tmp/$name.e.ll -S
-      clang /tmp/$name.e.ll -o /tmp/$name.e.o -c; mpif90 /tmp/$name.e.o -o $name.e `pkg-config llvm-prof --variable=profile_rt_lib`
-      exit
-   elif [ "$2" == "cgpop" ]; then
-      opt -load src/libLLVMPred.so -PerfPred -insert-pred-profiling -insert-mpi-profiling $1 -o /tmp/$name.1.ll -S
-      opt -load src/libLLVMPred.so -Reduce /tmp/$name.1.ll -o /tmp/$name.2.ll -S
-      opt -load src/libLLVMPred.so -Force -Reduce /tmp/$name.2.ll -o /tmp/$name.3.ll -S
-      clang /tmp/$name.3.ll -o /tmp/$name.3.o -c; gfortran /tmp/$name.3.o -o $name.3 -lnetcdf -lnetcdff `pkg-config llvm-prof --variable=profile_rt_lib`
-      exit
-   fi
+
+if [ "$EDGE" -eq "1" ]; then
+$FRONT opt -load src/libLLVMPred.so -insert-edge-profiling $input -o /tmp/$name.e.ll -S
+suffix="e"
+else
+$FRONT opt -load src/libLLVMPred.so -PerfPred -insert-pred-profiling -insert-mpi-profiling $input -o /tmp/$name.1.ll -S
+$FRONT opt -load src/libLLVMPred.so -Reduce /tmp/$name.1.ll -o /tmp/$name.2.ll -S
+if [ "$CGPOP" -eq "1" ]; then
+$FRONT opt -load src/libLLVMPred.so -Force -Reduce /tmp/$name.2.ll -o /tmp/$name.3.ll -S
+suffix="3"
+else
+suffix="2"
 fi
-opt -load src/libLLVMPred.so -PerfPred -insert-pred-profiling -insert-mpi-profiling $1 -o /tmp/$name.1.ll -S
-opt -load src/libLLVMPred.so -Reduce /tmp/$name.1.ll -o /tmp/$name.2.ll -S
-clang /tmp/$name.2.ll -o /tmp/$name.2.o -c; gfortran /tmp/$name.2.o -o $name.2 `pkg-config llvm-prof --variable=profile_rt_lib`
+fi
+$FRONT clang /tmp/$name.$suffix.ll -o /tmp/$name.$suffix.o -c
+$FRONT gfortran /tmp/$name.$suffix.o -o $name.$suffix $LFLAGS `pkg-config llvm-prof --variable=profile_rt_lib`
