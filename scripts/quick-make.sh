@@ -11,6 +11,7 @@ EDGE=0
 CGPOP=0
 ARG_BEG=
 ARG_END=
+MPIF90=gfortran
 i=1
 
 function print_help
@@ -40,7 +41,10 @@ while true; do
          ARG_END="\""
          shift ;;
       --echo) FRONT=echo; shift ;;
-      --edge) EDGE=1; shift ;;
+      --edge) 
+         EDGE=1; 
+         MPIF90=mpif90
+         shift ;;
       --cgpop) 
          CGPOP=1; 
          LFLAGS="-lnetcdf -lnetcdff" 
@@ -75,5 +79,5 @@ fi
 fi
 $FRONT clang /tmp/$name.$suffix.ll -o /tmp/$name.$suffix.o -c
 statement_comp $i; i=$?
-$FRONT gfortran /tmp/$name.$suffix.o -o $name.$suffix $LFLAGS `pkg-config llvm-prof --variable=profile_rt_lib`
+$FRONT $MPIF90 /tmp/$name.$suffix.o -o $name.$suffix $LFLAGS `pkg-config llvm-prof --variable=profile_rt_lib`
 statement_comp $i; i=$?
