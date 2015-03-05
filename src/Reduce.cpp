@@ -18,24 +18,28 @@
 #include "ddg.h"
 #include "debug.h"
 
-#define WHY_RMED(flag, what, tag)                                              \
-  DEBUG(if (flag) {                                                            \
-    errs() << (what) << " removed in line: ";                                  \
-    errs() << __LINE__ << ':' << tag << "\n";                                  \
-    errs() << " -->" << *(what).getPointerOperand() << "\n";                   \
-  })
+// a simple notice removed object,
+#define WHY_RMED(flag, what)                                                   \
+   DEBUG(if (flag) {                                                           \
+      errs() << (what) << " removed in line: ";                                \
+      errs() << __LINE__ << ":\n";                                             \
+      errs() << " -->" << *(what).getPointerOperand() << "\n";                 \
+   })
 #define WHAT_RMD(what)                                                         \
   DEBUG({                                                                      \
     errs() << *(what).getUser() << " removed in line ";                        \
     errs() << __LINE__ << ":\n";                                               \
     errs() << " -->" << *(what).get() << "\n";                                 \
   })
+#ifdef ANNOY_DEBUG
 #define WHY_KEPT(what, searched)                                               \
   DEBUG({                                                                      \
     errs() << *(what).getUser() << " couldn't removed because: \n";            \
     errs() << "found visit : " << (searched) << "\n";                          \
   })
-#define FLAG(what) (what)?AttributeFlags::IsDeletable:AttributeFlags::None
+#else
+#define WHY_KEPT(what, searched)
+#endif
 
 using namespace std;
 using namespace lle;
@@ -221,6 +225,7 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
       if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
          if(GV->getName().endswith("Counters")) return AttributeFlags::None;
          what = noused_global(GV, SI);
+         WHY_RMED(FLAG(what), *SI);
          return FLAG(what);
       }
    }
@@ -228,7 +233,7 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
    if(Arg){
       flag = noused_flat(SI->getOperandUse(1));
       flag = AttributeFlags(flag & noused_param(Arg));
-      WHY_RMED(flag, *SI, (GEP==nullptr));
+      WHY_RMED(flag, *SI);
    }else if(Alloca){
       Loop* L = LTC->getLoopFor(SI->getParent());
       if(L){
@@ -241,14 +246,14 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
             if(Ind != SI->getPointerOperand()){
                //XXX not stable, because it doesn't use domtree info
                flag = noused_flat(SI->getOperandUse(1));
-               WHY_RMED(flag, *SI, (GEP==nullptr));
+               WHY_RMED(flag, *SI);
             }
          }// if it is in loop, and we can't get induction, we ignore it
       }else{
          // a store inst not in loop, and it isn't used after
          // then it can be removed
          flag = noused_flat(SI->getOperandUse(1));
-         WHY_RMED(flag, *SI, (GEP==nullptr));
+         WHY_RMED(flag, *SI);
       }
    }
    return flag;

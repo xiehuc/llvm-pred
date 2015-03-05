@@ -6,12 +6,11 @@
 #ifndef NO_DEBUG
 #cmakedefine NO_DEBUG
 #endif
+#cmakedefine ANNOY_DEBUG @WITH_MORE_DEBUG@
 #define TIMING_@TIMING@
 #define TIMING_SOURCE_@TIMING_SOURCE@
 #define PROMOTE_FREQ_@PROMOTE_FREQ@
 
-//hide clobber result when doing memory analysis dependencies
-#define HIDE_CLOBBER 1
 // DDGraph::expr() print ref number. to simplify presentation
 #define EXPR_ENABLE_REF 
 // a special symbol for self reference

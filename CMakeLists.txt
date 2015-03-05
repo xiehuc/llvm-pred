@@ -14,6 +14,7 @@ find_package(LLVM)
 
 option(DYNAMIC_LINK "Link Dynamic LLVM Libraries" ${LLVM_DYNAMIC_LIBRARY_FOUND})
 option(WITH_DEBUG "Enable Extra Debug Output" On)
+option(WITH_MORE_DEBUG "Enable More Extra Debug Output" Off)
 set(TIMING "tsc" CACHE STRINGS "Select timing implement")
 set_property(CACHE TIMING PROPERTY STRINGS "tsc" "tscp" "clock_gettime")
 set(TIMING_SOURCE "lmbench" CACHE STRINGS "Select cycle timging source")
