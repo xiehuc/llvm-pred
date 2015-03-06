@@ -2,10 +2,10 @@
 #quick make a bitcode to drawfcode
 
 # process options
-OPTS=$(getopt -o ecdhg --long "echo,cgpop,edge,help,gdb" -n $(basename "$0") -- "$@")
+OPTS=$(getopt -o ecdhgl --long "echo,cgpop,edge,help,gdb,log" -n $(basename "$0") -- "$@")
 
 eval set -- "$OPTS"
-FRONT=
+FRONT=eval
 LFLAGS=
 EDGE=0
 CGPOP=0
@@ -13,11 +13,13 @@ ARG_BEG=
 ARG_END=
 MPIF90=gfortran
 i=1
+REDICT=
 
 function print_help
 {
    echo "$0 [options] <bitcode>"
    echo "options:"
+   echo "   --log: write output to /tmp/quick-make-log/"
    echo "   --gdb: echo gdb command"
    echo "   --echo: echo all command"
    echo "   --edge: used for compile edge profiling"
@@ -35,6 +37,10 @@ function statement_comp
 # process arguments
 while true; do
    case "$1" in
+      --log)
+         mkdir -p /tmp/quick-make-log
+         ARG_END+=' 2>/tmp/quick-make-log/$i.log'
+         shift ;;
       --gdb) 
          FRONT=echo\ gdb
          ARG_BEG="-ex \"r"
