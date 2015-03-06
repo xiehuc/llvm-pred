@@ -69,12 +69,6 @@ exp2:
    Value* V = RE.find_visit(&Test->getArgOperandUse(0));
    EXPECT_EQ(V, std::next(B_a_beg, 6)); // %4
 
-   /*
-   ir.clear();
-   V = RE.find_visit(&Test2->getArgOperandUse(0));
-   EXPECT_EQ(V, std::next(B_b_beg, 4)); 
-   errs()<<*V<<"\n";
-   */
 }
 
 TEST(NousedTest, GepBeforeFail) {

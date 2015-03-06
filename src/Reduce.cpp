@@ -23,7 +23,7 @@
    DEBUG(if (flag) {                                                           \
       errs() << (what) << " removed in line: ";                                \
       errs() << __LINE__ << ":\n";                                             \
-      errs() << " -->" << *(what).getPointerOperand() << "\n";                 \
+      errs() << " -->" << *(what) << "\n";                                     \
    })
 // a more deeper notice removed object
 #define WHAT_RMD(what)                                                         \
@@ -209,16 +209,14 @@ Value* ReduceCode::noused(llvm::Use &U)
    return flag;
 }
 */
-
-AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
+AttributeFlags ReduceCode::nousedOperator(Use& op, Instruction* pos, ConfigFlags c)
 {
    AttributeFlags flag = AttributeFlags::None;
    Value* what;
-   Argument* Arg = dyn_cast<Argument>(SI->getPointerOperand());
-   AllocaInst* Alloca = dyn_cast<AllocaInst>(SI->getPointerOperand());
-   auto GEP = isGEP(SI->getOperandUse(1));
-
-   if(Protected.count(SI)) return AttributeFlags::None;
+   Value* target = op.get();
+   Argument* Arg = dyn_cast<Argument>(target);
+   AllocaInst* Alloca = dyn_cast<AllocaInst>(target);
+   auto GEP = isGEP(op);
 
    if(GEP){
       Arg = dyn_cast<Argument>(GEP->getPointerOperand());
@@ -226,29 +224,32 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
       // 过于激进的删除
       if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
          if(GV->getName().endswith("Counters")) return AttributeFlags::None;
-         what = noused_global(GV, SI);
-         WHY_RMED(FLAG(what), *SI);
+         what = noused_global(GV, pos);
+         WHY_RMED(FLAG(what), target);
          return FLAG(what);
       }
    }
 
    if(Arg){
-      flag = noused_flat(SI->getOperandUse(1));
+      flag = noused_flat(op);
       flag = AttributeFlags(flag & noused_param(Arg));
-      WHY_RMED(flag, *SI);
+      WHY_RMED(flag, target);
    }else if(Alloca){
-      Loop* L = LTC->getLoopFor(SI->getParent());
-      if(L){
+      // a store inst not in loop, and it isn't used after
+      // then it can be removed
+      Loop* L = NULL;
+      if (!(c & DISABLE_STORE_INLOOP)
+          && (L = LTC->getLoopFor(pos->getParent()))) {
          Value* Ind = LTC->getInduction(L);
          if(Ind != NULL){
             // a store inst in loop, and it isn't used after loop
             // and it isn't induction, then it can be removed
             if(LoadInst* LI = dyn_cast<LoadInst>(Ind))
                Ind = LI->getOperand(0);
-            if(Ind != SI->getPointerOperand()){
+            if(Ind != target){
                //XXX not stable, because it doesn't use domtree info
-               flag = noused_flat(SI->getOperandUse(1));
-               WHY_RMED(flag, *SI);
+               flag = noused_flat(op);
+               WHY_RMED(flag, target);
             }
          }// if it is in loop, and we can't get induction, we ignore it
       }else{
@@ -258,6 +259,15 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
          WHY_RMED(flag, *SI);
       }
    }
+   return flag;
+}
+AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
+{
+   if(Protected.count(SI)) return AttributeFlags::None;
+   Use& op = SI->getOperandUse(1);
+   Value* target = SI->getPointerOperand();
+
+   AttributeFlags flag = nousedOperator(op, SI);
    return flag;
 }
 
@@ -506,6 +516,11 @@ ReduceCode::ReduceCode():ModulePass(ID),
    auto DirectDelete = std::bind(direct_return, _1, AttributeFlags::IsDeletable);
    auto DirectDeleteCascade = std::bind(direct_return, _1, 
          AttributeFlags::IsDeletable | AttributeFlags::Cascade);
+   ReduceCode* RC = this;
+   auto nouse_test = [RC](CallInst* CI, unsigned Which) {
+      return RC->nousedOperator(CI->getArgOperandUse(Which), CI,
+                                DISABLE_STORE_INLOOP);
+   };
 
    CGF = NULL;
 
@@ -516,7 +531,8 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["_gfortran_st_write"] = gfortran_write_stdout;
    Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
    Attributes["_gfortran_system_clock_4"] = DirectDelete;
-   Attributes["llvm.memset"] = std::bind(nouse_at, _1, 0);
+   // memset is write instrincs, we disable gep filter
+   Attributes["llvm.memset"] = std::bind(nouse_test, _1, 0); 
    if(Force){
 //int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
 //               MPI_Op op, int root, MPI_Comm comm)

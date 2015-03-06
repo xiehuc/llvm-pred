@@ -20,6 +20,12 @@ namespace lle {
    };
    inline AttributeFlags operator|(AttributeFlags a, AttributeFlags b)
    {return static_cast<AttributeFlags>(static_cast<int>(a) | static_cast<int>(b));}
+   enum ConfigFlags
+   {
+      NO_ADJUST = 0,
+      DISABLE_GEP_FILTER = 1<<0,
+      DISABLE_STORE_INLOOP = 1<<1,
+   };
 };
 namespace llvm {
    class Use;
@@ -54,5 +60,8 @@ class lle::ReduceCode: public llvm::ModulePass
    void getAnalysisUsage(llvm::AnalysisUsage& AU) const override;
    bool runOnModule(llvm::Module& M) override;
    bool runOnFunction(llvm::Function& F);
+
+   AttributeFlags nousedOperator(llvm::Use&, llvm::Instruction* pos,
+                                 ConfigFlags config = NO_ADJUST);
 };
 #endif
