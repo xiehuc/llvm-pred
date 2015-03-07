@@ -25,16 +25,14 @@ static int dt_init() {
    return 0;
 }
 static int _DT_INIT = dt_init();
-      errs() << __LINE__ << ":\n";                                             \
-      errs() << " -->" << *(what) << "\n";                                     \
-   })
-// a more deeper notice removed object
+
+// a deeper notice removed object
 #define WHAT_RMD(what)                                                         \
-  DEBUG({                                                                      \
-    errs() << *(what).getUser() << " removed in line ";                        \
-    errs() << __LINE__ << ":\n";                                               \
-    errs() << " -->" << *(what).get() << "\n";                                 \
-  })
+   DEBUG({                                                                     \
+      errs() << *(what).getUser() << " removed in line ";                                \
+      errs() << __LINE__ << ":\n";                                             \
+      errs() << " -->" << *(what).get() << "\n";                               \
+   })
 #ifdef ANNOY_DEBUG
 #define WHY_KEPT(what, searched)                                               \
   DEBUG({                                                                      \
@@ -42,9 +40,21 @@ static int _DT_INIT = dt_init();
     errs() << "found visit : " << (searched) << "\n";                          \
   })
 #else
-#define WHY_KEPT(what, searched)
+#define WHY_KEPT(what, searched) {}
 #endif
 #define FLAG(what) (what)?AttributeFlags::None:AttributeFlags::IsDeletable
+// a notice according to flag, notice removed object, or kept reason
+// @param what: which one removed or kept
+// @param searched: if kept, the found user
+#define NOTICE(what, searched)                                                 \
+   DEBUG({                                                                     \
+      if (FLAG(searched))                                                      \
+         WHAT_RMD(what)                                                        \
+      else                                                                     \
+         WHY_KEPT(what, searched)                                              \
+   })
+// should removed when all noused_* return a user insead of flag
+#define WHY_RMED(flag, what) DEBUG(if (flag) WHAT_RMD(what))
 
 using namespace std;
 using namespace lle;
@@ -228,7 +238,7 @@ AttributeFlags ReduceCode::nousedOperator(Use& op, Instruction* pos, ConfigFlags
       if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
          if(GV->getName().endswith("Counters")) return AttributeFlags::None;
          what = noused_global(GV, pos);
-         WHY_RMED(FLAG(what), target);
+         NOTICE(op, what);
          return FLAG(what);
       }
    }
@@ -236,7 +246,7 @@ AttributeFlags ReduceCode::nousedOperator(Use& op, Instruction* pos, ConfigFlags
    if(Arg){
       flag = noused_flat(op);
       flag = AttributeFlags(flag & noused_param(Arg));
-      WHY_RMED(flag, target);
+      WHY_RMED(flag, op);
    }else if(Alloca){
       // a store inst not in loop, and it isn't used after
       // then it can be removed
@@ -252,14 +262,14 @@ AttributeFlags ReduceCode::nousedOperator(Use& op, Instruction* pos, ConfigFlags
             if(Ind != target){
                //XXX not stable, because it doesn't use domtree info
                flag = noused_flat(op);
-               WHY_RMED(flag, target);
+               WHY_RMED(flag, op);
             }
          }// if it is in loop, and we can't get induction, we ignore it
       }else{
          // a store inst not in loop, and it isn't used after
          // then it can be removed
-         flag = noused_flat(SI->getOperandUse(1));
-         WHY_RMED(flag, *SI);
+         flag = noused_flat(op);
+         WHY_RMED(flag, op);
       }
    }
    return flag;
