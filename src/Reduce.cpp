@@ -9,6 +9,7 @@
 #include <llvm/ADT/PostOrderIterator.h>
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 #include <llvm/IR/IntrinsicInst.h>
+#include <llvm/IR/IRBuilder.h>
 
 #include <ValueProfiling.h>
 
@@ -18,10 +19,12 @@
 #include "ddg.h"
 #include "debug.h"
 
-// a simple notice removed object,
-#define WHY_RMED(flag, what)                                                   \
-   DEBUG(if (flag) {                                                           \
-      errs() << (what) << " removed in line: ";                                \
+static unsigned DT[30] = {0};
+static int dt_init() {
+#include "datatype.h"
+   return 0;
+}
+static int _DT_INIT = dt_init();
       errs() << __LINE__ << ":\n";                                             \
       errs() << " -->" << *(what) << "\n";                                     \
    })
@@ -265,7 +268,6 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
 {
    if(Protected.count(SI)) return AttributeFlags::None;
    Use& op = SI->getOperandUse(1);
-   Value* target = SI->getPointerOperand();
 
    AttributeFlags flag = nousedOperator(op, SI);
    return flag;
@@ -421,12 +423,6 @@ static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
 }
 
 
-static AttributeFlags nouse_at(llvm::CallInst* CI, unsigned Which)
-{
-   Use& buf = CI->getArgOperandUse(Which);
-   return noused_flat(buf);
-}
-
 static constexpr AttributeFlags direct_return(CallInst* CI, AttributeFlags flags)
 {
    return flags;
@@ -455,12 +451,29 @@ static AttributeFlags mpi_comm_replace(CallInst* CI, SmallPtrSetImpl<StoreInst*>
    Protected->insert(new StoreInst(Rank, RankVariable, CI)); // 因为它是最后加入的, 所以排在use列表的最后.
    return AttributeFlags::IsDeletable;
 }
+static AttributeFlags mpi_allreduce_force(CallInst* CI)
+{
+   Value* Send  = CI->getArgOperand(0);
+   Value* Recv  = CI->getArgOperand(1);
+   Value* Count = CI->getArgOperand(2);
+   Value* Type  = CI->getArgOperand(3);
+   auto GV = dyn_cast<GlobalVariable>(Type);
+   auto GVI = dyn_cast_or_null<ConstantInt>(GV?GV->getInitializer():NULL);
+   uint64_t TyIdx = GVI?GVI->getZExtValue():7; // DT[7] == 4, default is int
+   uint64_t TySize = DT[TyIdx];
 
+   IRBuilder<> Builder(CI);
+   Builder.CreateMemCpy(Recv, Send, Builder.CreateLoad(Count), TySize);
+   return AttributeFlags::IsDeletable;
+}
+# if 0
 static AttributeFlags mpi_allreduce_force(CallInst* CI)
 {
    //FIXME should replaced with memcpy
    Value* Send = CI->getArgOperand(0);
    Value* Recv = CI->getArgOperand(1);
+   if(std::less<Instruction>()(dyn_cast<Instruction>(Recv), dyn_cast<Instruction>(Send)));
+      std::swap(Send, Recv);
 
    // if there are free of Send and free of Recv, we replace Recv Use with
    // send, then we free Send twice. this is bad, 
@@ -503,6 +516,7 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
    Recv->replaceAllUsesWith(Send);
    return AttributeFlags::IsDeletable;
 }
+#endif
 
 ReduceCode::ReduceCode():ModulePass(ID), 
    dse(createDeadStoreEliminationPass()),
@@ -511,16 +525,16 @@ ReduceCode::ReduceCode():ModulePass(ID),
    simpCFG(createCFGSimplificationPass())
 {
    using std::placeholders::_1;
+   ReduceCode* RC = this;
+   auto nouse_at = [RC](CallInst* CI, unsigned Which) {
+      return RC->nousedOperator(CI->getArgOperandUse(Which), CI,
+                                DISABLE_STORE_INLOOP);
+   };
    auto mpi_nouse_recvbuf = std::bind(nouse_at, _1, 1);
    auto mpi_nouse_buf = std::bind(nouse_at, _1, 0);
    auto DirectDelete = std::bind(direct_return, _1, AttributeFlags::IsDeletable);
    auto DirectDeleteCascade = std::bind(direct_return, _1, 
          AttributeFlags::IsDeletable | AttributeFlags::Cascade);
-   ReduceCode* RC = this;
-   auto nouse_test = [RC](CallInst* CI, unsigned Which) {
-      return RC->nousedOperator(CI->getArgOperandUse(Which), CI,
-                                DISABLE_STORE_INLOOP);
-   };
 
    CGF = NULL;
 
@@ -532,7 +546,7 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
    Attributes["_gfortran_system_clock_4"] = DirectDelete;
    // memset is write instrincs, we disable gep filter
-   Attributes["llvm.memset"] = std::bind(nouse_test, _1, 0); 
+   Attributes["llvm.memset"] = std::bind(nouse_at, _1, 0); 
    if(Force){
 //int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
 //               MPI_Op op, int root, MPI_Comm comm)
