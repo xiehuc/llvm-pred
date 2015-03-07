@@ -370,6 +370,12 @@ bool std::less<Instruction>::operator()(Instruction* L, Instruction* R)
    return L_idx < R_idx;
 }
 
+bool std::less_equal<Instruction>::operator()(Instruction* L, Instruction* R)
+{
+   bool less = std::less<Instruction>()(L, R);
+   return less || L==R;
+}
+
 Constant* lle::insertConstantString(Module* M, const string Inserted) 
 {
    LLVMContext& C = M->getContext();

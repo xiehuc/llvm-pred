@@ -863,7 +863,7 @@ bool CGFilter::operator()(Use* U)
    if(order == UINT_MAX) return true;
    if(order == threshold){
       AssertRuntime(threshold_f == F, "should be same function "<<order<<":"<<threshold);
-      return std::less<Instruction>()(I, threshold_inst);
+      return std::less_equal<Instruction>()(I, threshold_inst);
    }
    return order < threshold;
 }

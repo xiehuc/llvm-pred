@@ -96,6 +96,13 @@ struct less<llvm::Instruction>
 {
    bool operator()(llvm::Instruction*, llvm::Instruction* );
 };
+// a safe replacement for !std::less<Instruction>()(L, R) // L >= R
+// using std::less_equal<Instruction>()(R, L) R <= L
+template <>
+struct less_equal<llvm::Instruction>
+{
+   bool operator()(llvm::Instruction*, llvm::Instruction* );
+};
 }
 
 #endif
