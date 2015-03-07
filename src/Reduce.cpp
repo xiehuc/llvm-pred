@@ -278,6 +278,8 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
 {
    if(Protected.count(SI)) return AttributeFlags::None;
    Use& op = SI->getOperandUse(1);
+   // Constant Protection
+   if(isa<Constant>(SI->getOperand(0))) return AttributeFlags::None;
 
    AttributeFlags flag = nousedOperator(op, SI);
    return flag;

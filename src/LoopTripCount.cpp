@@ -103,6 +103,7 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 		const BranchInst* EBR = cast<BranchInst>(TE->getTerminator());
 		AssertThrow(EBR->isConditional(), not_found("end branch is not conditional"));
 		ICmpInst* EC = dyn_cast<ICmpInst>(EBR->getCondition());
+      AssertThrow(EC, not_found("end condition is not icmp"));
 		if(EC->getPredicate() == EC->ICMP_SGT){
          AssertThrow(!L->contains(EBR->getSuccessor(0)), not_found(dbg()<<"abnormal exit with great than:"<<*EBR));
          //终止块的终止指令---->跳出执行循环外的指令
