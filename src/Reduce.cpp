@@ -29,7 +29,7 @@ static int _DT_INIT = dt_init();
 // a deeper notice removed object
 #define WHAT_RMD(what)                                                         \
    DEBUG({                                                                     \
-      errs() << *(what).getUser() << " removed in line ";                                \
+      errs() << *(what).getUser() << " removed in line ";                      \
       errs() << __LINE__ << ":\n";                                             \
       errs() << " -->" << *(what).get() << "\n";                               \
    })
@@ -194,34 +194,6 @@ Value* ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP, ResolveEn
    Dbg_PrintGraph(RE.resolve(GV), nullptr);
    return Visit;
 }
-/*
-Value* ReduceCode::noused(llvm::Use &U)
-{
-   Argument* Arg = dyn_cast<Argument>(U.get());
-   AllocaInst* Alloca = dyn_cast<AllocaInst>(U.get());
-   auto GEP = isRefGEP(U);
-
-   if(GEP){
-      Arg = dyn_cast<Argument>(GEP->getPointerOperand());
-      Alloca = dyn_cast<AllocaInst>(GEP->getPointerOperand());
-      // 过于激进的删除
-      if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
-         if(GV->getName().endswith("Counters")) return NULL;
-         return noused_global(GV, SI);
-      }
-   }
-
-   if(Arg){
-      flag = noused_flat(U);
-      flag = AttributeFlags(flag & noused_param(Arg));
-      WHY_RMED(flag, *SI, (GEP==nullptr));
-   }else if(Alloca){
-      flag = noused_flat(U);
-      WHY_RMED(flag, *SI, (GEP==nullptr));
-   }
-   return flag;
-}
-*/
 AttributeFlags ReduceCode::nousedOperator(Use& op, Instruction* pos, ConfigFlags c)
 {
    AttributeFlags flag = AttributeFlags::None;
@@ -241,12 +213,11 @@ AttributeFlags ReduceCode::nousedOperator(Use& op, Instruction* pos, ConfigFlags
          NOTICE(op, what);
          return FLAG(what);
       }
-   }
-
-   if(Arg){
+   }if(Arg){
       flag = noused_flat(op);
       flag = AttributeFlags(flag & noused_param(Arg));
       WHY_RMED(flag, op);
+      return flag;
    }else if(Alloca){
       // a store inst not in loop, and it isn't used after
       // then it can be removed
@@ -263,15 +234,16 @@ AttributeFlags ReduceCode::nousedOperator(Use& op, Instruction* pos, ConfigFlags
                //XXX not stable, because it doesn't use domtree info
                flag = noused_flat(op);
                WHY_RMED(flag, op);
+               return flag;
             }
          }// if it is in loop, and we can't get induction, we ignore it
-      }else{
-         // a store inst not in loop, and it isn't used after
-         // then it can be removed
-         flag = noused_flat(op);
-         WHY_RMED(flag, op);
       }
+      // a store inst not in loop, and it isn't used after
+      // then it can be removed
    }
+   // in other case
+   flag = noused_flat(op);
+   WHY_RMED(flag, op);
    return flag;
 }
 AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
