@@ -12,6 +12,7 @@ add_definitions(-fno-rtti)
 add_definitions(-Wall --std=c++11)
 
 add_executable(unit_test
+   IgnoreListTest.cpp
    GEPFilterTest.cpp
    CGFilterTest.cpp
    NousedTest.cpp
