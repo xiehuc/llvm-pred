@@ -54,6 +54,7 @@ while true; do
       --cgpop) 
          CGPOP=1; 
          LFLAGS="-lnetcdf -lnetcdff" 
+         export IGNORE_FUNC="__io_serial_MOD_read_appmd,__simple_domain_MOD_init_domain_blocks"
          shift ;;
       --help) print_help; shift;;
       --) shift; break ;;

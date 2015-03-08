@@ -9,9 +9,8 @@
 namespace lle {
    class CGFilter;
    class LoopTripCount;
-   struct MarkPreserve;
-   class SlashShrink;
    class ReduceCode;
+   class IgnoreList;
    enum AttributeFlags {
       None = 0,
       IsDeletable = 1,
@@ -36,10 +35,10 @@ class lle::ReduceCode: public llvm::ModulePass
    typedef std::function<AttributeFlags(llvm::CallInst*)> Attribute_;
    std::unordered_map<std::string, Attribute_> Attributes;
    llvm::SmallSet<llvm::StoreInst*, 4> Protected;
-   llvm::SmallSet<llvm::Function*, 4> ErasedFunc;
+   IgnoreList* ignore;
+
    llvm::DominatorTree* DomT;
    LoopTripCount* LTC;
-
    DSE_Adaptive dse;
    DAE_Adaptive dae;
    Adaptive ic, simpCFG;
@@ -49,10 +48,11 @@ class lle::ReduceCode: public llvm::ModulePass
    AttributeFlags getAttribute(llvm::StoreInst*);
    void washFunction(llvm::Function* F);
    AttributeFlags noused_param(llvm::Argument*);
-   llvm::Value *
-   noused_global(llvm::GlobalVariable *, llvm::Instruction *,
-                 ResolveEngine::CallBack = ResolveEngine::always_false);
+   llvm::Value* noused_global(llvm::GlobalVariable*, llvm::Instruction*,
+                              ResolveEngine::CallBack
+                              = ResolveEngine::always_false);
    llvm::Value* noused(llvm::Use&);
+
    public:
    static char ID;
    ReduceCode();

@@ -14,6 +14,7 @@
 #include <ValueProfiling.h>
 
 #include "LoopTripCount.h"
+#include "IgnoreList.h"
 #include "Resolver.h"
 #include "Reduce.h"
 #include "ddg.h"
@@ -259,6 +260,7 @@ AttributeFlags ReduceCode::getAttribute(StoreInst *SI)
 
 bool ReduceCode::runOnFunction(Function& F)
 {
+   if(ignore->count(F.getName())) return false;
    LTC = &getAnalysis<LoopTripCount>(F);
    DomT = &getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
    dse.prepare(&F, this);
@@ -382,11 +384,6 @@ void ReduceCode::washFunction(llvm::Function *F)
    simpCFG.runOnFunction(*F);
 }
 
-ReduceCode::~ReduceCode()
-{
-   delete CGF;
-}
-
 
 //======================ATTRIBUTE BEGIN====================================//
 static AttributeFlags gfortran_write_stdout(llvm::CallInst* CI)
@@ -502,11 +499,12 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
 }
 #endif
 
-ReduceCode::ReduceCode():ModulePass(ID), 
-   dse(createDeadStoreEliminationPass()),
-   dae(createDeadArgEliminationPass()),
-   ic(createInstructionCombiningPass()),
-   simpCFG(createCFGSimplificationPass())
+ReduceCode::ReduceCode()
+    : ModulePass(ID)
+    , dse(createDeadStoreEliminationPass())
+    , dae(createDeadArgEliminationPass())
+    , ic(createInstructionCombiningPass())
+    , simpCFG(createCFGSimplificationPass())
 {
    using std::placeholders::_1;
    ReduceCode* RC = this;
@@ -521,6 +519,7 @@ ReduceCode::ReduceCode():ModulePass(ID),
          AttributeFlags::IsDeletable | AttributeFlags::Cascade);
 
    CGF = NULL;
+   ignore = new IgnoreList("FUNC");
 
    Attributes["_gfortran_transfer_character_write"] = gfortran_write_stdout;
    Attributes["_gfortran_transfer_integer_write"] = gfortran_write_stdout;
@@ -577,6 +576,12 @@ ReduceCode::ReduceCode():ModulePass(ID),
    Attributes["mpi_finalize_"] = DirectDelete;
    Attributes["mpi_abort_"] = DirectDelete;
    Attributes["main"] = std::bind(direct_return, _1, AttributeFlags::None);
+}
+
+ReduceCode::~ReduceCode()
+{
+   delete CGF;
+   delete ignore;
 }
 
 //==================================ATTRIBUTE END===============================//
