@@ -231,11 +231,9 @@ AttributeFlags ReduceCode::nousedOperator(Use& op, Instruction* pos, ConfigFlags
             // and it isn't induction, then it can be removed
             if(LoadInst* LI = dyn_cast<LoadInst>(Ind))
                Ind = LI->getOperand(0);
-            if(Ind != target){
+            if(Ind == target){
                //XXX not stable, because it doesn't use domtree info
-               flag = noused_flat(op);
-               WHY_RMED(flag, op);
-               return flag;
+               return AttributeFlags::None;
             }
          }// if it is in loop, and we can't get induction, we ignore it
       }
