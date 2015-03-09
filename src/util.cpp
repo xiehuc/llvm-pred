@@ -402,18 +402,6 @@ std::vector<BasicBlock*> lle::getPath(BasicBlock *From, BasicBlock *To)
    return Path;
 }
 
-GetElementPtrInst* lle::isGEP(Use &O)
-{
-   ConstantExpr* CExpr = dyn_cast<ConstantExpr>(O.get());
-   return dyn_cast<GetElementPtrInst>(CExpr?CExpr->getAsInstruction():O.get());
-}
-
-GetElementPtrInst* lle::isGEP(User* U)
-{
-   ConstantExpr* CExpr = dyn_cast<ConstantExpr>(U);
-   return dyn_cast<GetElementPtrInst>(CExpr?CExpr->getAsInstruction():U);
-}
-
 GetElementPtrInst* lle::isRefGEP(Instruction* I)
 {
    GetElementPtrInst* GEPI = dyn_cast<GetElementPtrInst>(I);

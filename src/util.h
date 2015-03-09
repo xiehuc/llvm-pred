@@ -34,10 +34,23 @@ namespace lle
    // return true, and set @param 2 to global variable,
    // if it is referenced by a gep inst, set @param 3 to this gep inst
    bool isRefGlobal(llvm::Value* V, llvm::GlobalVariable** = nullptr, llvm::GetElementPtrInst** = nullptr);
-   // return if U.get() is GEP
-   llvm::GetElementPtrInst* isGEP(llvm::Use& U);
-   // return if I is GEP
-   llvm::GetElementPtrInst* isGEP(llvm::User* I);
+   template<class T>
+   T* isCEorI(llvm::Use& O)
+   {
+      llvm::ConstantExpr* CExpr = llvm::dyn_cast<llvm::ConstantExpr>(O.get());
+      return llvm::dyn_cast<T>(CExpr ? CExpr->getAsInstruction() : O.get());
+   }
+   template<class T>
+   T* isCEorI(llvm::User* I)
+   {
+      llvm::ConstantExpr* CExpr = llvm::dyn_cast<llvm::ConstantExpr>(I);
+      return llvm::dyn_cast<T>(CExpr ? CExpr->getAsInstruction() : I);
+   }
+   // return if U.get() is GEPinst or GEP const expr
+   // return if I is GEPinst or GEP const expr
+#define isGEP isCEorI<llvm::GetElementPtrInst>
+#define isCast isCEorI<llvm::CastInst>
+      
    // return if I is GEP or I's operand is GEP
    llvm::GetElementPtrInst* isRefGEP(llvm::Instruction* I);
 
