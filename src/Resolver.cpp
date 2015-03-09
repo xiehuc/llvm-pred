@@ -641,6 +641,12 @@ static bool gep_rule_(Use* U, DataDepGraph& G)
    }
    return ret;
 }
+static bool icast_rule_(Use* U, DataDepGraph& G)
+{
+   if(auto CI = dyn_cast<CastInst>(U->get()))
+      G.addSolved(U, CI->getOperandUse(0));
+   return false;// always want to find more result
+}
 
 bool InitRule::operator()(Use* U, DataDepGraph& G)
 {
@@ -688,6 +694,7 @@ void ResolveEngine::ibase_rule(ResolveEngine& RE)
 const ResolveEngine::SolveRule ResolveEngine::useonly_rule = useonly_rule_;
 const ResolveEngine::SolveRule ResolveEngine::gep_rule = gep_rule_;
 const ResolveEngine::SolveRule ResolveEngine::iuse_rule = use_inverse_rule_;
+const ResolveEngine::SolveRule ResolveEngine::icast_rule = icast_rule_;
 
 //===============================RESOLVE RULES END===============================//
 //=============================RESOLVE FILTERS BEGIN=============================//

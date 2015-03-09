@@ -277,6 +277,7 @@ class lle::ResolveEngine
    static void ibase_rule(ResolveEngine&);
    // use with InitRule, a public rule used for 
    static const SolveRule iuse_rule;
+   static const SolveRule icast_rule;
    // }
    // {
    static CallBack exclude(QueryTy);
