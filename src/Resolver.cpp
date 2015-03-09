@@ -8,6 +8,7 @@
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/ADT/DepthFirstIterator.h>
 #include <llvm/ADT/PostOrderIterator.h>
+#include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/Dominators.h>
 
 #include "ddg.h"
@@ -20,6 +21,10 @@ using namespace llvm;
 
 char ResolverPass::ID = 0;
 static RegisterPass<ResolverPass> Y("-Resolver","A Pass used to cache Resolver Result",false,false);
+static const set<string> IgnoreFindCall = {
+   "llvm.lifetime",
+   "free"
+};
 
 Use* NoResolve::operator()(Value* V, ResolverBase* _UNUSED_)
 {
@@ -484,12 +489,15 @@ struct find_visit
    find_visit(llvm::Value*& ret):ret(ret) {}
    bool operator()(Use* U){
       User* Ur = U->getUser();
-      if(isa<LoadInst>(Ur))
-         ret=Ur;
-      else if(CallInst* CI = dyn_cast<CallInst>(Ur)){//call inst also is a kind of visit
-         if(Function* F = dyn_cast<Function>(castoff(CI->getCalledValue())))
-            if(!F->getName().startswith("llvm.lifetime"))//some llvm call should ignore
-               ret=CI;
+      if (isa<LoadInst>(Ur))
+         ret = Ur;
+      else if (CallInst* CI = dyn_cast<CallInst>(Ur)) {
+         // call inst also is a kind of visit
+         StringRef Name = castoff(CI->getCalledValue())->getName();
+         if (auto I = dyn_cast<IntrinsicInst>(CI))
+            Name = getName(I->getIntrinsicID());
+         if (!IgnoreFindCall.count(Name)) // some call should ignore
+            ret = CI;
       }
 
       // most of time, we just care whether it has visitor,
