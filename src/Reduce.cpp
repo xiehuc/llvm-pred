@@ -277,8 +277,10 @@ bool ReduceCode::runOnFunction(Function& F)
             flag = getAttribute(CI);
          }else if(ReturnInst* RI = dyn_cast<ReturnInst>(Inst)){
             flag = noused_ret_rep(RI);
+#if 0 // don't delete store inst
          }else if(StoreInst* SI = dyn_cast<StoreInst>(Inst)){
-            flag = getAttribute(SI);
+            //flag = getAttribute(SI);
+#endif
          }
          if(flag & IsDeletable){
             (flag & Cascade)? dse.DeleteCascadeInstruction(Inst): 
@@ -527,7 +529,7 @@ ReduceCode::ReduceCode()
    Attributes["_gfortran_st_write_done"] = gfortran_write_stdout;
    Attributes["_gfortran_system_clock_4"] = DirectDelete;
    // memset is write instrincs, we disable gep filter
-   Attributes["llvm.memset"] = std::bind(nouse_at, _1, 0); 
+   // Attributes["llvm.memset"] = std::bind(nouse_at, _1, 0); // XXX: don't delete memset call
    if(Force){
 //int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
 //               MPI_Op op, int root, MPI_Comm comm)
