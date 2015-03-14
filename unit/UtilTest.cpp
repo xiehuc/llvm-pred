@@ -41,3 +41,26 @@ TEST(UtilTest, getPath) {
    EXPECT_EQ(Path[1], std::next(B_beg));
    EXPECT_EQ(Path[2], std::next(B_beg, 3));
 }
+
+// GCD function in PerformPred.cpp
+static uint32_t GCD(uint32_t A, uint32_t B) // 最大公约数
+{
+#define swap(A,B) (T=A,A=B,B=T)
+   uint32_t T;
+   A>B?swap(A,B):0;//makes A is small, B is large
+   if(A==0) return 0;
+   do{
+      B%=A;
+      A>B?swap(A,B):0;
+   }while(A!=0);
+   return B;
+#undef swap
+}
+
+TEST(UtilTest, GCDTest) {
+   EXPECT_EQ(GCD(2,6),  2);
+   EXPECT_EQ(GCD(8,12), 4);
+   // Zero Test
+   EXPECT_EQ(GCD(0,12), 0);
+   EXPECT_EQ(GCD(12,0), 0);
+}

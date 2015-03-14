@@ -101,18 +101,21 @@ static inline int32_t ilog2(uint32_t x) {
 
 static uint32_t GCD(uint32_t A, uint32_t B) // 最大公约数
 {
-   uint32_t Max=A, Min=B;
-   A<B?Max=B,Min=A:0;
+#define swap(A,B) (T=A,A=B,B=T)
+   uint32_t T;
+   A>B?swap(A,B):0;//makes A is small, B is large
+   if(A==0) return 0;
    do{
-      A=Min,B=Max%Min;
-      A<B?Max=B,Min=A:Max=A,Min=B;
-   }while(B!=0);
-   return A;
+      B%=A;
+      A>B?swap(A,B):0;
+   }while(A!=0);
+   return B;
+#undef swap
 }
 static BranchProbability scale(const BranchProbability& prob)
 {
    uint32_t n = prob.getNumerator(), d = prob.getDenominator();
-   uint32_t gcd = GCD(n,d);
+   uint32_t gcd = GCD(n,d)?:1;//if GCD return 0, gcd=1
    return BranchProbability(n/gcd, d/gcd);
 }
 static BranchProbability operator/(const BlockFrequency& LHS, const BlockFrequency& RHS)
