@@ -25,11 +25,9 @@ add_library(LLVMPred SHARED
 	LoopTripCount.cpp
    DSEAdaptive.cpp
    DAEAdaptive.cpp
-   LibFReshape.cpp
    PerformPred.cpp
    Adaptive.cpp
    Resolver.cpp
-   LockInst.cpp
    GVInfo.cpp
    Reduce.cpp
    Print.cpp
