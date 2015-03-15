@@ -1,8 +1,9 @@
 #!/bin/bash
-#quick make a bitcode to drawfcode
+# quick make a bitcode to drawfcode
 
 # process options
 OPTS=$(getopt -o ecdhgl --long "echo,cgpop,edge,help,gdb,log" -n $(basename "$0") -- "$@")
+VER=$LLVM_RECOMMEND_VERSION
 
 eval set -- "$OPTS"
 FRONT=eval
@@ -14,10 +15,22 @@ ARG_END=
 MPIF90=gfortran
 i=1
 REDICT=
+if [ "$VER" != "" ]; then
+   opt=opt-$VER
+   clang=clang-$VER
+else
+   opt=opt
+   clang=clang
+fi
+
+if [ ! -e $(which $opt) ]; then
+   echo "couldn't fount $opt, did you set LLVM_RECOMMEND_VERSION macro?"
+   exit 0
+fi
 
 function print_help
 {
-   echo "$0 [options] <bitcode>"
+   echo "LLVM_RECOMMEND_VERSION=? $0 [options] <bitcode>"
    echo "options:"
    echo "   --log: write output to /tmp/quick-make-log/"
    echo "   --gdb: echo gdb command"
@@ -67,23 +80,23 @@ name=${name%.bc}
 
 # compile code
 if [ "$EDGE" -eq "1" ]; then
-$FRONT opt $ARG_BEG -load src/libLLVMPred.so -insert-edge-profiling $input -o /tmp/$name.e.ll -S $ARG_END
+$FRONT $opt $ARG_BEG -load src/libLLVMPred.so -insert-edge-profiling $input -o /tmp/$name.e.ll -S $ARG_END
 statement_comp $i; i=$?
 suffix="e"
 else
-$FRONT opt $ARG_BEG -load src/libLLVMPred.so -PerfPred -insert-pred-profiling -insert-mpi-profiling $input -o /tmp/$name.1.ll -S $ARG_END
+$FRONT $opt $ARG_BEG -load src/libLLVMPred.so -PerfPred -insert-pred-profiling -insert-mpi-profiling $input -o /tmp/$name.1.ll -S $ARG_END
 statement_comp $i; i=$?
-$FRONT opt $ARG_BEG -load src/libLLVMPred.so -Reduce /tmp/$name.1.ll -o /tmp/$name.2.ll -S $ARG_END
+$FRONT $opt $ARG_BEG -load src/libLLVMPred.so -Reduce /tmp/$name.1.ll -o /tmp/$name.2.ll -S $ARG_END
 statement_comp $i; i=$?
 if [ "$CGPOP" -eq "1" ]; then
-$FRONT opt $ARG_BEG -load src/libLLVMPred.so -Force -Reduce /tmp/$name.2.ll -o /tmp/$name.3.ll -S $ARG_END
+$FRONT $opt $ARG_BEG -load src/libLLVMPred.so -Force -Reduce /tmp/$name.2.ll -o /tmp/$name.3.ll -S $ARG_END
 statement_comp $i; i=$?
 suffix="3"
 else
 suffix="2"
 fi
 fi
-$FRONT clang /tmp/$name.$suffix.ll -o /tmp/$name.$suffix.o -c
+$FRONT $clang /tmp/$name.$suffix.ll -o /tmp/$name.$suffix.o -c
 statement_comp $i; i=$?
 $FRONT $MPIF90 /tmp/$name.$suffix.o -o $name.$suffix $LFLAGS `pkg-config llvm-prof --variable=profile_rt_lib`
 statement_comp $i; i=$?

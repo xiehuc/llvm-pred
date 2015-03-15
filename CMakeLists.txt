@@ -26,7 +26,6 @@ option(UNIT_TEST "Enable Build Unit Test" Off)
 
 find_package(PkgConfig)
 pkg_check_modules(LLVM_PROF llvm-prof REQUIRED)
-pkg_check_modules(GSL gsl REQUIRED)
 
 if(NOT WITH_DEBUG)
    set(NO_DEBUG On)
