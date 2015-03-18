@@ -7,8 +7,6 @@
 #cmakedefine NO_DEBUG
 #endif
 #cmakedefine ANNOY_DEBUG 
-#define TIMING_@TIMING@
-#define TIMING_SOURCE_@TIMING_SOURCE@
 #define PROMOTE_FREQ_@PROMOTE_FREQ@
 
 // DDGraph::expr() print ref number. to simplify presentation
