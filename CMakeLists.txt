@@ -18,7 +18,7 @@ option(WITH_MORE_DEBUG "Enable More Extra Debug Output" Off)
 set(PROMOTE_FREQ "select" CACHE STRINGS "Select how to fix promote errors in performance predication")
 set_property(CACHE PROMOTE_FREQ PROPERTY STRINGS "select" "path_prob")
 option(UNIT_TEST "Enable Build Unit Test" Off)
-
+option(TC_USE_SCEV "LoopTripcount use SCEV" Off)
 
 find_package(PkgConfig)
 pkg_check_modules(LLVM_PROF llvm-prof REQUIRED)

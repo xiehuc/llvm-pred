@@ -8,10 +8,12 @@
 #include <llvm/Analysis/LoopInfo.h>
 #include <llvm/ADT/DepthFirstIterator.h>
 #include <llvm/Transforms/Utils/LoopUtils.h>
-
+#include <llvm/Analysis/ScalarEvolution.h>
 #include <map>
 #include <vector>
 #include <algorithm>
+#include <llvm/IR/Type.h>
+#include <llvm/IR/LLVMContext.h>
 
 #include "util.h"
 #include "config.h"
@@ -52,6 +54,7 @@ static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
 void LoopTripCount::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
 	AU.addRequired<LoopInfo>();
+   AU.addRequired<ScalarEvolution>();
 }
 
 LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
@@ -78,7 +81,22 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 	SmallVector<BasicBlock*,4> Exits;
 	L->getExitingBlocks(Exits);
 
-	if(Exits.size()==1) TE = Exits.front();
+	if(Exits.size()==1) {
+#ifndef TC_USE_SCEV
+      TE = Exits.front();
+#else
+      auto& SCEVInfo = getAnalysis<ScalarEvolution>();
+      int scev_count = SCEVInfo.getSmallConstantTripCount(L, Exits.front());
+      if(scev_count != 0){
+         IntegerType *I32Ty = Type::getInt32Ty(H->getContext());
+         end = ConstantInt::get(I32Ty,scev_count+1);
+         start = ConstantInt::get(I32Ty,1);
+         step = ConstantInt::get(I32Ty,1);
+         return AnalysisedLoop{0,start,step,end,ind};
+      }
+      TE = Exits.front();
+#endif
+   }
 	else{
 		if(std::find(Exits.begin(),Exits.end(),L->getLoopLatch())!=Exits.end()) TE = L->getLoopLatch();
 		else{
