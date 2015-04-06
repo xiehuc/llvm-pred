@@ -17,11 +17,11 @@ add_executable(unit_test
    CGFilterTest.cpp
    NousedTest.cpp
    UtilTest.cpp
+   gtest/gtest-all.cc
+   gtest/gtest_main.cc
    )
 target_link_libraries(unit_test
 	${LLVM_DYNAMIC_LIBRARY}
    LLVMPred
-   gtest
-   gmock
-   gmock_main
+   pthread
 	)

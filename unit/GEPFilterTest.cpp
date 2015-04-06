@@ -1,6 +1,5 @@
 #include "internal.h"
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 
 #include "Resolver.h"
 
@@ -60,10 +59,12 @@ TEST(GEPFilterTest, Construct) {
    // not all constant get element ptr
    GEPFilter gf_d(inst_1);
 
-   EXPECT_THAT(gf_a.idxs, ElementsAreArray(arr));
-   EXPECT_THAT(gf_b.idxs, ElementsAreArray(arr));
-   EXPECT_THAT(gf_c.idxs, ElementsAre(0, 1));
-   EXPECT_THAT(gf_d.idxs, ElementsAre(0, 2));
+   for(unsigned i=0;i<3;i++){
+      EXPECT_EQ(gf_a.idxs[i], arr[i]);
+      EXPECT_EQ(gf_b.idxs[i], arr[i]);
+   }
+   EXPECT_EQ(gf_c.idxs[1], 1);
+   EXPECT_EQ(gf_d.idxs[1], 2);
 }
 
 TEST(GEPFilterTest, Query) {
