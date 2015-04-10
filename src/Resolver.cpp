@@ -22,7 +22,8 @@ using namespace llvm;
 char ResolverPass::ID = 0;
 static RegisterPass<ResolverPass> Y("-Resolver","A Pass used to cache Resolver Result",false,false);
 static const set<string> IgnoreFindCall = {
-   "llvm.lifetime",
+   "llvm.lifetime.end",
+   "llvm.lifetime.start",
    "free"
 };
 

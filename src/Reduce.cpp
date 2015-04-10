@@ -38,7 +38,7 @@ static int _DT_INIT = dt_init();
 #define WHY_KEPT(what, searched)                                               \
   DEBUG({                                                                      \
     errs() << *(what).getUser() << " couldn't removed because: \n";            \
-    errs() << "found visit : " << (searched) << "\n";                          \
+    errs() << "found visit : " << (*searched) << "\n";                          \
   })
 #else
 #define WHY_KEPT(what, searched) {}
@@ -101,7 +101,7 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
    RE.addFilter(RE.exclude(&U));
    RE.resolve(ToSearch, RE.findVisit(Searched));
    if(Searched){
-      WHY_KEPT(U, *Searched);
+      WHY_KEPT(U, Searched);
       return AttributeFlags::None;
    }
    if(auto GEP = isGEP(U)){
@@ -112,7 +112,7 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
       ir.clear();
       RE.resolve(ToSearch, RE.findVisit(Searched));
       if (Searched) {
-         WHY_KEPT(U, *Searched);
+         WHY_KEPT(U, Searched);
          return AttributeFlags::None;
       } else {
          ir.clear();
