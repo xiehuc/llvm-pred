@@ -59,7 +59,9 @@ void LoopTripCount::getAnalysisUsage(llvm::AnalysisUsage & AU) const
    AU.addRequired<ScalarEvolution>();
 }
 
-void LoopTripCount::SCEV_analysis(Loop* L){
+void LoopTripCount::SCEV_analysis(Loop* L)
+{
+   SCEV_Analysised tmp = {0};
    auto& SCEV_Info = getAnalysis<ScalarEvolution>();
    tmp.LoopInfo = SCEV_Info.getBackedgeTakenCount(L);
    Value* TC = NULL;
