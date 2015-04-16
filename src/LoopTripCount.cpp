@@ -294,8 +294,13 @@ Value* LoopTripCount::SCEV_insertTripCount(const llvm::SCEV *scev_expr, llvm::St
    ScalarEvolution* SE = &getAnalysis<ScalarEvolution>();
    SCEVExpander Expander(*SE,"loop-trip-count");
    Value *inst = Expander.expandCodeFor(scev_expr,scev_expr->getType(),InsertPos);
-   if(inst != NULL){
-      inst->setName(HeaderName+".tc");
+   IRBuilder<> B(InsertPos);
+   Type* I32Ty = B.getInt32Ty();
+   if(inst->getType() != I32Ty){
+      B.CreateCast(CastInst::getCastOpcode(inst, false, I32Ty, false), inst, I32Ty);
+   }
+      if(inst != NULL){
+         inst->setName(HeaderName+".tc");
    }
    return inst;
 }
