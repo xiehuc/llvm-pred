@@ -43,7 +43,7 @@ namespace lle
       std::vector<AnalysisedLoop> CycleMap;
       ///////////////////////////////////
       std::vector<SCEV_Analysised> SCEV_CycleMap;
-      void SCEV_analysis(llvm::Loop*);
+      void SCEV_analysis(llvm::Loop*,llvm::BasicBlock *TE);
       // an unstable cache, the Loop -> index of Loop in df order
       llvm::DenseMap<llvm::Loop*, size_t> LoopMap;
       AnalysisedLoop analysis(llvm::Loop*);

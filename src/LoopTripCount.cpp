@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/Analysis/ScalarEvolutionExpander.h>
 
 #include "util.h"
 #include "config.h"
@@ -58,7 +59,7 @@ void LoopTripCount::getAnalysisUsage(llvm::AnalysisUsage & AU) const
    AU.addRequired<ScalarEvolution>();
 }
 
-void LoopTripCount::SCEV_analysis(Loop* L){
+void LoopTripCount::SCEV_analysis(Loop* L,BasicBlock *TE){
    LoopTripCount::SCEV_Analysised  tmp = {0};
    auto& SCEV_Info = getAnalysis<ScalarEvolution>();
    tmp.LoopInfo = SCEV_Info.getBackedgeTakenCount(L);
@@ -116,7 +117,10 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 			if(ExitEdges.size()==1) TE = const_cast<BasicBlock*>(ExitEdges.front().first);
 		}
 	}
-
+#ifdef TC_USE_SCEV
+   SCEV_analysis(L, TE);
+   return AnalysisedLoop{0};
+#endif
 	//process true exit
 	AssertThrow(TE, not_found("need have a true exit"));
 
@@ -276,6 +280,8 @@ Value* ScevToInst(const SCEV *scev_expr,llvm::Instruction *InsertPos){
             return NULL;
          inst = Builder.CreateAdd(LHS_add,RHS_add);
       }
+   }else if(auto cast_expr = dyn_cast<SCEVCastExpr>(scev_expr)){
+      return ScevToInst(cast_expr->getOperand(), InsertPos);
    }
   return inst;
 }
@@ -285,7 +291,9 @@ Value* LoopTripCount::SCEV_insertTripCount(const llvm::SCEV *scev_expr, llvm::St
    if(isa<SCEVCouldNotCompute>(scev_expr)){
       return NULL;
    }
-   Value* inst = ScevToInst(scev_expr,InsertPos);
+   ScalarEvolution* SE = &getAnalysis<ScalarEvolution>();
+   SCEVExpander Expander(*SE,"loop-trip-count");
+   Value *inst = Expander.expandCodeFor(scev_expr,scev_expr->getType(),InsertPos);
    if(inst != NULL){
       inst->setName(HeaderName+".tc");
    }
@@ -359,7 +367,8 @@ bool LoopTripCount::runOnFunction(Function &F)
          CycleMap.push_back(AL);
          AssertRuntime(LoopMap[L] < CycleMap.size() ," should insert indeed");
 #else
-         SCEV_analysis(L);
+        // SCEV_analysis(L);
+        analysis(L);
 #endif
       }
    }
