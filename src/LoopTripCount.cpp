@@ -59,8 +59,7 @@ void LoopTripCount::getAnalysisUsage(llvm::AnalysisUsage & AU) const
    AU.addRequired<ScalarEvolution>();
 }
 
-void LoopTripCount::SCEV_analysis(Loop* L,BasicBlock *TE){
-   LoopTripCount::SCEV_Analysised  tmp = {0};
+void LoopTripCount::SCEV_analysis(Loop* L){
    auto& SCEV_Info = getAnalysis<ScalarEvolution>();
    tmp.LoopInfo = SCEV_Info.getBackedgeTakenCount(L);
    Value* TC = NULL;
@@ -117,10 +116,6 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 			if(ExitEdges.size()==1) TE = const_cast<BasicBlock*>(ExitEdges.front().first);
 		}
 	}
-#ifdef TC_USE_SCEV
-   SCEV_analysis(L, TE);
-   return AnalysisedLoop{0};
-#endif
 	//process true exit
 	AssertThrow(TE, not_found("need have a true exit"));
 
@@ -372,8 +367,8 @@ bool LoopTripCount::runOnFunction(Function &F)
          CycleMap.push_back(AL);
          AssertRuntime(LoopMap[L] < CycleMap.size() ," should insert indeed");
 #else
-        // SCEV_analysis(L);
-        analysis(L);
+         SCEV_analysis(L);
+        //analysis(L);
 #endif
       }
    }
