@@ -100,12 +100,7 @@ void InsertLoopTripCount::print(llvm::raw_ostream &OS, const llvm::Module *M) co
 
    for(Loop* Top : LI)
       for(auto L = df_begin(Top), E = df_end(Top); L!=E; ++L){
-#ifndef TC_USE_SCEV
          Value* CC = LTC->getTripCount(*L);
-
-#else
-         Value* CC = LTC->SCEV_getTripCount(*L);
-#endif
          if(!CC) continue;
 
          lle::Resolver<UseOnlyResolve> R; /* print is not a part of normal process

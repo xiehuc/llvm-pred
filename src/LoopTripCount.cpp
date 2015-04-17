@@ -59,28 +59,27 @@ void LoopTripCount::getAnalysisUsage(llvm::AnalysisUsage & AU) const
    AU.addRequired<ScalarEvolution>();
 }
 
-void LoopTripCount::SCEV_analysis(Loop* L)
+LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 {
-   SCEV_Analysised tmp = {0};
-   auto& SCEV_Info = getAnalysis<ScalarEvolution>();
-   tmp.LoopInfo = SCEV_Info.getBackedgeTakenCount(L);
+#ifdef TC_USE_SCEV
+   auto& SE = getAnalysis<ScalarEvolution>();
+   const SCEV* LoopInfo = SE.getBackedgeTakenCount(L);
    Value* TC = NULL;
-   BasicBlock* Preheader = L->getLoopPreheader();
+   /*BasicBlock* Preheader = L->getLoopPreheader();
    if(Preheader){
       string HName = (L->getHeader()->getName()+".tc").str();
       auto Found = find_if(Preheader->begin(),Preheader->end(), [HName](Instruction& I){
             return I.getName()==HName;
             });
       if(Found != Preheader->end()) TC = &*Found;
+   }*/
+   if(!isa<SCEVCouldNotCompute>(LoopInfo)){
+      AnalysisedLoop ret = {0};
+      ret.userdata = const_cast<void*>((const void*)LoopInfo);
+      ret.TripCount = TC;
+      return ret;
    }
-   tmp.TripCount = TC;
-   LoopMap[L] = SCEV_CycleMap.size(); // write to cache
-   SCEV_CycleMap.push_back(tmp);
-   AssertRuntime(LoopMap[L] < SCEV_CycleMap.size() ," should insert indeed");
-
-}
-LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
-{
+#endif
 	Value* start = NULL;
 	Value* ind = NULL;
 	Value* end = NULL;
@@ -283,26 +282,25 @@ Value* ScevToInst(const SCEV *scev_expr,llvm::Instruction *InsertPos){
   return inst;
 }
 
-Value* LoopTripCount::SCEV_insertTripCount(const llvm::SCEV *scev_expr, llvm::StringRef HeaderName, llvm::Instruction* InsertPos)
-{
-   if(isa<SCEVCouldNotCompute>(scev_expr)){
-      return NULL;
-   }
-   ScalarEvolution* SE = &getAnalysis<ScalarEvolution>();
-   SCEVExpander Expander(*SE,"loop-trip-count");
-   Value *inst = Expander.expandCodeFor(scev_expr,scev_expr->getType(),InsertPos);
-   IRBuilder<> B(InsertPos);
-   Type* I32Ty = B.getInt32Ty();
-   if(inst->getType() != I32Ty){
-      inst = B.CreateCast(CastInst::getCastOpcode(inst, false, I32Ty, false), inst, I32Ty);
-   }
-   if(inst != NULL){
-      inst->setName(HeaderName+".tc");
-   }
-   return inst;
-}
 Value* LoopTripCount::insertTripCount(AnalysisedLoop AL, StringRef HeaderName, Instruction* InsertPos)
 {
+#ifdef TC_USE_SCEV
+   SCEV* scev_expr = (SCEV*)AL.userdata;
+   if(scev_expr && !isa<SCEVCouldNotCompute>(scev_expr)){
+      ScalarEvolution& SE = getAnalysis<ScalarEvolution>();
+      SCEVExpander Expander(SE,"loop-trip-count");
+      Value *inst = Expander.expandCodeFor(scev_expr,scev_expr->getType(),InsertPos);
+      IRBuilder<> B(InsertPos);
+      Type* I32Ty = B.getInt32Ty();
+      if(inst->getType() != I32Ty){
+         inst = B.CreateCast(CastInst::getCastOpcode(inst, false, I32Ty, false), inst, I32Ty);
+      }
+      if(inst != NULL){
+         inst->setName(HeaderName+".tc");
+      }
+      return inst;
+   }
+#endif
 	Value* RES = NULL;
    Value* start = AL.Start, *END = AL.End;
    if(!start || !END || !InsertPos || !AL.Step) return NULL;
@@ -340,13 +338,11 @@ bool LoopTripCount::runOnFunction(Function &F)
    LI = &getAnalysis<LoopInfo>();
    LoopMap.clear();
    CycleMap.clear();
-   SCEV_CycleMap.clear();
    unfound_str = "";
 
    for(Loop* TopL : *LI){
       for(auto LIte = df_begin(TopL), E = df_end(TopL); LIte!=E; ++LIte){
          Loop* L = *LIte;
-#ifndef TC_USE_SCEV
          Value* TC = NULL;
          AnalysisedLoop AL = {0};
          try{
@@ -368,10 +364,6 @@ bool LoopTripCount::runOnFunction(Function &F)
          LoopMap[L] = CycleMap.size(); // write to cache
          CycleMap.push_back(AL);
          AssertRuntime(LoopMap[L] < CycleMap.size() ," should insert indeed");
-#else
-         SCEV_analysis(L);
-        //analysis(L);
-#endif
       }
    }
    unfound.str();
@@ -404,29 +396,13 @@ Value* LoopTripCount::getOrInsertTripCount(Loop *L)
       InsertPreheaderForLoop(L, this);
    }
    Instruction* InsertPos = L->getLoopPredecessor()->getTerminator();
-   Value* V = NULL;
-#ifndef TC_USE_SCEV
-   V = getTripCount(L);
+   Value* V = getTripCount(L);
    if(V==NULL){
       auto ite = LoopMap.find(L);
       if(ite == LoopMap.end()) return NULL;
       AnalysisedLoop& AL = CycleMap[ite->second];
       AL.TripCount = V = insertTripCount(AL, L->getHeader()->getName(), InsertPos);
    }
-#else
-   V = SCEV_getTripCount(L);
-   if(V == NULL){
-      auto ite_scev = LoopMap.find(L);
-      if(ite_scev == LoopMap.end()) return NULL;
-      SCEV_Analysised& tmp = SCEV_CycleMap[ite_scev->second];
-      const SCEV* scev_info = tmp.LoopInfo;
-      tmp.TripCount = V = SCEV_insertTripCount(scev_info,L->getHeader()->getName(), InsertPos);
-      string a;
-      raw_string_ostream o(a);
-      if(scev_info)
-          o<<*scev_info<<"\n";
-   }
-#endif
    return V;
 }
 

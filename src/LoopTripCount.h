@@ -34,16 +34,11 @@ namespace lle
       struct AnalysisedLoop {
          int AdjustStep;
          llvm::Value* Start, *Step, *End, *Ind, *TripCount;
-      };
-      struct SCEV_Analysised{
-         const llvm::SCEV* LoopInfo;
-         llvm::Value* TripCount;
+         void* userdata;
       };
 		// a stable cache, the index of Loop in df order -> LoopTripCount
       std::vector<AnalysisedLoop> CycleMap;
       ///////////////////////////////////
-      std::vector<SCEV_Analysised> SCEV_CycleMap;
-      void SCEV_analysis(llvm::Loop*);
       // an unstable cache, the Loop -> index of Loop in df order
       llvm::DenseMap<llvm::Loop*, size_t> LoopMap;
       AnalysisedLoop analysis(llvm::Loop*);
@@ -54,7 +49,6 @@ namespace lle
 		 * source, so we directly return it. caller can make a cast
 		 * instruction and insert it by hand.
 		 */
-      llvm::Value* SCEV_insertTripCount(const llvm::SCEV *scev_expr, llvm::StringRef, llvm::Instruction* InsertPos);
       llvm::Value* insertTripCount(AnalysisedLoop,llvm::StringRef, llvm::Instruction* InsertPos);
 		public:
 		static char ID;
@@ -70,10 +64,6 @@ namespace lle
          return ite==LoopMap.end()?NULL:CycleMap[ite->second].TripCount;
       }
       ///////
-      llvm::Value* SCEV_getTripCount(llvm::Loop* L) const{
-         auto ite = LoopMap.find(L);
-         return ite == LoopMap.end()?NULL:SCEV_CycleMap[ite->second].TripCount;
-      }
       llvm::Value* getInduction(llvm::Loop* L) const {
          auto ite = LoopMap.find(L);
          return (ite==LoopMap.end())?NULL:CycleMap[ite->second].TripCount;
