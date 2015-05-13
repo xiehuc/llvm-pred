@@ -66,7 +66,7 @@ namespace lle
       ///////
       llvm::Value* getInduction(llvm::Loop* L) const {
          auto ite = LoopMap.find(L);
-         return (ite==LoopMap.end())?NULL:CycleMap[ite->second].TripCount;
+         return (ite==LoopMap.end())?NULL:CycleMap[ite->second].Ind;
       }
       // a helper function which convenient.
       llvm::Value* getOrInsertTripCount(llvm::Loop* l);
