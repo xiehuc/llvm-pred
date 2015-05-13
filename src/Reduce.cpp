@@ -39,7 +39,6 @@ static int _DT_INIT = dt_init();
   DEBUG({                                                                      \
     errs() << *(what).getUser() << " couldn't removed because: \n";            \
     errs() << "found visit : " << (*searched) << "\n";                          \
-    errs()<<"HAOMENG TEST!!!\n";                                               \
   })
 #else
 #define WHY_KEPT(what, searched) {}
