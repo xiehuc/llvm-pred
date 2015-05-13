@@ -4,6 +4,7 @@
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/Analysis/LoopInfo.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Analysis/ScalarEvolution.h>
 
 #include <iostream>
 #include <map>
@@ -33,10 +34,11 @@ namespace lle
       struct AnalysisedLoop {
          int AdjustStep;
          llvm::Value* Start, *Step, *End, *Ind, *TripCount;
+         void* userdata;
       };
-
 		// a stable cache, the index of Loop in df order -> LoopTripCount
       std::vector<AnalysisedLoop> CycleMap;
+      ///////////////////////////////////
       // an unstable cache, the Loop -> index of Loop in df order
       llvm::DenseMap<llvm::Loop*, size_t> LoopMap;
       AnalysisedLoop analysis(llvm::Loop*);
@@ -61,9 +63,10 @@ namespace lle
          auto ite = LoopMap.find(L);
          return ite==LoopMap.end()?NULL:CycleMap[ite->second].TripCount;
       }
+      ///////
       llvm::Value* getInduction(llvm::Loop* L) const {
          auto ite = LoopMap.find(L);
-         return ite==LoopMap.end()?NULL:CycleMap[ite->second].Ind;
+         return (ite==LoopMap.end())?NULL:CycleMap[ite->second].TripCount;
       }
       // a helper function which convenient.
       llvm::Value* getOrInsertTripCount(llvm::Loop* l);
