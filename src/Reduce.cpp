@@ -277,7 +277,7 @@ bool ReduceCode::runOnFunction(Function& F)
             flag = getAttribute(CI);
          }else if(ReturnInst* RI = dyn_cast<ReturnInst>(Inst)){
             flag = noused_ret_rep(RI);
-#if 1 // don't delete store inst . haomeng change
+#ifdef DELETE_STORE //delete store inst
          }else if(StoreInst* SI = dyn_cast<StoreInst>(Inst)){
             flag = getAttribute(SI);
 #endif

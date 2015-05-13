@@ -9,6 +9,7 @@
 #cmakedefine ANNOY_DEBUG 
 #define PROMOTE_FREQ_@PROMOTE_FREQ@
 #cmakedefine TC_USE_SCEV
+#cmakedefine DELETE_STORE
 // DDGraph::expr() print ref number. to simplify presentation
 #define EXPR_ENABLE_REF 
 // a special symbol for self reference
