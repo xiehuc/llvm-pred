@@ -61,7 +61,9 @@ using namespace std;
 using namespace lle;
 using namespace llvm;
 
-static AttributeFlags mpi_comm_replace(CallInst* CI, SmallPtrSetImpl<StoreInst*>* Protected, const std::string Env);
+static const std::set<StringRef> MpiDelayDelete = {
+  "mpi_init_", "mpi_finalize_", "mpi_comm_rank_", "mpi_comm_size_"
+};
 
 char ReduceCode::ID = 0;
 static RegisterPass<ReduceCode> Y("Reduce", "Slash and Shrink Code to make a minicore program");
@@ -134,7 +136,12 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI)
       Name = getName(I->getIntrinsicID());
    auto Found = Attributes.find(Name);
    if(Found == Attributes.end()) return AttributeFlags::None;
-   return Found->second(CI);
+   auto Ret = Found->second(CI);
+   if(Ret & AttributeFlags::IsDeletable && !MpiDelayDelete.count(Name)){
+     mpi_stats.unref(CI);
+     errs()<<mpi_stats.count()<<"\n";
+   }
+   return Ret;
 }
 
 AttributeFlags ReduceCode::noused_param(Argument* Arg)
@@ -317,9 +324,7 @@ static void RemoveDeadFunction(Module& M, bool focusDeclation)
 
 bool ReduceCode::doInitialization(Module& M)
 {
-  DSE_Adaptive* dse = &this->dse;
   auto DirtyFunc = &this->DirtyFunc;
-  auto Protected = &this->Protected;
   for(auto& F : M){
     for(auto& B : F){
       for(auto& I : B){
@@ -329,21 +334,8 @@ bool ReduceCode::doInitialization(Module& M)
         if(!CalledF) continue;
         StringRef FName = CalledF->getName();
         if(!FName.startswith("mpi_")) continue;
-        if(FName == "mpi_init_" || FName == "mpi_finailize_")
-          mpi_stats.onEmpty([dse, CI, DirtyFunc, &F](){
-              dse->DeleteDeadInstruction(CI);
-              (*DirtyFunc)[&F] = true;
-              });
-        else if(FName == "mpi_comm_rank_")
-          mpi_stats.onEmpty([Protected, dse, CI, DirtyFunc, &F](){
-              mpi_comm_replace(CI, Protected, "MPI_RANK");
-              dse->DeleteDeadInstruction(CI);
-              (*DirtyFunc)[&F] = true;
-              });
-        else if(FName == "mpi_comm_size_")
-          mpi_stats.onEmpty([Protected, dse, CI, DirtyFunc, &F](){
-              mpi_comm_replace(CI, Protected, "MPI_SIZE");
-              dse->DeleteDeadInstruction(CI);
+        if(MpiDelayDelete.count(FName))
+          mpi_stats.onEmpty([DirtyFunc, &F](){
               (*DirtyFunc)[&F] = true;
               });
         else
@@ -479,8 +471,9 @@ static constexpr AttributeFlags direct_return(CallInst* CI, AttributeFlags flags
    return flags;
 }
 
-static AttributeFlags mpi_comm_replace(CallInst* CI, SmallPtrSetImpl<StoreInst*>* Protected, const std::string Env)
+static AttributeFlags mpi_comm_replace(CallInst* CI, SmallPtrSetImpl<StoreInst*>* Protected, MPIStatistics* stat, const std::string Env)
 {
+   if(stat->count() > 0) return AttributeFlags::None;
    Module* M = CI->getParent()->getParent()->getParent();
    LLVMContext& C = M->getContext();
    Type* CharPTy = Type::getInt8PtrTy(C);
@@ -501,6 +494,11 @@ static AttributeFlags mpi_comm_replace(CallInst* CI, SmallPtrSetImpl<StoreInst*>
    CallInst::Create(exitF, {ConstantInt::getNullValue(I32Ty)}, "", Res);
    Protected->insert(new StoreInst(Rank, RankVariable, CI)); // 因为它是最后加入的, 所以排在use列表的最后.
    return AttributeFlags::IsDeletable;
+}
+static AttributeFlags mpi_delay_delete(CallInst* CI, MPIStatistics* stat)
+{
+  if(stat->count() > 0) return AttributeFlags::None;
+  else return AttributeFlags::IsDeletable;
 }
 static AttributeFlags mpi_allreduce_force(CallInst* CI)
 {
@@ -580,22 +578,15 @@ ReduceCode::ReduceCode()
    ReduceCode* RC = this;
    MPIStatistics* stat = &this->mpi_stats;
    auto nouse_at = [RC, stat](CallInst* CI, unsigned Which) {
-      AttributeFlags ret = RC->nousedOperator(CI->getArgOperandUse(Which), CI,
+      return RC->nousedOperator(CI->getArgOperandUse(Which), CI,
                                 DISABLE_STORE_INLOOP);
-      if(ret & AttributeFlags::IsDeletable) stat->unref(CI);
-      return ret;
    };
    auto mpi_nouse_recvbuf = std::bind(nouse_at, _1, 1);
    auto mpi_nouse_buf = std::bind(nouse_at, _1, 0);
    auto DirectDelete = std::bind(direct_return, _1, AttributeFlags::IsDeletable);
-   auto MPIDirectDeleteCascade = [stat](CallInst* CI){
-     stat->unref(CI);
-     return AttributeFlags::IsDeletable | AttributeFlags::Cascade;
-   };
-   auto MPIDirectDelete = [stat](CallInst* CI){
-     stat->unref(CI);
-     return AttributeFlags::IsDeletable;
-   };
+   auto DirectDeleteCascade = std::bind(direct_return, _1, 
+         AttributeFlags::IsDeletable | AttributeFlags::Cascade);
+   auto mpi_direct_delete = std::bind(mpi_delay_delete, _1, stat);
 
    CGF = NULL;
    ignore = new IgnoreList("FUNC");
@@ -641,19 +632,19 @@ ReduceCode::ReduceCode()
 //int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
 //               MPI_Comm comm )
    // 由于模拟的时候只有一个进程, 所以不需要扩散变量.
-   Attributes["mpi_bcast_"] = MPIDirectDelete;
-   Attributes["mpi_comm_split_"] = MPIDirectDelete;
-   //Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, &Protected, "MPI_RANK");
-   //Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, &Protected, "MPI_SIZE");
+   Attributes["mpi_bcast_"] = DirectDelete;
+   Attributes["mpi_comm_split_"] = DirectDelete;
+   Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, &Protected, stat, "MPI_RANK");
+   Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, &Protected, stat, "MPI_SIZE");
    //always delete mpi_wtime_
-   Attributes["mpi_wtime_"] = MPIDirectDeleteCascade;
-   Attributes["mpi_error_string_"] = MPIDirectDelete;
-   Attributes["mpi_wait_"] = MPIDirectDelete;
-   Attributes["mpi_waitall_"] = MPIDirectDelete;
-   Attributes["mpi_barrier_"] = MPIDirectDelete;
-   //Attributes["mpi_init_"] = DirectDelete;
-   //Attributes["mpi_finalize_"] = DirectDelete;
-   Attributes["mpi_abort_"] = MPIDirectDelete;
+   Attributes["mpi_wtime_"] = DirectDeleteCascade;
+   Attributes["mpi_error_string_"] = DirectDelete;
+   Attributes["mpi_wait_"] = DirectDelete;
+   Attributes["mpi_waitall_"] = DirectDelete;
+   Attributes["mpi_barrier_"] = DirectDelete;
+   Attributes["mpi_init_"] = mpi_direct_delete;
+   Attributes["mpi_finalize_"] = mpi_direct_delete;
+   Attributes["mpi_abort_"] = DirectDelete;
    Attributes["main"] = std::bind(direct_return, _1, AttributeFlags::None);
 }
 
