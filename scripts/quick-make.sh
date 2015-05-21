@@ -75,7 +75,6 @@ while true; do
 done
 
 input="$1"
-echo $input
 name=$(basename $1)
 name=${name%.bc}
 
