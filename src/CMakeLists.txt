@@ -20,20 +20,18 @@ else()
 endif()
 
 add_library(LLVMPred SHARED
-	KnownLibCallInfo.cpp
    InsertTripCount.cpp
-	LoopTripCount.cpp
+   LoopTripCount.cpp
    DSEAdaptive.cpp
    DAEAdaptive.cpp
    PerformPred.cpp
    Adaptive.cpp
    Resolver.cpp
-   GVInfo.cpp
    Reduce.cpp
    Print.cpp
-	util.cpp
+   util.cpp
    ddg.cpp
-	)
+   )
 
 target_link_libraries(LLVMPred
 	${LLVM_DYNAMIC_LIBRARY}
