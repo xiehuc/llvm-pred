@@ -9,14 +9,12 @@
 #include <string>
 
 #include "util.h"
-#include "KnownLibCallInfo.h"
 
 #include "debug.h"
 
 namespace lle{
    class PrintEnv;
    class PrintCgTree;
-   class PrintLibCall;
    class DotBlockFreq;
 }
 
@@ -42,48 +40,9 @@ class lle::PrintEnv: public ModulePass
    }
 };
 
-/* A simple helper to print functions called what libcalls
- * this is useful to debug and check the program structure
- */
-class lle::PrintLibCall: public FunctionPass
-{
-   LibCallFromFile LC;
-   public:
-   static char ID;
-   PrintLibCall():FunctionPass(ID) {};
-   bool runOnFunction(Function&) ;
-};
-
 char PrintEnv::ID = 0;
-char PrintLibCall::ID = 0;
 
 static RegisterPass<PrintEnv> X("Env","print environment params", true, true);
-static RegisterPass<PrintLibCall> Z("Call", "print function invokes what libcall", true, true);
-
-bool PrintLibCall::runOnFunction(Function &F)
-{
-   int empty = 1;
-   for(auto I = inst_begin(F), E = inst_end(F); I!=E; ++I){
-      if(CallInst* CI = dyn_cast<CallInst>(&*I)){
-         Function* Func = dyn_cast<Function>(castoff(CI->getCalledValue()));
-         if(!Func) continue;
-         auto FuncInfo = LC.getFunctionInfo(Func);
-         if(FuncInfo && FuncInfo->UniversalBehavior &
-               AliasAnalysis::ModRefResult::Mod){ /* the function writes
-                                                     memory */
-            if(empty){
-               errs()<<F.getName()<<":\n";
-               empty = 0;
-            }
-
-            errs()<<"   "<<Func->getName()<<"\n";
-         }
-         
-      }
-   }
-   if(!empty) errs()<<"\n";
-   return false;
-}
 
 /** A simple helper to print callgraph,
  * the difference with -print-callgraph is this only print module function,

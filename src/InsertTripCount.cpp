@@ -11,7 +11,6 @@
 
 #include "ddg.h"
 #include "util.h"
-#include "GVInfo.h"
 #include "Reduce.h"
 #include "config.h"
 #include "Resolver.h"
@@ -44,12 +43,11 @@ static RegisterPass<InsertLoopTripCount> Y("Insert-Trip-Count", "Insert Loop Tri
 
 void InsertLoopTripCount::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
-	AU.setPreservesAll();
-   AU.addRequired<GVInfo>();
-   AU.addRequired<LoopInfo>();
-   AU.addRequired<ResolverPass>();
-	AU.addRequired<LoopTripCount>();
-   AU.addRequired<ScalarEvolution>();
+  AU.setPreservesAll();
+  AU.addRequired<LoopInfo>();
+  AU.addRequired<ResolverPass>();
+  AU.addRequired<LoopTripCount>();
+  AU.addRequired<ScalarEvolution>();
 }
 
 bool InsertLoopTripCount::runOnLoop(llvm::Loop *L)
@@ -61,8 +59,7 @@ bool InsertLoopTripCount::runOnLoop(llvm::Loop *L)
    // auto insert value trap when used -insert-value-profiling
    CC = ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 
-   RP->getResolver<GVResolve>().get_impl().initial(&getAnalysis<GVInfo>());
-   auto R = RP->getResolverSet<UseOnlyResolve, SpecialResolve, GVResolve>();
+   auto R = RP->getResolverSet<UseOnlyResolve, SpecialResolve>();
    ResolveResult RR = R.resolve(CC);
 
    if(Ddg && std::get<0>(RR).size()>1){

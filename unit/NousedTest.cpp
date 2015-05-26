@@ -57,9 +57,7 @@ exp2:
    std::unique_ptr<Module> M = parseAssembly(Assembly);
    Function::iterator F_a = M->getFunction("a")->begin();
    BasicBlock::iterator B_a_beg = F_a->begin();
-   BasicBlock::iterator B_b_beg = ++F_a->begin();
    CallInst* Test = cast<CallInst>(std::next(B_a_beg, 3));
-   CallInst* Test2 = cast<CallInst>(std::next(B_b_beg, 2));
 
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
@@ -68,7 +66,6 @@ exp2:
 
    Value* V = RE.find_visit(&Test->getArgOperandUse(0));
    EXPECT_EQ(V, std::next(B_a_beg, 6)); // %4
-
 }
 
 TEST(NousedTest, GepBeforeFail) {
