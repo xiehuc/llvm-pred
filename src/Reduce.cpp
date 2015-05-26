@@ -447,6 +447,21 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
    Builder.CreateMemCpy(Recv, Send, Builder.CreateLoad(Count), TySize);
    return AttributeFlags::IsDeletable;
 }
+static AttributeFlags mpi_alltoall_force(CallInst* CI)
+{
+   Value* Send  =  CI->getArgOperand(0);
+   Value* Recv  =  CI->getArgOperand(3);
+   Value* Count =  CI->getArgOperand(4);
+   Value* Type  =  CI->getArgOperand(5);
+   auto GV = dyn_cast<GlobalVariable>(Type);
+   auto GVI = dyn_cast_or_null<ConstantInt>(GV?GV->getInitializer():NULL);
+   uint64_t TyIdx = GVI?GVI->getZExtValue():7; // DT[7] == 4, default is int
+   uint64_t TySize = DT[TyIdx];
+
+   IRBuilder<> Builder(CI);
+   Builder.CreateMemCpy(Recv, Send, Builder.CreateLoad(Count), TySize);
+   return AttributeFlags::IsDeletable;
+}
 # if 0
 static AttributeFlags mpi_allreduce_force(CallInst* CI)
 {
@@ -534,10 +549,28 @@ ReduceCode::ReduceCode()
 //int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
 //               MPI_Op op, int root, MPI_Comm comm)
 //Deletable if recvbuf is no used
+#if (defined NPB_OPTION_FT)||(defined NPB_OPTION_)
       Attributes["mpi_reduce_"] = mpi_allreduce_force;
+#endif
 //int MPI_Allreduce(const void *sendbuf, void *recvbuf, int count,
 //                  MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
+#if (defined NPB_OPTION_LU)||(defined NPB_OPTION_)
       Attributes["mpi_allreduce_"] = mpi_allreduce_force;
+#endif
+   //Force reduce the mpi_alltoall. by haomeng
+#ifdef NPB_OPTION_FT
+      Attributes["mpi_alltoall_"] = mpi_alltoall_force;
+#endif
+#if (defined NPB_OPTION_CG)||(defined NPB_OPTION_LU)
+      Attributes["mpi_irecv_"]    = DirectDelete;
+      Attributes["mpi_send_"]     = DirectDelete;
+#endif
+#if (defined NPB_OPTION_SP)||(defined NPB_OPTION_BT)
+      Attributes["mpi_irecv_"]    = DirectDelete;
+      Attributes["mpi_reduce_"] = mpi_allreduce_force;
+      Attributes["mpi_isend_"]     = DirectDelete; 
+      Attributes["mpi_comm_dup_"] = DirectDelete;
+#endif
    }else{
       Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
       Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
@@ -545,20 +578,28 @@ ReduceCode::ReduceCode()
 //int MPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 //                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
 //                 MPI_Comm comm)
+#ifndef NPB_OPTION_FT
    Attributes["mpi_alltoall_"] = std::bind(nouse_at, _1, 3);
+#endif
 //Deletable if recvbuf is no used
 //int MPI_Send(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
 //             MPI_Comm comm)
 //int MPI_Recv(void *buf, int count, MPI_Datatype datatype, int source, int tag,
 //             MPI_Comm comm, MPI_Status *status)
+#if (!defined NPB_OPTION_CG)&&(!defined NPB_OPTION_LU)
    Attributes["mpi_send_"] = mpi_nouse_buf;
+#endif
    Attributes["mpi_recv_"] = mpi_nouse_buf;
 //int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
 //              int tag, MPI_Comm comm, MPI_Request *request)
 //int MPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
 //              MPI_Comm comm, MPI_Request *request)
+#if (!defined NPB_OPTION_SP)&&(!defined NPB_OPTION_BT)
    Attributes["mpi_isend_"] = mpi_nouse_buf;
+#endif
+#if (!defined NPB_OPTION_CG)&&(!defined NPB_OPTION_LU)&&(!defined NPB_OPTION_SP)&&(!defined NPB_OPTION_BT)
    Attributes["mpi_irecv_"] = mpi_nouse_buf;
+#endif
 //int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
 //               MPI_Comm comm )
    // 由于模拟的时候只有一个进程, 所以不需要扩散变量.
