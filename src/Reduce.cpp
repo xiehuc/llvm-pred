@@ -123,6 +123,18 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
          Dbg_PrintGraph(RE.resolve(ToSearch), U.getUser());
       }
    }
+   if(auto CAST = isCast(U)){
+      ToSearch = &CAST->getOperandUse(0);
+      ir.clear();
+      RE.resolve(ToSearch, RE.findVisit(Searched));
+      if (Searched) {
+         WHY_KEPT(U, Searched);
+         return AttributeFlags::None;
+      } else {
+         ir.clear();
+         Dbg_PrintGraph(RE.resolve(ToSearch), U.getUser());
+      }
+   }
    ir.clear();
    Dbg_PrintGraph(RE.resolve(&U), U.getUser());
    WHAT_RMD(U);
@@ -137,10 +149,8 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI)
    auto Found = Attributes.find(Name);
    if(Found == Attributes.end()) return AttributeFlags::None;
    auto Ret = Found->second(CI);
-   if(Ret & AttributeFlags::IsDeletable && !MpiDelayDelete.count(Name)){
+   if(Ret & AttributeFlags::IsDeletable && !MpiDelayDelete.count(Name))
      mpi_stats.unref(CI);
-     errs()<<mpi_stats.count()<<"\n";
-   }
    return Ret;
 }
 
@@ -608,9 +618,13 @@ ReduceCode::ReduceCode()
 //int MPI_Allreduce(const void *sendbuf, void *recvbuf, int count,
 //                  MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
       Attributes["mpi_allreduce_"] = mpi_allreduce_force;
+//int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
+//               MPI_Comm comm )
+      Attributes["mpi_bcast_"] = DirectDelete;
    }else{
       Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
       Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
+      Attributes["mpi_bcast_"] = mpi_nouse_buf;
    }
 //int MPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 //                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
@@ -629,9 +643,6 @@ ReduceCode::ReduceCode()
 //              MPI_Comm comm, MPI_Request *request)
    Attributes["mpi_isend_"] = mpi_nouse_buf;
    Attributes["mpi_irecv_"] = mpi_nouse_buf;
-//int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
-//               MPI_Comm comm )
-   Attributes["mpi_bcast_"] = mpi_nouse_buf;
    Attributes["mpi_comm_split_"] = DirectDelete;
    Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, &Protected, stat, "MPI_RANK");
    Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, &Protected, stat, "MPI_SIZE");
