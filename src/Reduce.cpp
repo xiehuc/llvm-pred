@@ -631,8 +631,7 @@ ReduceCode::ReduceCode()
    Attributes["mpi_irecv_"] = mpi_nouse_buf;
 //int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
 //               MPI_Comm comm )
-   // 由于模拟的时候只有一个进程, 所以不需要扩散变量.
-   Attributes["mpi_bcast_"] = DirectDelete;
+   Attributes["mpi_bcast_"] = mpi_nouse_buf;
    Attributes["mpi_comm_split_"] = DirectDelete;
    Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, &Protected, stat, "MPI_RANK");
    Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, &Protected, stat, "MPI_SIZE");
