@@ -170,7 +170,7 @@ AttributeFlags ReduceCode::noused_param(Argument* Arg)
          GlobalVariable* GV = NULL;
          GetElementPtrInst* GEP = NULL;
          if(f && isRefGlobal(Para->get(), &GV, &GEP))
-            f &= FLAG(Self->noused_global(GV, CI, excluded(S)));
+            f &= FLAG(Self->noused_global(GV, CI, GEP, excluded(S)));
          return f;
          });
    return all_deletable ? IsDeletable : AttributeFlags::None;
@@ -200,11 +200,11 @@ static AttributeFlags noused_ret_rep(ReturnInst* RI)
       ReturnInst::Create(F->getContext(), UndefValue::get(Ret->getType()), RI->getParent());
    return all_deletable ? IsDeletable : AttributeFlags::None;
 }
-Value* ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP, ResolveEngine::CallBack C)
+Value* ReduceCode::noused_global(GlobalVariable* GV, Instruction* pos, GetElementPtrInst* GEP, ResolveEngine::CallBack C)
 {
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
-   CGF->update(GEP);
+   CGF->update(pos);
    RE.addFilter(*CGF);
    GetElementPtrInst* GEPI = isRefGEP(GEP);
    if(GEPI) RE.addFilter(GEPFilter(GEPI));
@@ -229,7 +229,7 @@ AttributeFlags ReduceCode::nousedOperator(Use& op, Instruction* pos, ConfigFlags
       // 过于激进的删除
       if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
          if(GV->getName().endswith("Counters")) return AttributeFlags::None;
-         what = noused_global(GV, pos);
+         what = noused_global(GV, pos, GEP);
          NOTICE(op, what);
          return FLAG(what);
       }
