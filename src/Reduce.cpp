@@ -94,15 +94,22 @@ struct excluded{
 // a simple basic noused check 
 static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = ResolveEngine::always_false)
 {
-   ResolveEngine RE;
-   RE.addRule(RE.ibase_rule);
-   InitRule ir(RE.iuse_rule);
-   RE.addRule(std::ref(ir));
-   RE.addFilter(C);
-   RE.addFilter(iUseFilter(&U));
+   static bool inited = false;
+   static ResolveEngine RE;
+   static InitRule ir(RE.iuse_rule);
+   if(!inited){
+     RE.addRule(RE.ibase_rule);
+     RE.addRule(std::ref(ir));
+     inited = true;
+   }
+
    Use* ToSearch = &U;
    Value* Searched;
+   RE.clearFilters();
+   RE.addFilter(C);
+   RE.addFilter(iUseFilter(&U));
    RE.addFilter(RE.exclude(&U));
+   ir.clear();
    RE.resolve(ToSearch, RE.findVisit(Searched));
    if(Searched){
       WHY_KEPT(U, Searched);
