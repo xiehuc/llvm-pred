@@ -621,28 +621,32 @@ ReduceCode::ReduceCode()
 //int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
 //               MPI_Comm comm )
       Attributes["mpi_bcast_"] = DirectDelete;
-   }else{
-      Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
-      Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
-      Attributes["mpi_bcast_"] = mpi_nouse_buf;
-   }
-//int MPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
-//                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
-//                 MPI_Comm comm)
-   Attributes["mpi_alltoall_"] = std::bind(nouse_at, _1, 3);
+//int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
+//              int tag, MPI_Comm comm, MPI_Request *request)
+//int MPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
+//              MPI_Comm comm, MPI_Request *request)
+      Attributes["mpi_isend_"] = DirectDelete;
+      Attributes["mpi_irecv_"] = DirectDelete;
 //Deletable if recvbuf is no used
 //int MPI_Send(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
 //             MPI_Comm comm)
 //int MPI_Recv(void *buf, int count, MPI_Datatype datatype, int source, int tag,
 //             MPI_Comm comm, MPI_Status *status)
-   Attributes["mpi_send_"] = mpi_nouse_buf;
-   Attributes["mpi_recv_"] = mpi_nouse_buf;
-//int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
-//              int tag, MPI_Comm comm, MPI_Request *request)
-//int MPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
-//              MPI_Comm comm, MPI_Request *request)
-   Attributes["mpi_isend_"] = mpi_nouse_buf;
-   Attributes["mpi_irecv_"] = mpi_nouse_buf;
+      Attributes["mpi_send_"] = DirectDelete;
+      Attributes["mpi_recv_"] = DirectDelete;
+   }else{
+      Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
+      Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
+      Attributes["mpi_bcast_"] = mpi_nouse_buf;
+      Attributes["mpi_isend_"] = mpi_nouse_buf;
+      Attributes["mpi_irecv_"] = mpi_nouse_buf;
+      Attributes["mpi_send_"] = mpi_nouse_buf;
+      Attributes["mpi_recv_"] = mpi_nouse_buf;
+   }
+//int MPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
+//                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
+//                 MPI_Comm comm)
+   Attributes["mpi_alltoall_"] = std::bind(nouse_at, _1, 3);
    Attributes["mpi_comm_split_"] = DirectDelete;
    Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, &Protected, stat, "MPI_RANK");
    Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, &Protected, stat, "MPI_SIZE");
