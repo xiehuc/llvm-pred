@@ -649,6 +649,7 @@ ReduceCode::ReduceCode()
       Attributes["mpi_isend_"]     = DirectDelete; 
       Attributes["mpi_comm_dup_"] = DirectDelete;
       Attributes["mpi_bcast_"] = DirectDelete;
+      Attributes["mpi_recv_"] = DirectDelete;
    }else{
       Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
       Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
