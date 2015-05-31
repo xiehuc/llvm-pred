@@ -213,8 +213,7 @@ Value* ReduceCode::noused_global(GlobalVariable* GV, Instruction* pos, GetElemen
    RE.addRule(RE.ibase_rule);
    CGF->update(pos);
    RE.addFilter(*CGF);
-   GetElementPtrInst* GEPI = isRefGEP(GEP);
-   if(GEPI) RE.addFilter(GEPFilter(GEPI));
+   if(GEP) RE.addFilter(GEPFilter(GEP));
    RE.addFilter(C);
    Value* Visit;
    RE.resolve(GV, RE.findVisit(Visit));
