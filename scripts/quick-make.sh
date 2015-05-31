@@ -2,14 +2,14 @@
 # quick make a bitcode to drawfcode
 
 # process options
-OPTS=$(getopt -o ecdhgl --long "echo,cgpop,edge,help,gdb,log" -n $(basename "$0") -- "$@")
+OPTS=$(getopt -o ecdhgl --long "echo,cgpop,edge,help,gdb,log,force" -n $(basename "$0") -- "$@")
 VER=$LLVM_RECOMMEND_VERSION
 
 eval set -- "$OPTS"
 FRONT=eval
 LFLAGS=
 EDGE=0
-CGPOP=0
+FORCE=0
 ARG_BEG=
 ARG_END=
 MPIF90=gfortran
@@ -36,8 +36,9 @@ function print_help
    echo "   --gdb: echo gdb command"
    echo "   --echo: echo all command"
    echo "   --edge: used for compile edge profiling"
-   echo "   --help: show this help"
+   echo "   --force: use force reduce while compile"
    echo "   --cgpop: use for compile cgpop"
+   echo "   --help: show this help"
    exit 0
 }
 
@@ -65,10 +66,11 @@ while true; do
          MPIF90=mpif90
          shift ;;
       --cgpop) 
-         CGPOP=1; 
+         FORCE=1; 
          LFLAGS="-lnetcdf -lnetcdff" 
          shift ;;
-      --help) print_help; shift;;
+      --help) print_help; shift ;;
+      --force) FORCE=1; shift ;;
       --) shift; break ;;
       *) print_help ;;
    esac
@@ -88,7 +90,7 @@ $FRONT $opt $ARG_BEG -load src/libLLVMPred.so -PerfPred -insert-pred-profiling -
 statement_comp $i; i=$?
 $FRONT $opt $ARG_BEG -load src/libLLVMPred.so -Reduce /tmp/$name.1.ll -o /tmp/$name.2.ll -S $ARG_END
 statement_comp $i; i=$?
-if [ "$CGPOP" -eq "1" ]; then
+if [ "$FORCE" -eq "1" ]; then
 $FRONT $opt $ARG_BEG -load src/libLLVMPred.so -Force -Reduce /tmp/$name.2.ll -o /tmp/$name.3.ll -S $ARG_END
 statement_comp $i; i=$?
 suffix="3"

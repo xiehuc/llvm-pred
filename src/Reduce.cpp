@@ -94,15 +94,22 @@ struct excluded{
 // a simple basic noused check 
 static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = ResolveEngine::always_false)
 {
-   ResolveEngine RE;
-   RE.addRule(RE.ibase_rule);
-   InitRule ir(RE.iuse_rule);
-   RE.addRule(std::ref(ir));
-   RE.addFilter(C);
-   RE.addFilter(iUseFilter(&U));
+   static bool inited = false;
+   static ResolveEngine RE;
+   static InitRule ir(RE.iuse_rule);
+   if(!inited){
+     RE.addRule(RE.ibase_rule);
+     RE.addRule(std::ref(ir));
+     inited = true;
+   }
+
    Use* ToSearch = &U;
    Value* Searched;
+   RE.clearFilters();
+   RE.addFilter(C);
+   RE.addFilter(iUseFilter(&U));
    RE.addFilter(RE.exclude(&U));
+   ir.clear();
    RE.resolve(ToSearch, RE.findVisit(Searched));
    if(Searched){
       WHY_KEPT(U, Searched);
@@ -113,6 +120,18 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
       // GEP->getPointerOperand()
       RE.addFilter(GEPFilter(GEP));
       ToSearch = &GEP->getOperandUse(0);
+      ir.clear();
+      RE.resolve(ToSearch, RE.findVisit(Searched));
+      if (Searched) {
+         WHY_KEPT(U, Searched);
+         return AttributeFlags::None;
+      } else {
+         ir.clear();
+         Dbg_PrintGraph(RE.resolve(ToSearch), U.getUser());
+      }
+   }
+   if(auto CAST = isCast(U)){
+      ToSearch = &CAST->getOperandUse(0);
       ir.clear();
       RE.resolve(ToSearch, RE.findVisit(Searched));
       if (Searched) {
@@ -137,10 +156,8 @@ AttributeFlags ReduceCode::getAttribute(CallInst * CI)
    auto Found = Attributes.find(Name);
    if(Found == Attributes.end()) return AttributeFlags::None;
    auto Ret = Found->second(CI);
-   if(Ret & AttributeFlags::IsDeletable && !MpiDelayDelete.count(Name)){
+   if(Ret & AttributeFlags::IsDeletable && !MpiDelayDelete.count(Name))
      mpi_stats.unref(CI);
-     errs()<<mpi_stats.count()<<"\n";
-   }
    return Ret;
 }
 
@@ -160,7 +177,7 @@ AttributeFlags ReduceCode::noused_param(Argument* Arg)
          GlobalVariable* GV = NULL;
          GetElementPtrInst* GEP = NULL;
          if(f && isRefGlobal(Para->get(), &GV, &GEP))
-            f &= FLAG(Self->noused_global(GV, CI, excluded(S)));
+            f &= FLAG(Self->noused_global(GV, CI, GEP, excluded(S)));
          return f;
          });
    return all_deletable ? IsDeletable : AttributeFlags::None;
@@ -190,11 +207,11 @@ static AttributeFlags noused_ret_rep(ReturnInst* RI)
       ReturnInst::Create(F->getContext(), UndefValue::get(Ret->getType()), RI->getParent());
    return all_deletable ? IsDeletable : AttributeFlags::None;
 }
-Value* ReduceCode::noused_global(GlobalVariable* GV, Instruction* GEP, ResolveEngine::CallBack C)
+Value* ReduceCode::noused_global(GlobalVariable* GV, Instruction* pos, GetElementPtrInst* GEP, ResolveEngine::CallBack C)
 {
    ResolveEngine RE;
    RE.addRule(RE.ibase_rule);
-   CGF->update(GEP);
+   CGF->update(pos);
    RE.addFilter(*CGF);
    GetElementPtrInst* GEPI = isRefGEP(GEP);
    if(GEPI) RE.addFilter(GEPFilter(GEPI));
@@ -219,7 +236,7 @@ AttributeFlags ReduceCode::nousedOperator(Use& op, Instruction* pos, ConfigFlags
       // 过于激进的删除
       if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
          if(GV->getName().endswith("Counters")) return AttributeFlags::None;
-         what = noused_global(GV, pos);
+         what = noused_global(GV, pos, GEP);
          NOTICE(op, what);
          return FLAG(what);
       }
@@ -644,6 +661,7 @@ ReduceCode::ReduceCode()
    }else{
       Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
       Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
+      Attributes["mpi_bcast_"] = mpi_nouse_buf;
    }
 //int MPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 //                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
@@ -673,7 +691,6 @@ ReduceCode::ReduceCode()
 //int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
 //               MPI_Comm comm )
    // 由于模拟的时候只有一个进程, 所以不需要扩散变量.
-   Attributes["mpi_bcast_"] = DirectDelete;
    Attributes["mpi_comm_split_"] = DirectDelete;
    Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, &Protected, stat, "MPI_RANK");
    Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, &Protected, stat, "MPI_SIZE");

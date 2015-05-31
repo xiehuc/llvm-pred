@@ -256,6 +256,9 @@ class lle::ResolveEngine
    void rmFilter(int idx){
       filters.erase(filters.begin()+idx%filters.size());
    };
+   void clearFilters(){
+      filters.clear();
+   }
 
    void setMaxIteration(size_t max) { max_iteration = max;}
    DataDepGraph resolve(QueryTy Q, CallBack C = always_false);
