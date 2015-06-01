@@ -212,8 +212,15 @@ static AttributeFlags noused_ret_rep(ReturnInst* RI)
 }
 Value* ReduceCode::noused_global(GlobalVariable* GV, Instruction* pos, GetElementPtrInst* GEP, ResolveEngine::CallBack C)
 {
-   ResolveEngine RE;
-   RE.addRule(RE.ibase_rule);
+   static ResolveEngine RE;
+   static bool inited = false;
+   static ResolveCache RC;
+   if(!inited){
+      RE.addRule(RE.ibase_rule);
+      RE.useCache(RC);
+      inited = true;
+   }
+   RE.clearFilters();
    CGF->update(pos);
    RE.addFilter(*CGF);
    if(GEP) RE.addFilter(GEPFilter(GEP));
