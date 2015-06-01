@@ -10,6 +10,7 @@
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 #include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/Analysis/CallGraph.h>
 
 #include <ValueProfiling.h>
 

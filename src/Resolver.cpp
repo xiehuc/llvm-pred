@@ -10,6 +10,7 @@
 #include <llvm/ADT/PostOrderIterator.h>
 #include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/Dominators.h>
+#include <llvm/Analysis/CallGraph.h>
 
 #include "ddg.h"
 #include "util.h"
@@ -441,6 +442,7 @@ ResolveEngine::ResolveEngine()
 {
    implicity_rule = ::implicity_rule;
    max_iteration = UINT32_MAX;
+   Cache = NULL;
 }
 
 void ResolveEngine::do_solve(DataDepGraph& G, CallBack& C)
@@ -472,6 +474,7 @@ void ResolveEngine::do_solve(DataDepGraph& G, CallBack& C)
 
 DataDepGraph ResolveEngine::resolve(QueryTy Q, CallBack C)
 {
+   Use* R = NULL;
    DataDepGraph G;
    G.isDependency(implicity_rule == ::implicity_rule);
    iteration = 0;
@@ -480,6 +483,12 @@ DataDepGraph ResolveEngine::resolve(QueryTy Q, CallBack C)
    else
       implicity_rule(Q.get<Value*>(), G);
    G.setRoot(Q);
+   if(Cache->ask(Q, R)){
+      for(auto& f : filters) f(R);
+      C(R);
+      return G;
+   }else
+      Cache->storeKey(Q);
    do_solve(G, C);
    return G;
 }
@@ -487,18 +496,19 @@ DataDepGraph ResolveEngine::resolve(QueryTy Q, CallBack C)
 struct find_visit
 {
    llvm::Value*& ret;
-   find_visit(llvm::Value*& ret):ret(ret) {}
+   ResolveCache* C;
+   find_visit(llvm::Value*& ret, ResolveCache* C = NULL):ret(ret), C(C) {}
    bool operator()(Use* U){
       User* Ur = U->getUser();
       if (isa<LoadInst>(Ur))
-         ret = Ur;
+         C->storeValue(ret = Ur, U->getOperandNo());
       else if (CallInst* CI = dyn_cast<CallInst>(Ur)) {
          // call inst also is a kind of visit
          StringRef Name = castoff(CI->getCalledValue())->getName();
          if (auto I = dyn_cast<IntrinsicInst>(CI))
             Name = getName(I->getIntrinsicID());
          if (!IgnoreFindCall.count(Name)) // some call should ignore
-            ret = CI;
+            C->storeValue(ret = CI, U->getOperandNo());
       }
 
       // most of time, we just care whether it has visitor,
@@ -519,7 +529,7 @@ ResolveEngine::CallBack ResolveEngine::exclude(QueryTy Q)
 ResolveEngine::CallBack ResolveEngine::findVisit(Value*& V)
 {
    V = NULL;
-   return ::find_visit(V);
+   return ::find_visit(V, this->Cache);
 }
 
 Value* ResolveEngine::find_visit(QueryTy Q)
@@ -892,3 +902,23 @@ bool iUseFilter::operator()(Use* U)
    return false;
 }
 //==============================RESOLVE FILTERS END==============================//
+
+void ResolveCache::storeValue(Value* V, unsigned op)
+{
+   if(this == NULL) return;
+   Cache[StoredKey] = std::make_pair(WeakVH(V), op);
+}
+bool ResolveCache::ask(QueryTy Q, Use*& R)
+{
+   if(this == NULL) return false;
+   const auto Found = Cache.find(Q);
+   if(Found == Cache.end()) return false;
+   Value* V = Found->second.first;
+   User* U = V?dyn_cast<User>(V):NULL;
+   if(U == NULL){
+      Cache.erase(Found);
+      return false;
+   }
+   R = &U->getOperandUse(Found->second.second);
+   return true;
+}

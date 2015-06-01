@@ -10,10 +10,13 @@
 #include <llvm/Pass.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/ADT/PointerUnion.h>
-#include <llvm/Analysis/CallGraph.h>
 #include <llvm/Analysis/MemoryDependenceAnalysis.h>
 
 #include <ProfileInfo.h>
+
+namespace llvm{
+   class CallGraphNode;
+};
 
 namespace lle{
    struct NoResolve;
@@ -38,6 +41,7 @@ namespace lle{
 
    class DataDepGraph;
    class ResolveEngine;
+   class ResolveCache;
    struct InitRule;
    struct MDARule;
    struct GEPFilter;
@@ -228,14 +232,6 @@ class lle::ResolveEngine
    // if return true, stop solve in current branch
    typedef std::function<bool(llvm::Use*)> CallBack;
 
-   private:
-   bool (*implicity_rule)(llvm::Value*, DataDepGraph& G);
-   std::vector<SolveRule> rules;
-   std::vector<CallBack> filters;
-   size_t max_iteration, iteration;
-   void do_solve(DataDepGraph& G, CallBack& C);
-
-   public:
    ResolveEngine();
    // add a rule in engine
    void addRule(SolveRule rule){
@@ -258,6 +254,10 @@ class lle::ResolveEngine
    };
    void clearFilters(){
       filters.clear();
+   }
+
+   void useCache(ResolveCache& C){
+      Cache = &C;
    }
 
    void setMaxIteration(size_t max) { max_iteration = max;}
@@ -290,12 +290,39 @@ class lle::ResolveEngine
    // rmFilter(exclude(Q))
    llvm::Value* find_visit(QueryTy Q);
    // update V if find a visit inst(load and call)
-   static CallBack findVisit(llvm::Value*& V);
+   CallBack findVisit(llvm::Value*& V);
    // update V if find a store inst
-   static CallBack findStore(llvm::Value*& V);
+   CallBack findStore(llvm::Value*& V);
    // update V if find a visit or store inst
-   static CallBack findRef(llvm::Value*& V);
+   CallBack findRef(llvm::Value*& V);
    // }
+   private:
+   bool (*implicity_rule)(llvm::Value*, DataDepGraph& G);
+   void do_solve(DataDepGraph& G, CallBack& C);
+
+   std::vector<SolveRule> rules;
+   std::vector<CallBack> filters;
+   size_t max_iteration, iteration;
+   ResolveCache* Cache;
+};
+
+class lle::ResolveCache
+{
+   public:
+   typedef ResolveEngine::QueryTy QueryTy;
+   static ResolveCache& get(void* id){
+      return Pool[id];
+   }
+   bool ask(QueryTy Q, llvm::Use*& R);
+   void storeKey(QueryTy Q) {
+      if(this == NULL) return;
+      StoredKey = Q;
+   }
+   void storeValue(llvm::Value* V, unsigned op);
+   private:
+   static llvm::DenseMap<void*, ResolveCache> Pool;
+   llvm::DenseMap<QueryTy, std::pair<llvm::WeakVH, unsigned> > Cache;
+   QueryTy StoredKey;
 };
 
 
