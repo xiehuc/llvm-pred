@@ -256,6 +256,8 @@ class lle::ResolveEngine
       filters.clear();
    }
 
+   // when use cache, you should always not trust resolve returned ddg
+   // because when cache result, ddg return's empty
    void useCache(ResolveCache& C){
       Cache = &C;
    }
@@ -306,24 +308,35 @@ class lle::ResolveEngine
    ResolveCache* Cache;
 };
 
+/* a ResolveCache used for speed up ResolveEngine resolve progress */
 class lle::ResolveCache
 {
    public:
    typedef ResolveEngine::QueryTy QueryTy;
+   /* get a unique ResolveCache by id
+    * @example:
+    * static int id; // since every static variable address is unique
+    * ResolveCache::get(&id);
+    */
    static ResolveCache& get(void* id){
       return Pool[id];
    }
+   /** ask whether a Q has dependency R */
    bool ask(QueryTy Q, llvm::Use*& R);
+   /** store key Q to later make an entry */
    void storeKey(QueryTy Q) {
       if(this == NULL) return;
       StoredKey = Q;
    }
+   /** store a value to make an entry with stored key before */
    void storeValue(llvm::Value* V, unsigned op) {
       if(this == NULL) return;
       Cache[StoredKey] = std::make_pair(llvm::WeakVH(V), op);
    }
    private:
    static llvm::DenseMap<void*, ResolveCache> Pool;
+   // a WeakVH is smart, when value delete, it auto set itself to NULL
+   // unsigned is the op idx
    llvm::DenseMap<QueryTy, std::pair<llvm::WeakVH, unsigned> > Cache;
    QueryTy StoredKey;
 };
