@@ -27,6 +27,7 @@ static const set<string> IgnoreFindCall = {
    "llvm.lifetime.start",
    "free"
 };
+DenseMap<void*, ResolveCache> ResolveCache::Pool;
 
 Use* NoResolve::operator()(Value* V, ResolverBase* _UNUSED_)
 {
@@ -476,6 +477,12 @@ DataDepGraph ResolveEngine::resolve(QueryTy Q, CallBack C)
 {
    Use* R = NULL;
    DataDepGraph G;
+   if(Cache && Cache->ask(Q, R)){
+      for(auto& f : filters) f(R);
+      C(R);
+      return G;
+   }else
+      Cache->storeKey(Q);
    G.isDependency(implicity_rule == ::implicity_rule);
    iteration = 0;
    if(Q.is<Use*>())
@@ -483,12 +490,6 @@ DataDepGraph ResolveEngine::resolve(QueryTy Q, CallBack C)
    else
       implicity_rule(Q.get<Value*>(), G);
    G.setRoot(Q);
-   if(Cache->ask(Q, R)){
-      for(auto& f : filters) f(R);
-      C(R);
-      return G;
-   }else
-      Cache->storeKey(Q);
    do_solve(G, C);
    return G;
 }
@@ -903,14 +904,8 @@ bool iUseFilter::operator()(Use* U)
 }
 //==============================RESOLVE FILTERS END==============================//
 
-void ResolveCache::storeValue(Value* V, unsigned op)
-{
-   if(this == NULL) return;
-   Cache[StoredKey] = std::make_pair(WeakVH(V), op);
-}
 bool ResolveCache::ask(QueryTy Q, Use*& R)
 {
-   if(this == NULL) return false;
    const auto Found = Cache.find(Q);
    if(Found == Cache.end()) return false;
    Value* V = Found->second.first;

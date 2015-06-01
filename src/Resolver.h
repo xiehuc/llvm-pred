@@ -318,7 +318,10 @@ class lle::ResolveCache
       if(this == NULL) return;
       StoredKey = Q;
    }
-   void storeValue(llvm::Value* V, unsigned op);
+   void storeValue(llvm::Value* V, unsigned op) {
+      if(this == NULL) return;
+      Cache[StoredKey] = std::make_pair(llvm::WeakVH(V), op);
+   }
    private:
    static llvm::DenseMap<void*, ResolveCache> Pool;
    llvm::DenseMap<QueryTy, std::pair<llvm::WeakVH, unsigned> > Cache;

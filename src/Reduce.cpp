@@ -110,17 +110,15 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
    RE.addFilter(C);
    RE.addFilter(iUseFilter(&U));
    RE.addFilter(RE.exclude(&U));
+   RE.useCache(ResolveCache::get(&inited));
    ir.clear();
    RE.resolve(ToSearch, RE.findVisit(Searched));
    if(Searched){
       WHY_KEPT(U, Searched);
       return AttributeFlags::None;
    }
-   if(auto GEP = isGEP(U)){
-      // if we didn't find direct visit on Pointed, we tring find visit on
-      // GEP->getPointerOperand()
-      RE.addFilter(GEPFilter(GEP));
-      ToSearch = &GEP->getOperandUse(0);
+   if(auto CAST = isCast(U)){
+      ToSearch = &CAST->getOperandUse(0);
       ir.clear();
       RE.resolve(ToSearch, RE.findVisit(Searched));
       if (Searched) {
@@ -131,8 +129,12 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
          Dbg_PrintGraph(RE.resolve(ToSearch), U.getUser());
       }
    }
-   if(auto CAST = isCast(U)){
-      ToSearch = &CAST->getOperandUse(0);
+   if(auto GEP = isGEP(U)){
+      // if we didn't find direct visit on Pointed, we tring find visit on
+      // GEP->getPointerOperand()
+      RE.addFilter(GEPFilter(GEP));
+      RE.useCache(ResolveCache::get(&RE));
+      ToSearch = &GEP->getOperandUse(0);
       ir.clear();
       RE.resolve(ToSearch, RE.findVisit(Searched));
       if (Searched) {
