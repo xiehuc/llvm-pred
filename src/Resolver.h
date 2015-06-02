@@ -10,10 +10,13 @@
 #include <llvm/Pass.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/ADT/PointerUnion.h>
-#include <llvm/Analysis/CallGraph.h>
 #include <llvm/Analysis/MemoryDependenceAnalysis.h>
 
 #include <ProfileInfo.h>
+
+namespace llvm{
+   class CallGraphNode;
+};
 
 namespace lle{
    struct NoResolve;
@@ -38,6 +41,7 @@ namespace lle{
 
    class DataDepGraph;
    class ResolveEngine;
+   class ResolveCache;
    struct InitRule;
    struct MDARule;
    struct GEPFilter;
@@ -228,14 +232,6 @@ class lle::ResolveEngine
    // if return true, stop solve in current branch
    typedef std::function<bool(llvm::Use*)> CallBack;
 
-   private:
-   bool (*implicity_rule)(llvm::Value*, DataDepGraph& G);
-   std::vector<SolveRule> rules;
-   std::vector<CallBack> filters;
-   size_t max_iteration, iteration;
-   void do_solve(DataDepGraph& G, CallBack& C);
-
-   public:
    ResolveEngine();
    // add a rule in engine
    void addRule(SolveRule rule){
@@ -258,6 +254,12 @@ class lle::ResolveEngine
    };
    void clearFilters(){
       filters.clear();
+   }
+
+   // when use cache, you should always not trust resolve returned ddg
+   // because when cache result, ddg return's empty
+   void useCache(ResolveCache& C){
+      Cache = &C;
    }
 
    void setMaxIteration(size_t max) { max_iteration = max;}
@@ -290,12 +292,53 @@ class lle::ResolveEngine
    // rmFilter(exclude(Q))
    llvm::Value* find_visit(QueryTy Q);
    // update V if find a visit inst(load and call)
-   static CallBack findVisit(llvm::Value*& V);
+   CallBack findVisit(llvm::Value*& V);
    // update V if find a store inst
-   static CallBack findStore(llvm::Value*& V);
+   CallBack findStore(llvm::Value*& V);
    // update V if find a visit or store inst
-   static CallBack findRef(llvm::Value*& V);
+   CallBack findRef(llvm::Value*& V);
    // }
+   private:
+   bool (*implicity_rule)(llvm::Value*, DataDepGraph& G);
+   void do_solve(DataDepGraph& G, CallBack& C);
+
+   std::vector<SolveRule> rules;
+   std::vector<CallBack> filters;
+   size_t max_iteration, iteration;
+   ResolveCache* Cache;
+};
+
+/* a ResolveCache used for speed up ResolveEngine resolve progress */
+class lle::ResolveCache
+{
+   public:
+   typedef ResolveEngine::QueryTy QueryTy;
+   /* get a unique ResolveCache by id
+    * @example:
+    * static int id; // since every static variable address is unique
+    * ResolveCache::get(&id);
+    */
+   static ResolveCache& get(void* id){
+      return Pool[id];
+   }
+   /** ask whether a Q has dependency R */
+   bool ask(QueryTy Q, llvm::Use*& R);
+   /** store key Q to later make an entry */
+   void storeKey(QueryTy Q) {
+      if(this == NULL) return;
+      StoredKey = Q;
+   }
+   /** store a value to make an entry with stored key before */
+   void storeValue(llvm::Value* V, unsigned op) {
+      if(this == NULL) return;
+      Cache[StoredKey] = std::make_pair(llvm::WeakVH(V), op);
+   }
+   private:
+   static llvm::DenseMap<void*, ResolveCache> Pool;
+   // a WeakVH is smart, when value delete, it auto set itself to NULL
+   // unsigned is the op idx
+   llvm::DenseMap<QueryTy, std::pair<llvm::WeakVH, unsigned> > Cache;
+   QueryTy StoredKey;
 };
 
 

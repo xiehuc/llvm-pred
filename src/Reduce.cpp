@@ -10,6 +10,7 @@
 #include <llvm/Transforms/Utils/BasicBlockUtils.h>
 #include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/Analysis/CallGraph.h>
 
 #include <ValueProfiling.h>
 
@@ -109,17 +110,15 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
    RE.addFilter(C);
    RE.addFilter(iUseFilter(&U));
    RE.addFilter(RE.exclude(&U));
+   RE.useCache(ResolveCache::get(&inited));
    ir.clear();
    RE.resolve(ToSearch, RE.findVisit(Searched));
    if(Searched){
       WHY_KEPT(U, Searched);
       return AttributeFlags::None;
    }
-   if(auto GEP = isGEP(U)){
-      // if we didn't find direct visit on Pointed, we tring find visit on
-      // GEP->getPointerOperand()
-      RE.addFilter(GEPFilter(GEP));
-      ToSearch = &GEP->getOperandUse(0);
+   if(auto CAST = isCast(U)){
+      ToSearch = &CAST->getOperandUse(0);
       ir.clear();
       RE.resolve(ToSearch, RE.findVisit(Searched));
       if (Searched) {
@@ -130,8 +129,12 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
          Dbg_PrintGraph(RE.resolve(ToSearch), U.getUser());
       }
    }
-   if(auto CAST = isCast(U)){
-      ToSearch = &CAST->getOperandUse(0);
+   if(auto GEP = isGEP(U)){
+      // if we didn't find direct visit on Pointed, we tring find visit on
+      // GEP->getPointerOperand()
+      RE.addFilter(GEPFilter(GEP));
+      RE.useCache(ResolveCache::get(&RE));
+      ToSearch = &GEP->getOperandUse(0);
       ir.clear();
       RE.resolve(ToSearch, RE.findVisit(Searched));
       if (Searched) {
@@ -209,12 +212,18 @@ static AttributeFlags noused_ret_rep(ReturnInst* RI)
 }
 Value* ReduceCode::noused_global(GlobalVariable* GV, Instruction* pos, GetElementPtrInst* GEP, ResolveEngine::CallBack C)
 {
-   ResolveEngine RE;
-   RE.addRule(RE.ibase_rule);
+   static ResolveEngine RE;
+   static bool inited = false;
+   static ResolveCache RC;
+   if(!inited){
+      RE.addRule(RE.ibase_rule);
+      RE.useCache(RC);
+      inited = true;
+   }
+   RE.clearFilters();
    CGF->update(pos);
    RE.addFilter(*CGF);
-   GetElementPtrInst* GEPI = isRefGEP(GEP);
-   if(GEPI) RE.addFilter(GEPFilter(GEPI));
+   if(GEP) RE.addFilter(GEPFilter(GEP));
    RE.addFilter(C);
    Value* Visit;
    RE.resolve(GV, RE.findVisit(Visit));
