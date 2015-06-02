@@ -543,18 +543,18 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
 }
 static AttributeFlags mpi_alltoall_force(CallInst* CI)
 {
-   Value* Send  =  CI->getArgOperand(0);
-   Value* Recv  =  CI->getArgOperand(3);
-   Value* Count =  CI->getArgOperand(4);
-   Value* Type  =  CI->getArgOperand(5);
-   auto GV = dyn_cast<GlobalVariable>(Type);
-   auto GVI = dyn_cast_or_null<ConstantInt>(GV?GV->getInitializer():NULL);
-   uint64_t TyIdx = GVI?GVI->getZExtValue():7; // DT[7] == 4, default is int
-   uint64_t TySize = DT[TyIdx];
+      Value* Send  =  CI->getArgOperand(0);
+      Value* Recv  =  CI->getArgOperand(3);
+      Value* Count =  CI->getArgOperand(4);
+      Value* Type  =  CI->getArgOperand(5);
+      auto GV = dyn_cast<GlobalVariable>(Type);
+      auto GVI = dyn_cast_or_null<ConstantInt>(GV?GV->getInitializer():NULL);
+      uint64_t TyIdx = GVI?GVI->getZExtValue():7; // DT[7] == 4, default is int
+      uint64_t TySize = DT[TyIdx];
 
-   IRBuilder<> Builder(CI);
-   Builder.CreateMemCpy(Recv, Send, Builder.CreateLoad(Count), TySize);
-   return AttributeFlags::IsDeletable;
+      IRBuilder<> Builder(CI);
+      Builder.CreateMemCpy(Recv, Send, Builder.CreateLoad(Count), TySize);
+      return AttributeFlags::IsDeletable;
 }
 # if 0
 static AttributeFlags mpi_allreduce_force(CallInst* CI)
@@ -649,30 +649,37 @@ ReduceCode::ReduceCode()
 //int MPI_Allreduce(const void *sendbuf, void *recvbuf, int count,
 //                  MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
       Attributes["mpi_allreduce_"] = mpi_allreduce_force;
-   //Force reduce the mpi_alltoall. by haomeng
-      Attributes["mpi_alltoall_"] = mpi_alltoall_force;
-      Attributes["mpi_irecv_"]    = DirectDelete;
-      Attributes["mpi_send_"]     = DirectDelete;
-      Attributes["mpi_irecv_"]    = DirectDelete;
-      Attributes["mpi_reduce_"] = mpi_allreduce_force;
-      Attributes["mpi_isend_"]     = DirectDelete; 
-      Attributes["mpi_comm_dup_"] = DirectDelete;
+//int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
+//               MPI_Comm comm )
       Attributes["mpi_bcast_"] = DirectDelete;
+//int MPI_Irecv(void *buf, int count, MPI_Datatype datatype, int source,
+//              int tag, MPI_Comm comm, MPI_Request *request)
+//int MPI_Isend(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
+//              MPI_Comm comm, MPI_Request *request)
+      Attributes["mpi_isend_"] = DirectDelete;
+      Attributes["mpi_irecv_"] = DirectDelete;
+//Deletable if recvbuf is no used
+//int MPI_Send(const void *buf, int count, MPI_Datatype datatype, int dest, int tag,
+//             MPI_Comm comm)
+//int MPI_Recv(void *buf, int count, MPI_Datatype datatype, int source, int tag,
+//             MPI_Comm comm, MPI_Status *status)
+      Attributes["mpi_send_"] = DirectDelete;
       Attributes["mpi_recv_"] = DirectDelete;
+      Attributes["mpi_comm_dup_"] = DirectDelete;//bt
+      Attributes["mpi_alltoall_"] = mpi_alltoall_force;//ft
    }else{
       Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
       Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
-      Attributes["mpi_alltoall_"] = std::bind(nouse_at, _1, 3);
-      Attributes["mpi_send_"] = mpi_nouse_buf;
-      Attributes["mpi_recv_"] = mpi_nouse_buf;
+      Attributes["mpi_bcast_"] = mpi_nouse_buf;
       Attributes["mpi_isend_"] = mpi_nouse_buf;
       Attributes["mpi_irecv_"] = mpi_nouse_buf;
-      Attributes["mpi_bcast_"] = mpi_nouse_buf;
+      Attributes["mpi_send_"] = mpi_nouse_buf;
+      Attributes["mpi_recv_"] = mpi_nouse_buf;
+      Attributes["mpi_alltoall_"] = std::bind(nouse_at, _1, 3);
    }
 //int MPI_Alltoall(const void *sendbuf, int sendcount, MPI_Datatype sendtype,
 //                 void *recvbuf, int recvcount, MPI_Datatype recvtype,
 //                 MPI_Comm comm)
-//                 
    Attributes["mpi_comm_split_"] = DirectDelete;
    Attributes["mpi_comm_rank_"] = std::bind(mpi_comm_replace, _1, &Protected, stat, "MPI_RANK");
    Attributes["mpi_comm_size_"] = std::bind(mpi_comm_replace, _1, &Protected, stat, "MPI_SIZE");
