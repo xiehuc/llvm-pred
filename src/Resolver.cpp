@@ -27,7 +27,6 @@ static const set<string> IgnoreFindCall = {
    "llvm.lifetime.start",
    "free"
 };
-DenseMap<void*, ResolveCache> ResolveCache::Pool;
 
 Use* NoResolve::operator()(Value* V, ResolverBase* _UNUSED_)
 {

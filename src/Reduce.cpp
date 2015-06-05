@@ -21,7 +21,7 @@
 #include "ddg.h"
 #include "debug.h"
 
-static unsigned DT[30] = {0};
+static unsigned DT[128] = {0};
 static int dt_init() {
 #include "datatype.h"
    return 0;
@@ -98,6 +98,7 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
    static bool inited = false;
    static ResolveEngine RE;
    static InitRule ir(RE.iuse_rule);
+   static ResolveCache RC1, RC2, RC3;
    if(!inited){
      RE.addRule(RE.ibase_rule);
      RE.addRule(std::ref(ir));
@@ -110,7 +111,7 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
    RE.addFilter(C);
    RE.addFilter(iUseFilter(&U));
    RE.addFilter(RE.exclude(&U));
-   RE.useCache(ResolveCache::get(&inited));
+   RE.useCache(RC1);
    ir.clear();
    RE.resolve(ToSearch, RE.findVisit(Searched));
    if(Searched){
@@ -120,6 +121,7 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
    if(auto CAST = isCast(U)){
       ToSearch = &CAST->getOperandUse(0);
       ir.clear();
+      RE.useCache(RC3);
       RE.resolve(ToSearch, RE.findVisit(Searched));
       if (Searched) {
          WHY_KEPT(U, Searched);
@@ -133,7 +135,7 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
       // if we didn't find direct visit on Pointed, we tring find visit on
       // GEP->getPointerOperand()
       RE.addFilter(GEPFilter(GEP));
-      RE.useCache(ResolveCache::get(&RE));
+      RE.useCache(RC2);
       ToSearch = &GEP->getOperandUse(0);
       ir.clear();
       RE.resolve(ToSearch, RE.findVisit(Searched));
