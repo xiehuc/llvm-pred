@@ -528,7 +528,7 @@ static AttributeFlags mpi_delay_delete(CallInst* CI, MPIStatistics* stat)
   if(stat->count() > 0) return AttributeFlags::None;
   else return AttributeFlags::IsDeletable;
 }
-static AttributeFlags mpi_allreduce_force(CallInst* CI)
+static AttributeFlags replace_with_memcpy(CallInst* CI)
 {
    Value* Send  = CI->getArgOperand(0);
    Value* Recv  = CI->getArgOperand(1);
@@ -543,72 +543,6 @@ static AttributeFlags mpi_allreduce_force(CallInst* CI)
    Builder.CreateMemCpy(Recv, Send, Builder.CreateLoad(Count), TySize);
    return AttributeFlags::IsDeletable;
 }
-static AttributeFlags mpi_alltoall_force(CallInst* CI)
-{
-      Value* Send  =  CI->getArgOperand(0);
-      Value* Recv  =  CI->getArgOperand(3);
-      Value* Count =  CI->getArgOperand(4);
-      Value* Type  =  CI->getArgOperand(5);
-      auto GV = dyn_cast<GlobalVariable>(Type);
-      auto GVI = dyn_cast_or_null<ConstantInt>(GV?GV->getInitializer():NULL);
-      uint64_t TyIdx = GVI?GVI->getZExtValue():7; // DT[7] == 4, default is int
-      uint64_t TySize = DT[TyIdx];
-
-      IRBuilder<> Builder(CI);
-      Builder.CreateMemCpy(Recv, Send, Builder.CreateLoad(Count), TySize);
-      return AttributeFlags::IsDeletable;
-}
-# if 0
-static AttributeFlags mpi_allreduce_force(CallInst* CI)
-{
-   //FIXME should replaced with memcpy
-   Value* Send = CI->getArgOperand(0);
-   Value* Recv = CI->getArgOperand(1);
-   if(std::less<Instruction>()(dyn_cast<Instruction>(Recv), dyn_cast<Instruction>(Send)));
-      std::swap(Send, Recv);
-
-   // if there are free of Send and free of Recv, we replace Recv Use with
-   // send, then we free Send twice. this is bad, 
-   // we can remove Send's Use for now
-   ResolveEngine RE;
-   RE.addRule(RE.ibase_rule);
-   InitRule ir(RE.iuse_rule);
-   RE.addRule(std::ref(ir));
-   Use* Q = &CI->getArgOperandUse(0);
-   iUseFilter uf(Q);
-   RE.addFilter(std::ref(uf));
-   RE.resolve(Q, [](Use* U){
-         CallInst* Call = dyn_cast<CallInst>(U->getUser());
-         Function* F = NULL;
-         if(Call && (F = Call->getCalledFunction())){
-            if(F->getName()=="free"){
-               Call->setArgOperand(0, UndefValue::get(Call->getArgOperand(0)->getType()));
-               Call->removeFromParent();
-            }
-         }
-         return false;
-      });
-   ir.clear();
-   Q = &CI->getArgOperandUse(1);
-   uf.update(Q);
-   auto ddg = RE.resolve(Q, [](Use* U){
-         errs()<<*U->getUser()<<"\n";
-         CallInst* Call = dyn_cast<CallInst>(U->getUser());
-         Function* F = NULL;
-         if(Call && (F = Call->getCalledFunction())){
-            if(F->getName()=="llvm.lifetime.end"){
-               Call->setArgOperand(1, UndefValue::get(Call->getArgOperand(1)->getType()));
-               Call->removeFromParent();
-            }
-         }
-         return false;
-      });
-   WriteGraph(&ddg, "test");
-
-   Recv->replaceAllUsesWith(Send);
-   return AttributeFlags::IsDeletable;
-}
-#endif
 
 ReduceCode::ReduceCode()
     : ModulePass(ID)
@@ -647,10 +581,10 @@ ReduceCode::ReduceCode()
 //int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
 //               MPI_Op op, int root, MPI_Comm comm)
 //Deletable if recvbuf is no used
-      Attributes["mpi_reduce_"] = mpi_allreduce_force;
+      Attributes["mpi_reduce_"] = replace_with_memcpy;
 //int MPI_Allreduce(const void *sendbuf, void *recvbuf, int count,
 //                  MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
-      Attributes["mpi_allreduce_"] = mpi_allreduce_force;
+      Attributes["mpi_allreduce_"] = replace_with_memcpy;
 //int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
 //               MPI_Comm comm )
       Attributes["mpi_bcast_"] = DirectDelete;
@@ -668,7 +602,9 @@ ReduceCode::ReduceCode()
       Attributes["mpi_send_"] = DirectDelete;
       Attributes["mpi_recv_"] = DirectDelete;
       Attributes["mpi_comm_dup_"] = DirectDelete;//bt
-      Attributes["mpi_alltoall_"] = mpi_alltoall_force;//ft
+      // since alltoall need communite all threads, but we don't know the
+      // content, so we could only copy send to recv
+      Attributes["mpi_alltoall_"] = replace_with_memcpy; //ft
    }else{
       Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
       Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
