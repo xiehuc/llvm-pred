@@ -22,7 +22,7 @@ namespace lle{
    class InsertLoopTripCount:public llvm::FunctionPass
    {
       LoopTripCount* LTC;
-      ResolverPass* RP;
+      //ResolverPass* RP;
       public:
       static char ID;
       explicit InsertLoopTripCount():FunctionPass(ID){}
@@ -45,7 +45,7 @@ void InsertLoopTripCount::getAnalysisUsage(llvm::AnalysisUsage & AU) const
 {
   AU.setPreservesAll();
   AU.addRequired<LoopInfo>();
-  AU.addRequired<ResolverPass>();
+  //AU.addRequired<ResolverPass>();
   AU.addRequired<LoopTripCount>();
   AU.addRequired<ScalarEvolution>();
 }
@@ -59,7 +59,7 @@ bool InsertLoopTripCount::runOnLoop(llvm::Loop *L)
    // auto insert value trap when used -insert-value-profiling
    CC = ValueProfiler::insertValueTrap(CC, L->getLoopPreheader()->getTerminator());
 
-   auto R = RP->getResolverSet<UseOnlyResolve, SpecialResolve>();
+   /*auto R = RP->getResolverSet<UseOnlyResolve, SpecialResolve>();
    ResolveResult RR = R.resolve(CC);
 
    if(Ddg && std::get<0>(RR).size()>1){
@@ -72,14 +72,15 @@ bool InsertLoopTripCount::runOnLoop(llvm::Loop *L)
       DDGraph d(RR, CC);
       WriteGraph(&d, func_name+"-ddg", false, os.str());
    }
+   */
 	return false;
 }
 
 bool InsertLoopTripCount::runOnFunction(Function &F)
 {
    auto& LI = getAnalysis<LoopInfo>();
-	LTC = &getAnalysis<LoopTripCount>();
-   RP = &getAnalysis<ResolverPass>();
+   LTC = &getAnalysis<LoopTripCount>();
+   //RP = &getAnalysis<ResolverPass>();
    bool Changed = false;
    LTC->updateCache(LI);
 
@@ -100,6 +101,7 @@ void InsertLoopTripCount::print(llvm::raw_ostream &OS, const llvm::Module *M) co
          Value* CC = LTC->getTripCount(*L);
          if(!CC) continue;
 
+#if 0
          lle::Resolver<UseOnlyResolve> R; /* print is not a part of normal process
                                              . so don't make it modify resolver cache*/
          ResolveResult RR = R.resolve(CC);
@@ -124,5 +126,6 @@ void InsertLoopTripCount::print(llvm::raw_ostream &OS, const llvm::Module *M) co
             }
          }
          OS<<"\n\n";
+#endif
       }
 }
