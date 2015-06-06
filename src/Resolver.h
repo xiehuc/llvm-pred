@@ -126,12 +126,12 @@ class lle::ResolveCache
    bool ask(QueryTy Q, llvm::Value*& V, unsigned& op);
    /** store key Q to later make an entry */
    void storeKey(QueryTy Q) {
-      if(this == NULL) return;
+      if(this == NULL || Q == NULL) return;
       StoredKey = Q;
    }
    /** store a value to make an entry with stored key before */
    void storeValue(llvm::Value* V, unsigned op) {
-      if(this == NULL) return;
+      if(this == NULL || V == NULL) return;
       Cache[StoredKey] = std::make_pair(llvm::WeakVH(V), op);
    }
    private:

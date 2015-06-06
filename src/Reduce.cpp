@@ -134,11 +134,15 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
    if(auto GEP = isGEP(U)){
       // if we didn't find direct visit on Pointed, we tring find visit on
       // GEP->getPointerOperand()
-      RE.addFilter(GEPFilter(GEP));
-      RE.useCache(NULL);
-      ToSearch = &GEP->getOperandUse(0);
-      ir.clear();
-      RE.resolve(ToSearch, RE.findVisit(Searched));
+      unsigned notused;
+      if(!RC2.ask(&U, Searched, notused)){
+         RE.addFilter(GEPFilter(GEP));
+         ToSearch = &GEP->getOperandUse(0);
+         ir.clear();
+         RE.resolve(ToSearch, RE.findVisit(Searched));
+         RC2.storeKey(&U);
+         RC2.storeValue(Searched, 0);
+      }
       if (Searched) {
          WHY_KEPT(U, Searched);
          return AttributeFlags::None;
