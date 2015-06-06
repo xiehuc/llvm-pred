@@ -156,8 +156,9 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
 AttributeFlags ReduceCode::getAttribute(CallInst * CI)
 {
    StringRef Name = castoff(CI->getCalledValue())->getName();
+   string NameRef;
    if(auto I = dyn_cast<IntrinsicInst>(CI))
-      Name = getName(I->getIntrinsicID());
+      Name = NameRef = getName(I->getIntrinsicID()); // nameref hold a real string
    auto Found = Attributes.find(Name);
    if(Found == Attributes.end()) return AttributeFlags::None;
    auto Ret = Found->second(CI);

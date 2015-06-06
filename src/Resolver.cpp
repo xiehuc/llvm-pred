@@ -90,13 +90,15 @@ struct find_visit
    find_visit(llvm::Value*& ret, ResolveCache* C = NULL):ret(ret), C(C) {}
    bool operator()(Use* U){
       User* Ur = U->getUser();
+      string NameRef;
+      StringRef Name;
       if (isa<LoadInst>(Ur))
          C->storeValue(ret = Ur, U->getOperandNo());
       else if (CallInst* CI = dyn_cast<CallInst>(Ur)) {
          // call inst also is a kind of visit
          StringRef Name = castoff(CI->getCalledValue())->getName();
          if (auto I = dyn_cast<IntrinsicInst>(CI))
-            Name = getName(I->getIntrinsicID());
+            Name = NameRef = getName(I->getIntrinsicID());
          if (!IgnoreFindCall.count(Name)) // some call should ignore
             C->storeValue(ret = CI, U->getOperandNo());
       }
