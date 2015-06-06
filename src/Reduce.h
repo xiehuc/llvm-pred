@@ -66,8 +66,9 @@ class lle::ReduceCode: public llvm::ModulePass
    AttributeFlags getAttribute(llvm::StoreInst*);
    void washFunction(llvm::Function* F);
    AttributeFlags noused_param(llvm::Argument*);
+   //@param GEP : GEP->get() is GetElementPtr
    llvm::Value* noused_global(llvm::GlobalVariable*, llvm::Instruction* pos,
-                              llvm::GetElementPtrInst* GEP,
+                              llvm::Use* GEP,
                               ResolveEngine::CallBack
                               = ResolveEngine::always_false);
    llvm::Value* noused(llvm::Use&);

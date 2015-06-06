@@ -32,27 +32,35 @@ namespace lle
    bool isArray(llvm::Value*);
    // if value is a constexpr refence global variable.
    // return true, and set @param 2 to global variable,
-   // if it is referenced by a gep inst, set @param 3 to this gep inst
-   bool isRefGlobal(llvm::Value* V, llvm::GlobalVariable** = nullptr, llvm::GetElementPtrInst** = nullptr);
-   template<class T>
-   T* isCEorI(llvm::Use& O)
+   // if it is referenced by a gep inst, set 
+   // @param GEP : GEP->get() is GetElementPtr
+   bool isRefGlobal(llvm::Value* V, llvm::GlobalVariable** = nullptr, llvm::Use** GEP = nullptr);
+   template<class F>
+   llvm::User* isCEorI(llvm::Use& O, F f)
    {
+      llvm::User* U = llvm::dyn_cast<llvm::User>(O.get());
       llvm::ConstantExpr* CExpr = llvm::dyn_cast<llvm::ConstantExpr>(O.get());
-      return llvm::dyn_cast<T>(CExpr ? CExpr->getAsInstruction() : O.get());
+      if(CExpr && f(CExpr->getOpcode())) return U;
+      llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(O.get());
+      if(I && f(I->getOpcode())) return U;
+      return NULL;
    }
-   template<class T>
-   T* isCEorI(llvm::User* I)
+   template<class F>
+   llvm::User* isCEorI(llvm::User* U, F f)
    {
-      llvm::ConstantExpr* CExpr = llvm::dyn_cast<llvm::ConstantExpr>(I);
-      return llvm::dyn_cast<T>(CExpr ? CExpr->getAsInstruction() : I);
+      llvm::ConstantExpr* CExpr = llvm::dyn_cast<llvm::ConstantExpr>(U);
+      if(CExpr && f(CExpr->getOpcode())) return U;
+      llvm::Instruction* I = llvm::dyn_cast<llvm::Instruction>(U);
+      if(I && f(I->getOpcode())) return U;
+      return NULL;
    }
-   // return if U.get() is GEPinst or GEP const expr
-   // return if I is GEPinst or GEP const expr
-#define isGEP isCEorI<llvm::GetElementPtrInst>
-#define isCast isCEorI<llvm::CastInst>
+#define isGEP(o) isCEorI(o, std::bind(std::equal_to<unsigned>(), std::placeholders::_1, Instruction::GetElementPtr))
+#define isCast_(o) isCEorI<bool(*)(unsigned)>(o, Instruction::isCast)
       
+#if 0
    // return if I is GEP or I's operand is GEP
    llvm::GetElementPtrInst* isRefGEP(llvm::Instruction* I);
+#endif
 
 	//remove cast instruction for a value
 	//because cast means the original value and the returned value is

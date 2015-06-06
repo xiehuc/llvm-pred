@@ -66,17 +66,17 @@ DataDepGraph ResolveEngine::resolve(QueryTy Q, CallBack C)
 {
    Use* R = NULL;
    DataDepGraph G;
-   if(Cache && Cache->ask(Q, R)){
-      for(auto& f : filters) f(R);
-      C(R);
-      return G;
-   }else
-      Cache->storeKey(Q);
    G.isDependency(implicity_rule == ::implicity_rule);
    iteration = 0;
-   if(Q.is<Use*>())
+   if(Q.is<Use*>()){
       G.addUnsolved(*Q.get<Use*>());
-   else
+      if (Cache && Cache->ask(Q, R)) { // only use cache in search Use*
+         for(auto& f : filters) f(R);
+         C(R);
+         return G;
+      }else
+         Cache->storeKey(Q);
+   }else
       implicity_rule(Q.get<Value*>(), G);
    G.setRoot(Q);
    do_solve(G, C);
@@ -209,7 +209,7 @@ static bool use_inverse_rule_(Use* U, DataDepGraph& G)
    // load %0
    for_each(bound, V->use_end(), [U, &G](Use& u) {
       auto GEP = isGEP(u.getUser());
-      if(GEP && GEP->getPointerOperand() == u.get())
+      if(GEP && GEP->getOperand(0) == u.get())
          G.addSolved(U,u);
    });
    return true;
@@ -244,7 +244,7 @@ static bool gep_rule_(Use* U, DataDepGraph& G)
    bool ret = false;
    while( (Tg = Tg->getNext()) ){
       auto GEP = isGEP(Tg->getUser());
-      if(GEP && GEP->getPointerOperand() == Tg->get() ){
+      if(GEP && GEP->getOperand(0) == Tg->get() ){
          // add all GEP to Unsolved
          G.addSolved(U, GEP->getOperandUse(0));
          ret = true;
@@ -309,14 +309,15 @@ const ResolveEngine::SolveRule ResolveEngine::icast_rule = icast_rule_;
 
 //===============================RESOLVE RULES END===============================//
 //=============================RESOLVE FILTERS BEGIN=============================//
-GEPFilter::GEPFilter(GetElementPtrInst* GEP)
+GEPFilter::GEPFilter(User* GEP)
 {
    if(GEP == NULL){
       idxs.clear();
       return;
    }
-   idxs.reserve(GEP->getNumIndices());
-   for(auto I=GEP->idx_begin(), E = GEP->idx_end(); I!=E; ++I){
+   assert(isGEP(GEP));
+   idxs.reserve(GEP->getNumOperands()-1);
+   for(auto I=GEP->op_begin()+1, E = GEP->op_end(); I!=E; ++I){
       ConstantInt* CI = dyn_cast<ConstantInt>(I->get());
       if(CI) idxs.push_back(CI->getZExtValue());
       else break;
@@ -497,14 +498,23 @@ bool iUseFilter::operator()(Use* U)
 
 bool ResolveCache::ask(QueryTy Q, Use*& R)
 {
+   Value* V;
+   unsigned op;
+   if (!ask(Q, V, op))
+      return false;
+   User* U = dyn_cast<User>(V);
+   if (U == NULL)
+      return false;
+   R = &U->getOperandUse(op);
+   return true;
+}
+
+bool ResolveCache::ask(QueryTy Q, Value*& V, unsigned& op)
+{
    const auto Found = Cache.find(Q);
    if(Found == Cache.end()) return false;
-   Value* V = Found->second.first;
-   User* U = V?dyn_cast<User>(V):NULL;
-   if(U == NULL){
-      Cache.erase(Found);
-      return false;
-   }
-   R = &U->getOperandUse(Found->second.second);
-   return true;
+   V = Found->second.first;
+   op = Found->second.second;
+   if(V == NULL) Cache.erase(Found);
+   return V!=NULL;
 }

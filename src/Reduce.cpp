@@ -118,7 +118,7 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
       WHY_KEPT(U, Searched);
       return AttributeFlags::None;
    }
-   if(auto CAST = isCast(U)){
+   if(auto CAST = isCast_(U)){
       ToSearch = &CAST->getOperandUse(0);
       ir.clear();
       RE.useCache(RC3);
@@ -135,7 +135,7 @@ static AttributeFlags noused_flat(llvm::Use& U, ResolveEngine::CallBack C = Reso
       // if we didn't find direct visit on Pointed, we tring find visit on
       // GEP->getPointerOperand()
       RE.addFilter(GEPFilter(GEP));
-      RE.useCache(RC2);
+      RE.useCache(NULL);
       ToSearch = &GEP->getOperandUse(0);
       ir.clear();
       RE.resolve(ToSearch, RE.findVisit(Searched));
@@ -181,7 +181,7 @@ AttributeFlags ReduceCode::noused_param(Argument* Arg)
          Argument* NestArg = dyn_cast<Argument>(Para->get());
          if(f && NestArg) f &= Self->noused_param(NestArg);
          GlobalVariable* GV = NULL;
-         GetElementPtrInst* GEP = NULL;
+         Use* GEP = NULL;
          if(f && isRefGlobal(Para->get(), &GV, &GEP))
             f &= FLAG(Self->noused_global(GV, CI, GEP, excluded(S)));
          return f;
@@ -213,23 +213,34 @@ static AttributeFlags noused_ret_rep(ReturnInst* RI)
       ReturnInst::Create(F->getContext(), UndefValue::get(Ret->getType()), RI->getParent());
    return all_deletable ? IsDeletable : AttributeFlags::None;
 }
-Value* ReduceCode::noused_global(GlobalVariable* GV, Instruction* pos, GetElementPtrInst* GEP, ResolveEngine::CallBack C)
+Value* ReduceCode::noused_global(GlobalVariable* GV, Instruction* pos, Use* GEP, ResolveEngine::CallBack C)
 {
    static ResolveEngine RE;
    static bool inited = false;
    static ResolveCache RC;
    if(!inited){
       RE.addRule(RE.ibase_rule);
-      RE.useCache(RC);
       inited = true;
    }
    RE.clearFilters();
    CGF->update(pos);
    RE.addFilter(*CGF);
-   if(GEP) RE.addFilter(GEPFilter(GEP));
-   RE.addFilter(C);
    Value* Visit;
+   unsigned op;
+   if(GEP){
+      RE.addFilter(GEPFilter(dyn_cast<User>(GEP->get())));
+      // we need the real address GEP(Inst or ConstantExpr) to lookup, 
+      // so it shouldn't use ConstantExpr::getAsInstruction's return
+      // because this address is not stable
+      if(RC.ask(GEP, Visit, op))
+         return Visit;
+   }
+   RE.addFilter(C);
    RE.resolve(GV, RE.findVisit(Visit));
+   if(GEP && Visit){
+      RC.storeKey(GEP);
+      RC.storeValue(Visit, 0);
+   }
    Dbg_PrintGraph(RE.resolve(GV), nullptr);
    return Visit;
 }
@@ -243,12 +254,12 @@ AttributeFlags ReduceCode::nousedOperator(Use& op, Instruction* pos, ConfigFlags
    auto GEP = isGEP(op);
 
    if(GEP){
-      Arg = dyn_cast<Argument>(GEP->getPointerOperand());
-      Alloca = dyn_cast<AllocaInst>(GEP->getPointerOperand());
+      Arg = dyn_cast<Argument>(GEP->getOperand(0));
+      Alloca = dyn_cast<AllocaInst>(GEP->getOperand(0));
       // 过于激进的删除
-      if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getPointerOperand())){
+      if(GlobalVariable* GV = dyn_cast<GlobalVariable>(GEP->getOperand(0))){
          if(GV->getName().endswith("Counters")) return AttributeFlags::None;
-         what = noused_global(GV, pos, GEP);
+         what = noused_global(GV, pos, GEP?&op:NULL);
          NOTICE(op, what);
          return FLAG(what);
       }

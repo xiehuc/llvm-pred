@@ -67,9 +67,8 @@ class lle::ResolveEngine
 
    // when use cache, you should always not trust resolve returned ddg
    // because when cache result, ddg return's empty
-   void useCache(ResolveCache& C){
-      Cache = &C;
-   }
+   void useCache(ResolveCache& C) { Cache = &C; }
+   void useCache(std::nullptr_t null) { Cache = NULL; }
 
    void setMaxIteration(size_t max) { max_iteration = max;}
    DataDepGraph resolve(QueryTy Q, CallBack C = always_false);
@@ -124,6 +123,7 @@ class lle::ResolveCache
    typedef ResolveEngine::QueryTy QueryTy;
    /** ask whether a Q has dependency R */
    bool ask(QueryTy Q, llvm::Use*& R);
+   bool ask(QueryTy Q, llvm::Value*& V, unsigned& op);
    /** store key Q to later make an entry */
    void storeKey(QueryTy Q) {
       if(this == NULL) return;
@@ -173,7 +173,8 @@ struct lle::GEPFilter
    // it would only store front constants to idxs.
    // @example getelementptr @gv, 0, 1, %2
    // idxs == {0,1}
-   GEPFilter(llvm::GetElementPtrInst*);
+   // @param : must be a GetElementPtr
+   GEPFilter(llvm::User*);
    GEPFilter(llvm::ArrayRef<uint64_t> idx):
       idxs(idx.begin(), idx.end()) {}
    GEPFilter(std::initializer_list<uint64_t> idx): idxs(idx) {}

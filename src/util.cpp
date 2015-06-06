@@ -330,21 +330,26 @@ bool lle::isArray(Value *V)
 
 }
 
-bool lle::isRefGlobal(Value* V, GlobalVariable** pGV, GetElementPtrInst** pGEP)
+bool lle::isRefGlobal(Value* V, GlobalVariable** pGV, Use** pGEP)
 {
-   GetElementPtrInst* gep = NULL;
+   Use* U = NULL;
+   User* UU;
    while(!isa<GlobalVariable>(V)){
-      if(auto LI = dyn_cast<LoadInst>(V)) V = LI->getPointerOperand();
-      else if(auto Cast = dyn_cast<CastInst>(V)) V = Cast->getOperand(0);
-      else if(auto CE = dyn_cast<ConstantExpr>(V)) V = CE->getAsInstruction();
-      else if(auto GEP = dyn_cast<GetElementPtrInst>(V)){
-         V = GEP->getPointerOperand();
-         gep = GEP;
-      }
+      unsigned opcode = 0;
+      UU = dyn_cast<User>(V);
+      if (Instruction* I = dyn_cast<Instruction>(V))
+         opcode = I->getOpcode();
+      else if (ConstantExpr* CE = dyn_cast<ConstantExpr>(V))
+         opcode = CE->getOpcode();
       else return false;
+      if(opcode == Instruction::Load || Instruction::isCast(opcode))
+         V = (U = &UU->getOperandUse(0))->get();
+      else if(opcode == Instruction::GetElementPtr){
+         if(pGEP) *pGEP = U;
+         V = (U = &UU->getOperandUse(0))->get();
+      } else return false;
    }
    if(pGV) *pGV = cast<GlobalVariable>(V);
-   if(pGEP) *pGEP = gep;
    return true;
 }
 
@@ -402,6 +407,7 @@ std::vector<BasicBlock*> lle::getPath(BasicBlock *From, BasicBlock *To)
    return Path;
 }
 
+#if 0
 GetElementPtrInst* lle::isRefGEP(Instruction* I)
 {
    GetElementPtrInst* GEPI = dyn_cast<GetElementPtrInst>(I);
@@ -412,3 +418,4 @@ GetElementPtrInst* lle::isRefGEP(Instruction* I)
    }
    return NULL;
 }
+#endif
