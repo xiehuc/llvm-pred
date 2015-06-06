@@ -528,12 +528,14 @@ static AttributeFlags mpi_delay_delete(CallInst* CI, MPIStatistics* stat)
   if(stat->count() > 0) return AttributeFlags::None;
   else return AttributeFlags::IsDeletable;
 }
+template <unsigned send = 0, unsigned recv = 1, unsigned count = 2,
+          unsigned type = 3>
 static AttributeFlags replace_with_memcpy(CallInst* CI)
 {
-   Value* Send  = CI->getArgOperand(0);
-   Value* Recv  = CI->getArgOperand(1);
-   Value* Count = CI->getArgOperand(2);
-   Value* Type  = CI->getArgOperand(3);
+   Value* Send  = CI->getArgOperand(send);
+   Value* Recv  = CI->getArgOperand(recv);
+   Value* Count = CI->getArgOperand(count);
+   Value* Type  = CI->getArgOperand(type);
    auto GV = dyn_cast<GlobalVariable>(Type);
    auto GVI = dyn_cast_or_null<ConstantInt>(GV?GV->getInitializer():NULL);
    uint64_t TyIdx = GVI?GVI->getZExtValue():7; // DT[7] == 4, default is int
@@ -604,7 +606,7 @@ ReduceCode::ReduceCode()
       Attributes["mpi_comm_dup_"] = DirectDelete;//bt
       // since alltoall need communite all threads, but we don't know the
       // content, so we could only copy send to recv
-      Attributes["mpi_alltoall_"] = replace_with_memcpy; //ft
+      Attributes["mpi_alltoall_"] = replace_with_memcpy<0,3,4,5>; //ft
    }else{
       Attributes["mpi_reduce_"] = mpi_nouse_recvbuf;
       Attributes["mpi_allreduce_"] = mpi_nouse_recvbuf;
