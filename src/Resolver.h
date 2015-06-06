@@ -120,7 +120,7 @@ class lle::ResolveEngine
 class lle::ResolveCache
 {
    public:
-   typedef ResolveEngine::QueryTy QueryTy;
+   typedef llvm::Use* QueryTy;
    /** ask whether a Q has dependency R */
    bool ask(QueryTy Q, llvm::Use*& R);
    bool ask(QueryTy Q, llvm::Value*& V, unsigned& op);

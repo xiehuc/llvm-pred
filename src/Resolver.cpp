@@ -68,14 +68,14 @@ DataDepGraph ResolveEngine::resolve(QueryTy Q, CallBack C)
    DataDepGraph G;
    G.isDependency(implicity_rule == ::implicity_rule);
    iteration = 0;
-   if(Q.is<Use*>()){
-      G.addUnsolved(*Q.get<Use*>());
-      if (Cache && Cache->ask(Q, R)) { // only use cache in search Use*
+   if(Use* U = Q.dyn_cast<Use*>()){
+      G.addUnsolved(*U);
+      if (Cache && Cache->ask(U, R)) { // only use cache in search Use*
          for(auto& f : filters) f(R);
          C(R);
          return G;
       }else
-         Cache->storeKey(Q);
+         Cache->storeKey(U);
    }else
       implicity_rule(Q.get<Value*>(), G);
    G.setRoot(Q);
