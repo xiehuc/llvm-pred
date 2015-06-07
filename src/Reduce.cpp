@@ -599,10 +599,10 @@ ReduceCode::ReduceCode()
 //int MPI_Reduce(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype,
 //               MPI_Op op, int root, MPI_Comm comm)
 //Deletable if recvbuf is no used
-      Attributes["mpi_reduce_"] = replace_with_memcpy;
+      Attributes["mpi_reduce_"] = replace_with_memcpy<0,1,2,3>;
 //int MPI_Allreduce(const void *sendbuf, void *recvbuf, int count,
 //                  MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
-      Attributes["mpi_allreduce_"] = replace_with_memcpy;
+      Attributes["mpi_allreduce_"] = replace_with_memcpy<0,1,2,3>;
 //int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, 
 //               MPI_Comm comm )
       Attributes["mpi_bcast_"] = DirectDelete;
