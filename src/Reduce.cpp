@@ -29,12 +29,16 @@ static int dt_init() {
 static int _DT_INIT = dt_init();
 
 // a deeper notice removed object
+#define WHAT_RMD(what) {}
+#if 0
 #define WHAT_RMD(what)                                                         \
    DEBUG({                                                                     \
       errs() << *(what).getUser() << " removed in line ";                      \
       errs() << __LINE__ << ":\n";                                             \
       errs() << " -->" << *(what).get() << "\n";                               \
    })
+#endif
+#define REAL_RMD(what) DEBUG({ errs() << *(what) << " real removed \n"; })
 #ifdef ANNOY_DEBUG
 #define WHY_KEPT(what, searched)                                               \
    DEBUG({                                                                     \
@@ -336,6 +340,7 @@ bool ReduceCode::runOnFunction(Function& F)
 #endif
          }
          if(flag & IsDeletable){
+            REAL_RMD(Inst);
             (flag & Cascade)? dse.DeleteCascadeInstruction(Inst): 
                dse.DeleteDeadInstruction(Inst);
             Ret = MadeChange = true;
