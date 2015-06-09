@@ -46,12 +46,20 @@ class lle::MPIStatistics
   }
 };
 
+struct FuncNameCompare
+{
+   bool operator()(const llvm::Function* L, const llvm::Function* R) const
+   {
+      return L->getName() < R->getName();
+   }
+};
+
 class lle::ReduceCode: public llvm::ModulePass
 {
    typedef std::function<AttributeFlags(llvm::CallInst*)> Attribute_;
    std::unordered_map<std::string, Attribute_> Attributes;
    llvm::SmallSet<llvm::StoreInst*, 4> Protected;
-   llvm::DenseMap<llvm::Function*, bool> DirtyFunc;
+   std::map<llvm::Function*, bool, FuncNameCompare> DirtyFunc;
    IgnoreList* ignore;
    MPIStatistics mpi_stats;
 

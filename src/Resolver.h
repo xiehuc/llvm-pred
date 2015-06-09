@@ -131,8 +131,9 @@ class lle::ResolveCache
    }
    /** store a value to make an entry with stored key before */
    void storeValue(llvm::Value* V, unsigned op) {
-      if(this == NULL || V == NULL) return;
+      if(this == NULL || V == NULL || StoredKey == NULL) return;
       Cache[StoredKey] = std::make_pair(llvm::WeakVH(V), op);
+      StoredKey = NULL;
    }
    private:
    // a WeakVH is smart, when value delete, it auto set itself to NULL
