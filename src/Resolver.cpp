@@ -155,6 +155,12 @@ ResolveEngine::CallBack ResolveEngine::findRef(Value *&V)
    };
 }
 
+void ResolveEngine::useCache(ResolveCache& C) {
+#ifdef USE_CACHE
+  Cache = &C;
+#endif
+}
+
 //===========================RESOLVE RULES======================================//
 static bool useonly_rule_(Use* U, DataDepGraph& G)
 {

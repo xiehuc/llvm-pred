@@ -67,7 +67,7 @@ class lle::ResolveEngine
 
    // when use cache, you should always not trust resolve returned ddg
    // because when cache result, ddg return's empty
-   void useCache(ResolveCache& C) { Cache = &C; }
+   void useCache(ResolveCache& C);
    void useCache(std::nullptr_t null) { Cache = NULL; }
 
    void setMaxIteration(size_t max) { max_iteration = max;}
