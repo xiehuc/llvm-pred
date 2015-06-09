@@ -511,6 +511,12 @@ bool ResolveCache::ask(QueryTy Q, Use*& R)
    User* U = dyn_cast<User>(V);
    if (U == NULL)
       return false;
+   if(isa<UndefValue>(U->getOperand(op))){
+     // the special case a -> call(undef) 
+     // which value exists, op exists but it is undef
+     Cache.erase(Q);
+     return false;
+   }
    R = &U->getOperandUse(op);
    return true;
 }
