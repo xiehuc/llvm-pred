@@ -59,14 +59,21 @@ namespace lle
       // use this before getTripCount, to make a stable Loop Index Order
       void updateCache(llvm::LoopInfo& LI);
       llvm::Loop* getLoopFor(llvm::BasicBlock* BB) const;
-      llvm::Value* getTripCount(llvm::Loop* L) const {
+      const AnalysisedLoop* get(llvm::Loop* L) const {
          auto ite = LoopMap.find(L);
-         return ite==LoopMap.end()?NULL:CycleMap[ite->second].TripCount;
+         if (ite != LoopMap.end()) {
+            auto AL = &CycleMap[ite->second];
+            return (AL->Start) ? AL : NULL;
+         }
+         return NULL;
       }
-      ///////
+      llvm::Value* getTripCount(llvm::Loop* L) const {
+         const AnalysisedLoop* AL = get(L);
+         return AL ? AL->TripCount : NULL;
+      }
       llvm::Value* getInduction(llvm::Loop* L) const {
-         auto ite = LoopMap.find(L);
-         return (ite==LoopMap.end())?NULL:CycleMap[ite->second].Ind;
+         const AnalysisedLoop* AL = get(L);
+         return AL ? AL->Ind : NULL;
       }
       // a helper function which convenient.
       llvm::Value* getOrInsertTripCount(llvm::Loop* l);

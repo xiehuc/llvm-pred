@@ -31,6 +31,8 @@ using namespace llvm;
 char LoopTripCount::ID = 0;
 
 static RegisterPass<LoopTripCount> X("Loop-Trip-Count","Generate and insert loop trip count pass", false, false);
+static unsigned LoopCount;
+static unsigned UnfoundCount;
 
 //find start value fron induction variable
 static Value* tryFindStart(PHINode* IND,Loop* L,BasicBlock*& StartBB)
@@ -237,7 +239,7 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 		Assert(next->getOpcode() == Instruction::Add , "why induction increment is not Add");
 		Assert(next->getOperand(0) == ind ,"why induction increment is not add it self");
 		step = dyn_cast<ConstantInt>(next->getOperand(1));
-		Assert(step,"");
+      AssertThrow(step, not_found(dbg() << "step is not a constant:\n\t" << *next->getOperand(1)))
 	}while(next_phi && ++next_phi_idx<next_phi->getNumIncomingValues());
 
 	if(addfirst) OneStep -= 1;
@@ -339,12 +341,14 @@ bool LoopTripCount::runOnFunction(Function &F)
    LoopMap.clear();
    CycleMap.clear();
    unfound_str = "";
+   LoopCount = UnfoundCount = 0;
 
    for(Loop* TopL : *LI){
       for(auto LIte = df_begin(TopL), E = df_end(TopL); LIte!=E; ++LIte){
          Loop* L = *LIte;
          Value* TC = NULL;
          AnalysisedLoop AL = {0};
+         ++LoopCount;
          try{
             AL = analysis(L);
             /**trying to find inserted loop trip count in preheader */
@@ -358,6 +362,7 @@ bool LoopTripCount::runOnFunction(Function &F)
             }
             AL.TripCount = TC;
          }catch(NotFound& E){
+            ++UnfoundCount;
             unfound<<"  "<<E.get_line()<<":  "<<E.what()<<"\n";
             unfound<<"\t"<<*L<<"\n";
          }
@@ -376,12 +381,16 @@ void LoopTripCount::print(llvm::raw_ostream& OS,const llvm::Module*) const
    for(Loop* TopL : *LI){
       for(auto LIte = df_begin(TopL), E = df_end(TopL); LIte != E; ++LIte){
          Loop* L = *LIte;
-         Value* TripCount = getTripCount(L);
-         if(TripCount == NULL) continue;
+         const AnalysisedLoop* AL = get(L);
+         if(AL == NULL) continue;
          OS<<"In Loop:"<<*L<<"\n";
-         OS<<"Cycle:"<<*TripCount<<"\n";
+         OS<<"Start:"<<*AL->Start<<"\n";
+         OS<<"Step:"<<*AL->Step<<"\n";
+         OS<<"End:"<<*AL->End<<"\n";
       }
    }
+   errs() << "there are " << LoopCount << " loops " << UnfoundCount
+          << " unfound\n";
    errs()<<unfound_str;
 }
 
