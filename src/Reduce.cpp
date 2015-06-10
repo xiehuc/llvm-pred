@@ -66,9 +66,9 @@ using namespace std;
 using namespace lle;
 using namespace llvm;
 
-static const std::set<StringRef> MpiDelayDelete = {
-  "mpi_init_", "mpi_finalize_", "mpi_comm_rank_", "mpi_comm_size_"
-};
+static const std::set<StringRef> MpiDelayDelete
+    = { "mpi_init_", "mpi_finalize_", "mpi_comm_rank_", "mpi_comm_size_",
+        "mpi_barrier_" };
 
 char ReduceCode::ID = 0;
 static RegisterPass<ReduceCode> Y("Reduce", "Slash and Shrink Code to make a minicore program");
