@@ -100,6 +100,8 @@ void InsertLoopTripCount::print(llvm::raw_ostream &OS, const llvm::Module *M) co
       for(auto L = df_begin(Top), E = df_end(Top); L!=E; ++L){
          Value* CC = LTC->getTripCount(*L);
          if(!CC) continue;
+         OS<<**L;
+         OS<<"Cycles:"<<*CC<<"\n\n";
 
 #if 0
          lle::Resolver<UseOnlyResolve> R; /* print is not a part of normal process
@@ -128,4 +130,5 @@ void InsertLoopTripCount::print(llvm::raw_ostream &OS, const llvm::Module *M) co
          OS<<"\n\n";
 #endif
       }
+   OS<<"\n\n";
 }

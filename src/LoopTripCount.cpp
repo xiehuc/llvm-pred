@@ -239,7 +239,7 @@ LoopTripCount::AnalysisedLoop LoopTripCount::analysis(Loop* L)
 		Assert(next->getOpcode() == Instruction::Add , "why induction increment is not Add");
 		Assert(next->getOperand(0) == ind ,"why induction increment is not add it self");
 		step = dyn_cast<ConstantInt>(next->getOperand(1));
-      AssertThrow(step, not_found(dbg() << "step is not a constant:\n\t" << *next->getOperand(1)))
+      AssertThrow(step, not_found(dbg() << "step is not a constant: " << *next->getOperand(1)))
 	}while(next_phi && ++next_phi_idx<next_phi->getNumIncomingValues());
 
 	if(addfirst) OneStep -= 1;
@@ -389,9 +389,9 @@ void LoopTripCount::print(llvm::raw_ostream& OS,const llvm::Module*) const
          OS<<"End:"<<*AL->End<<"\n";
       }
    }
-   errs() << "there are " << LoopCount << " loops " << UnfoundCount
+   OS << "there are " << LoopCount << " loops " << UnfoundCount
           << " unfound\n";
-   errs()<<unfound_str;
+   OS<<unfound_str;
 }
 
 Loop* LoopTripCount::getLoopFor(BasicBlock *BB) const
