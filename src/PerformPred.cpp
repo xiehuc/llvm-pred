@@ -18,9 +18,13 @@ namespace lle {
 
 class lle::PerformPred : public llvm::FunctionPass
 {
+   struct ViewPortElem{
+      llvm::BasicBlock* first;
+      llvm::Value* second;
+      llvm::Value* third;
+   };
    llvm::DenseMap<llvm::Instruction*, llvm::Value*> Promoted;
-   llvm::DenseMap<llvm::Loop*, std::pair<llvm::BasicBlock*, llvm::Value*> > ViewPort; // Header -> (E_P, B_P,N)
-   llvm::BranchProbabilityInfo* BPI;
+   llvm::DenseMap<llvm::Loop*, ViewPortElem> ViewPort; // Header -> (E_P, B_P,N, TC)
    llvm::BlockFrequencyInfo* BFI;
    llvm::LoopInfo* LI;
    LoopTripCount* LTC;
@@ -286,7 +290,12 @@ bool PerformPred::runOnFunction(Function &F)
          Value* B_PN = NULL;
          // if we can find trip count, we promote view point, or we just select
          // entry as view point
-         BasicBlock* E_V = TC ? promote(dyn_cast<Instruction>(TC), L) : Entry;
+#ifdef USE_PROMOTE
+         BasicBlock* E_V = TC ? promote(dyn_cast<Instruction>(TC), L)
+                              : (PL ? ViewPort[PL].first : Entry);
+#else
+         BasicBlock* E_V = L->getLoopPreheader();
+#endif
          Builder.SetInsertPoint(E_V->getTerminator());
          if (TC == NULL) {
             // freq(H) / in_freq would get trip count as llvm's freq
@@ -310,19 +319,20 @@ bool PerformPred::runOnFunction(Function &F)
             }else{
                B_PN = one(*BB);
                Loop* IL;
+               ViewPort[L].third = TC;
                for (IL = L, PL = L->getParentLoop();
                     PL != NULL && !PL->contains(E_V);
                     IL = PL, PL = PL->getParentLoop()) { // caculate all nest
                                                          // parent view point
-                  B_PN = Builder.CreateMul(B_PN, LTC->getOrInsertTripCount(IL));
+                  B_PN = Builder.CreateMul(B_PN, ViewPort[IL].third);
                   B_PN = CreateMul(Builder, B_PN,
                                    getPathProb(PL->getHeader(), in_freq(IL)));
                }
-               B_PN = Builder.CreateMul(B_PN, LTC->getOrInsertTripCount(IL));
+               B_PN = Builder.CreateMul(B_PN, ViewPort[IL].third);
                B_PN = CreateMul(Builder, B_PN, getPathProb(E_V, in_freq(IL)));
             }
          }
-         ViewPort[L] = std::make_pair(E_V, B_PN);
+         ViewPort[L] = ViewPortElem{E_V, B_PN, TC};
       }
    }
 

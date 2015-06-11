@@ -21,6 +21,7 @@ option(UNIT_TEST "Enable Build Unit Test" Off)
 option(TC_USE_SCEV "LoopTripcount use SCEV" Off)
 option(DELETE_STORE "Delete the Store instructions" Off)
 option(USE_CACHE "Use Cache to Speedup Cacluate" Off)
+option(USE_PROMOTE "Use Promote Algorithm to promote view port" On)
 
 
 find_package(PkgConfig)

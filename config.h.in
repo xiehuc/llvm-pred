@@ -11,6 +11,7 @@
 #cmakedefine TC_USE_SCEV
 #cmakedefine DELETE_STORE
 #cmakedefine USE_CACHE
+#cmakedefine USE_PROMOTE
 // DDGraph::expr() print ref number. to simplify presentation
 #define EXPR_ENABLE_REF 
 // a special symbol for self reference
