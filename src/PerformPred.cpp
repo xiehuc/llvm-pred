@@ -25,6 +25,7 @@ class lle::PerformPred : public llvm::FunctionPass
    };
    llvm::DenseMap<llvm::Instruction*, llvm::Value*> Promoted;
    llvm::DenseMap<llvm::Loop*, ViewPortElem> ViewPort; // Header -> (E_P, B_P,N, TC)
+   llvm::BranchProbabilityInfo* BPI;
    llvm::BlockFrequencyInfo* BFI;
    llvm::LoopInfo* LI;
    LoopTripCount* LTC;
@@ -184,7 +185,9 @@ BasicBlock* PerformPred::promote(Instruction* LoopTC, Loop* L)
    SmallVector<BasicBlock*, 4> depends;
    SmallVector<Instruction*, 4> targets;
 
-   if(LoopTC) targets.push_back(LoopTC);
+   if (!LoopTC)
+      return &L->getHeader()->getParent()->getEntryBlock();
+   targets.push_back(LoopTC);
    unsigned Idx = 0;
    while(Idx != targets.size()){
       Instruction* I = targets[Idx];
@@ -202,10 +205,9 @@ BasicBlock* PerformPred::promote(Instruction* LoopTC, Loop* L)
    Loop* PL = L->getParentLoop();
    if(PL) depends.push_back(ViewPort[PL].first);
    
-
    BasicBlock* InsertInto, *dep;
    if(depends.empty())
-      return &L->getHeader()->getParent()->getEntryBlock();
+      return LoopTC->getParent();// couldn't promote
 
    InsertInto = depends.front();
    if(depends.size()>1){
