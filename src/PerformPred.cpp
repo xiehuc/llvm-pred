@@ -185,9 +185,7 @@ BasicBlock* PerformPred::promote(Instruction* LoopTC, Loop* L)
    SmallVector<BasicBlock*, 4> depends;
    SmallVector<Instruction*, 4> targets;
 
-   if (!LoopTC)
-      return &L->getHeader()->getParent()->getEntryBlock();
-   targets.push_back(LoopTC);
+   if(LoopTC) targets.push_back(LoopTC); // should also consider PL
    unsigned Idx = 0;
    while(Idx != targets.size()){
       Instruction* I = targets[Idx];
@@ -207,7 +205,10 @@ BasicBlock* PerformPred::promote(Instruction* LoopTC, Loop* L)
    
    BasicBlock* InsertInto, *dep;
    if(depends.empty())
-      return LoopTC->getParent();// couldn't promote
+      // couldn't promote, if LoopTC is inst, we keep it, or we put it in entry
+      // block
+      return LoopTC ? LoopTC->getParent()
+                    : &L->getHeader()->getParent()->getEntryBlock();
 
    InsertInto = depends.front();
    if(depends.size()>1){
