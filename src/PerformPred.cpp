@@ -180,6 +180,21 @@ BasicBlock* PerformPred::findCriticalBlock(BasicBlock *From, BasicBlock *To)
    return Last;
 }
 
+/** promote loop trip count instruction
+ * @case 1:
+ *    LoopTC is Constant, L has ParentLoop
+ * @result : we should consider PL's ViewPort
+ *
+ * @case 2:
+ *    LoopTC is Instruction, L hasn't ParentLoop
+ *    LoopTC's depends is not Instruction
+ * @example:
+ *    %4 = sub i32 %argc, 1
+ *    %.lr.ph47.tc = sub i32 %4, 1
+ *    %argc is Argument
+ * @result
+ *    we shouldn't consider depends, directly promote to Entry Block
+ */
 BasicBlock* PerformPred::promote(Instruction* LoopTC, Loop* L)
 {
    SmallVector<BasicBlock*, 4> depends;
@@ -202,17 +217,14 @@ BasicBlock* PerformPred::promote(Instruction* LoopTC, Loop* L)
    }
    Loop* PL = L->getParentLoop();
    if(PL) depends.push_back(ViewPort[PL].first);
-   
+
    BasicBlock* InsertInto, *dep;
    if(depends.empty())
-      // couldn't promote, if LoopTC is inst, we keep it, or we put it in entry
-      // block
-      return LoopTC ? LoopTC->getParent()
-                    : &L->getHeader()->getParent()->getEntryBlock();
-
-   InsertInto = depends.front();
+      InsertInto = &L->getHeader()->getParent()->getEntryBlock();
+   else
+      InsertInto = depends.front();
    if(depends.size()>1){
-      /* let C is insert point, 
+      /* let C is insert point,
        * dep1 dom C, dep2 dom C => dep1 dom dep2 or dep2 dom dep1 */
       for(auto Ite = depends.begin()+1, E = depends.end(); Ite != E; ++Ite){
          dep = *Ite;
